@@ -1,0 +1,25 @@
+// The world manifest: one entry per world, in play order. Copy for the era cards comes from design/WORLDS.md.
+// levels: ids of files in game/levels/<id>.js. A missing file shows COMING SOON in the menu (no need to edit this when a level lands).
+// tim / gregg: each host's one short line on the era card (24 chars a row, 2 rows, '|' breaks the row).
+// boss: the world's boss name (shown on the era card and as the n-boss row). bg/band/fg/accent: era card colours.
+(function () {
+  const W = (n, short, title, seasons, tag, boss, bg, band, fg, accent, dots, extra) => ({
+    n, short, title, seasons, tag, boss, bg, band, fg, accent, dots,
+    tim: (extra && extra.tim) || '', gregg: (extra && extra.gregg) || '',   // the one-line quips on the era card ('|' breaks the line)
+    levels: [{ id: n + '-1', name: (extra && extra.first) || '' }, ...((extra && extra.more) || []), { id: n + '-boss', name: boss, boss: true }],   // more: the world's middle stages [{id, name}]
+  });
+  window.WORLDS = [
+    W(1, 'DOT CITY', 'DOT CITY', 'THE CARTOON', 'FIND THE MAYOR. CUT THE RIBBON.', 'POINTY NIGHTMARES', '#3a8ed8', '#3ca752', '#ffffff', '#e52328', ['sam', 'cloud'], { more: [{ id: '1-2', name: 'HAS ANYONE SEEN MAYOR RON?' }, { id: '1-3', name: 'INTRODUCING THE DOOTLE DOTS' }], tim: 'A NEW AMATO PRODUCTION.', gregg: 'HEY GUYS. GOOD TO|BE HERE.' }),
+    W(2, 'RED SEATS', 'THE RED SEATS', 'SEASONS 1-4', 'WELCOME TO MY PROGRAM.', 'DR. SAN', '#3a0e1c', '#6a1a26', '#ffe9c0', '#e8c060', ['sam', 'mel'], { first: 'PILOT', more: [{ id: '2-2', name: 'THE TAPE ROOM' }, { id: '2-3', name: '500 MOVIES IN 500 DAYS' }], tim: 'HI EVERYBODY. MY NAME|IS TIM HEIDECKER.', gregg: 'HEY GUYS. ALWAYS A|PLEASURE.' }),
+    W(3, 'DECKER', 'DECKER', 'SEASONS 5-6 + DECKER 1-3', 'STARRING TIM HEIDECKER AS DECKER', 'ABDUL', '#5a4a40', '#8a7a6a', '#e8e8f0', '#f0c030', ['baxter', 'sam'], { more: [{ id: '3-2', name: 'EYES IN THE SKY' }, { id: '3-3', name: "DON'T TOUCH MY CARD" }], tim: 'I NEED EYES IN THE SKY.', gregg: 'ALL RIGHT. WHAT SHOULD|I DO NEXT?' }),
+    W(4, 'VFA/DEKKAR', 'VFA & DEKKAR', 'SEASONS 7-8', 'LUCKY SEASON SEVEN.', 'DEKKAR TIM', '#1a0c0c', '#46211e', '#f4e0d0', '#e8302a', ['cloud', 'mel'], { more: [{ id: '4-2', name: 'LUCKY SEVEN' }, { id: '4-3', name: 'KEEP IT DOWN' }], tim: 'THIS IS CALLED|EMPTY BOTTLE.', gregg: 'THOUSANDS OF MOVIES,|USING THE CODING SYSTEM.' }),
+    W(5, 'SIX BAGS', 'SIX BAGS', 'SEASON 9', "IT'S SIX BAGS CINEMA TIME.", 'SIX BAGS TIM', '#0e0c0b', '#2a2420', '#f8e8c8', '#e8a040', ['mel', 'baxter'], { more: [{ id: '5-2', name: 'NO OUTSIDE FOOD' }, { id: '5-3', name: 'ROAD TO HOLLYWOOD' }], tim: 'PUT IT ON THE TABLE.|NOT THAT HARD.', gregg: "I HATE THESE SEATS.|IT'S NOT POPCORN." }),
+    W(6, 'THE TRIAL', 'THE TRIAL', '2017', 'MAY I APPROACH?', 'LAWYER TIM', '#6a4a2a', '#b08050', '#f4ecda', '#6a8aaa', ['sam', 'baxter'], { more: [{ id: '6-2', name: 'ANSWER THE QUESTION' }, { id: '6-3', name: 'APPROACH THE BENCH' }], tim: "I FIRED MY LAWYER.|I'LL DO IT MYSELF.", gregg: "HEY GUYS.|I'M ON THE STAND." }),
+    W(7, 'OCX', 'OCX', 'SEASON 10', 'IMAGINE BEING GERM FREE.', 'OCX TIM', '#06080c', '#102030', '#ffffff', '#30d8f0', ['cloud', 'sam'], { more: [{ id: '7-2', name: 'MARKIVES' }, { id: '7-3', name: 'PACKS OF EIGHT' }], tim: 'GET YOUR VR|HEADSETS ON.', gregg: 'THE BERET IS|NOT A HAT.' }),
+    W(8, 'HEI NETWORK', 'HEI NETWORK', 'SEASONS 11-12 + OSCARS 7-9', "ON CINEMA'S BACK. WE GOT THE MONEY.", 'JOKER GREGG', '#8a2a44', '#2a5ac8', '#fff2e0', '#f0c040', ['mel', 'cloud'], { more: [{ id: '8-2', name: 'BREAK GROUND' }, { id: '8-3', name: 'THE CLONE WAR' }], tim: 'MOVIES, MONEY,|SO MUCH MORE.', gregg: 'THIS SHOULD BE|ABOUT MOVIES.' }),
+    W(9, 'AMATO ERA', 'THE AMATO ERA', 'SEASONS 13-14 + OSCARS 10-11', 'GOOD MORNING, EVERYBODY.', 'T. AMATO', '#e8dce8', '#d8b048', '#2a2440', '#f08030', ['baxter', 'cloud'], { more: [{ id: '9-2', name: 'TAPE CARPET' }, { id: '9-3', name: 'THE POWER OF REWARDS' }], tim: "I'M HAPPY, I'M|HEALTHY, I'M HEI.", gregg: 'FIVE BAGS AND|A HAPPY MEAL.' }),
+    W(10, 'MOVIE HOUSE', 'MOVIE HOUSE', 'SEASON 15 + OSCAR 12', 'IF A HOUSE COULD BE A MOVIE.', 'THE RAT KING', '#142418', '#2e4a30', '#d8f0d0', '#7ab860', ['mel', 'sam'], { more: [{ id: '10-2', name: 'RUNTIME RELAY' }, { id: '10-3', name: 'THE MUSEUM OF MOVIE HOUSES' }], tim: 'THE RATS HAVE TO GO.|ORKIN IS COMING.', gregg: 'HEY GUYS. WELCOME TO|MOVIE HOUSE.' }),
+    W(11, 'ESA/MANOR', 'ESA TO THE MANOR', 'SEASON 16', 'MY ROOM, MY RULES.', 'WARP-10 NEW', '#c8603a', '#2a8a8a', '#fff0d8', '#30c0b0', ['cloud', 'baxter'], { more: [{ id: '11-2', name: 'ARTS AND CRAFTS NIGHT' }, { id: '11-3', name: 'FOUR EPISODES, ONE MOVIE' }], tim: "I'M TAKING WARP 10.|MY ORGANS WERE 85.", gregg: "HEY GUYS. IT'S|MOVIE TIME." }),
+    W(12, 'LAST OSCAR', 'THE LAST OSCAR SPECIAL', 'THE FINALE', 'THE LAST OSCAR SPECIAL.', 'MICHAEL GREGG', '#7ac0ee', '#f4f4fa', '#2a3a6a', '#e8602a', ['sam', 'mel', 'cloud', 'baxter'], { more: [{ id: '12-2', name: 'THE MICHAEL PHENOMENON' }, { id: '12-3', name: 'OSCAR FEVER' }], tim: 'ALL RIGHT, WELL, WELCOME|TO THE SPECIAL.', gregg: 'WELL, THE WITCH|STOOD UP.' }),
+  ];
+})();
