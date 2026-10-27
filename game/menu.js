@@ -309,10 +309,15 @@
   function playLevel(id, all) {
     pvStop();   // the poster's footage hands the engine back first
     prepSongs(WORLDS.find(w => idsOf(w).includes(id)));
-    DD.start(LEVELS[id], { dots: all || ALL ? null : cast(), joins: all || ALL ? null : joinsOn(id),
+    DD.start(LEVELS[id], { dots: all || ALL ? null : cast(), joins: all || ALL ? null : joinsOn(id), perks: perks(), store: !!window.DDStore,   // the HEI store's upgrades, and X on the results card stops there
       onSave: r => { record(r); if (!(all || ALL)) { DD.opts.dots = cast(); DD.opts.joins = joinsOn(id); } },   // AGAIN on the results card: save the win, and the replay has whoever just joined
-      onExit: r => { record(r); afterStage(id, r, all); } });
+      onExit: r => { record(r); if (r.store) return openStore(() => afterStage(id, r, all), 'PLAY ON'); afterStage(id, r, all); } });
   }
+  // ---- the HEI Points store (store.js): from the world select, the stage list, or a results card on the way to the next stage
+  const perks = () => window.DDStore ? window.DDStore.perks() : null;
+  let storeBack = null;
+  function openStore(back, label) { pvStop(); storeBack = back || null; st = 'store'; t = 0; SFX.switch(); if (window.DDStore) window.DDStore.open({ label: label || 'BACK' }); DD.setScene(scene); }
+  function closeStore() { SFX.switch(); const f = storeBack; storeBack = null; if (f) f(); else { st = 'select'; t = 0; } }
   // a won stage plays straight on into the next one; a boss win goes on through the next world's era card; a quit (or a next
   // stage that isn't there yet) lands on this world's stage list with the cursor on the stage just played
   let eraPlay = false, eraAll = false;
@@ -338,7 +343,7 @@
   const ROTL = () => ((window.CUES && window.CUES.rotation) || []).filter(n => !(window.DDMusic && window.DDMusic.missing(n)));   // songs fetch when highlighted (game/music.js)
   const songTitle = n => ((window.CUES && window.CUES.titles) || {})[n] || n.toUpperCase().replace(/-/g, ' ');
   let ocur = 0, jcur = 1, clearArm = 0;
-  const CLR = 9;   // the CLEAR DATA row
+  const CLR = 10;   // the CLEAR DATA row
   const VOLS = [['music', 'MUSIC'], ['sfx', 'SOUND EFFECTS'], ['voice', 'VOICES']];   // rows 0-2: volume sliders (left / right, or click the bar)
   const OPTS = () => {
     const m = MUS(), sh = m && m.prefs && m.prefs.shuffle;
@@ -346,16 +351,18 @@
     return [...VOLS.map(([k, n]) => [n, 'LEFT / RIGHT TO SET THE VOLUME', k, V ? V.level(k) : 10]), ['JUKEBOX', 'CHOOSE WHICH SONGS PLAY'], ['SHUFFLE: ' + (sh ? 'ON' : 'OFF'), sh ? 'SONGS COME UP IN ANY ORDER' : 'SONGS COME UP IN ORDER'],
       ['UNLOCK ALL LEVELS: ' + (ALL ? 'ON' : 'OFF'), ALL ? 'EVERY WORLD AND STAGE IS OPEN' : 'WORLDS OPEN ONE BOSS AT A TIME'],
       ['UNLOCK ALL DOTS: ' + (ALLD ? 'ON' : 'OFF'), ALLD ? 'ALL FOUR DOTS FROM THE FIRST STAGE' : 'THE DOTS JOIN ONE STAGE AT A TIME'],
+      ['UNLIMITED HEI POINTS: ' + (unl() ? 'ON' : 'OFF'), unl() ? 'EVERY UPGRADE IN THE HEI STORE IS FREE' : 'EARN HEI POINTS BY BEATING STAGES'],
       ['SAVE DATA', 'DOWNLOAD YOUR SAVE AS A FILE'], ['LOAD DATA', 'OPEN A SAVE FILE'],
       [clearArm ? 'PRESS AGAIN TO CLEAR' : 'CLEAR DATA', 'ERASE ALL PROGRESS ON THIS COMPUTER'], ['BACK', '']];
   };
+  const unl = () => !!(window.DDStore && window.DDStore.unlimited);
   function openOptions() { st = 'options'; t = 0; ocur = 0; clearArm = 0; SFX.switch(); }
   let inGame = null;   // { st, t, done } while the options are up over a paused level (the pause menu's OPTIONS); BACK hands it back
   function optBack() {
     if (!inGame) { st = 'select'; t = 0; SFX.switch(); return; }
     const g = inGame; inGame = null; st = g.st; t = g.t; lastSt = st; SFX.switch(); g.done();
   }
-  function afterLoad() { try { PROG = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { PROG = {}; } ALL = Q.has('unlock') || unlockPref(); ALLD = dotsPref(); const m = MUS(); if (m && m.reloadPrefs) m.reloadPrefs(); }
+  function afterLoad() { try { PROG = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { PROG = {}; } ALL = Q.has('unlock') || unlockPref(); ALLD = dotsPref(); const m = MUS(); if (m && m.reloadPrefs) m.reloadPrefs(); if (window.DDStore) window.DDStore.reload(); }
   function saveData() {
     const data = {}; saveKeys().forEach(k => { data[k] = localStorage.getItem(k); });
     const json = JSON.stringify({ game: 'dootledots', v: 1, saved: new Date().toISOString(), data }, null, 1);
@@ -383,13 +390,14 @@
     else if (i === 1) { if (m && m.setShuffle) m.setShuffle(!m.prefs.shuffle); SFX.tick(); }
     else if (i === 2) { ALL = !ALL; try { localStorage.setItem(UKEY, ALL ? '1' : '0'); } catch (e) {} if (!ALL) ALL = Q.has('unlock'); SFX.tick(); }
     else if (i === 3) { ALLD = !ALLD; try { localStorage.setItem(DKEY, ALLD ? '1' : '0'); } catch (e) {} SFX.tick(); }
-    else if (i === 4) saveData();
-    else if (i === 5) loadData();
+    else if (i === 4) { if (window.DDStore) window.DDStore.setUnlimited(!unl()); SFX.tick(); }
+    else if (i === 5) saveData();
+    else if (i === 6) loadData();
     else if (i === CLR - 3) { if (clearArm) { clearArm = 0; clearData(); } else { clearArm = 1; SFX.buzz(); } }
     else optBack();
   }
   const SLX = 150, SLW = 9;   // the sliders' bar: left edge and notch width
-  const OY = i => 24 + i * 11, JB = { x: [14, 166], y0: 36, dy: 12, per: 9 };
+  const OY = i => 21 + i * 11, JB = { x: [14, 166], y0: 36, dy: 12, per: 9 };
   const jPos = k => ({ x: JB.x[Math.floor(k / JB.per)], y: JB.y0 + (k % JB.per) * JB.dy });   // song k (0-based) on the jukebox page
   function jukeDo(i) {
     const m = MUS(), list = ROTL(); if (!m) return;
@@ -414,13 +422,14 @@
     if (st === 'rewind') {
       if (t === 1) { DD.noise(0.4, 0.05, 900); }
       if (t === RW.play) { DD.tone(400, 1600, 0.5, 'square', 0.03); }   // the motor kicks into rewind
-      if (t >= RW.end || (t > 30 && (IN.ok || IN.start || c))) return rewindDone();
+      if (t >= RW.end || (t > 30 && (IN.ok || IN.start || IN.any || c))) return rewindDone();
       rwRoll();
       return;
     }
+    if (st === 'store') { if (!window.DDStore || window.DDStore.step(IN, c) === 'back') closeStore(); return; }
     if (st === 'title') {
       if (t === 20) sCurtain(); if (t === 120) sTa();
-      if (IN.ok || IN.start || c) { st = 'select'; t = 0; SFX.switch(); }
+      if (IN.ok || IN.start || IN.any || c) { st = 'select'; t = 0; SFX.switch(); }
       return;
     }
     if (st === 'select') {
@@ -430,6 +439,7 @@
       else if (IN.ny) { const n = cur + IN.ny * SL.cols; if (n >= 0 && n < WORLDS.length) selectTo(n); }
       if (c && inR(c, 0, 0, 58, 14)) { openShelf(); return; }
       if ((c && inR(c, VW - 62, 0, 62, 14)) || IN.opt) { openOptions(); return; }
+      if ((c && inR(c, VW - 98, 0, 36, 14)) || IN.store) { openStore(() => { st = 'select'; t = 0; }); return; }
       if (c) { for (let i = 0; i < WORLDS.length; i++) { const s = slot(i); if (inR(c, s.x, s.y - 6, SL.w, SL.h + 6)) { if (i === cur) enterWorld(cur); else selectTo(i); break; } } }
       if (IN.ok) enterWorld(cur);
       if (IN.back) { st = 'title'; t = 130; }
@@ -437,7 +447,7 @@
       const n = OPTS().length;
       if (IN.ny) { ocur = (ocur + IN.ny + n) % n; if (ocur !== CLR) clearArm = 0; SFX.tick(); }
       if (IN.nx && ocur < 3) { const V = window.DDVol, k = VOLS[ocur][0]; if (V) { V.set(k, V.level(k) + IN.nx); if (k === 'sfx') SFX.tick(); else if (k === 'voice' && window.DDVoice && window.DDVoice.preview) window.DDVoice.preview(); } }
-      else if (IN.nx && ocur >= 4 && ocur <= 6) optDo(ocur);
+      else if (IN.nx && ocur >= 4 && ocur <= 7) optDo(ocur);
       if (c && c.y >= OY(0) - 3 && c.y < OY(2) + 8 && c.x >= SLX && c.x < SLX + 10 * SLW) { const i = Math.floor((c.y - OY(0) + 3) / 11), V = window.DDVol; if (i >= 0 && i < 3 && V) { ocur = i; V.set(VOLS[i][0], Math.round((c.x - SLX) / SLW + 0.5)); SFX.tick(); } }
       else if (c) { for (let i = 0; i < n; i++) if (inR(c, 40, OY(i) - 3, VW - 80, 11)) { if (i === ocur) optDo(i); else { ocur = i; if (i !== CLR) clearArm = 0; SFX.tick(); } } }
       else if (IN.ok) optDo(ocur);
@@ -463,14 +473,15 @@
       if (IN.nx) { scur = Math.max(0, Math.min(n - 1, scur + IN.nx)); SFX.tick(); }
       if (IN.ny) { const k = scur + IN.ny * SH.n; if (k >= 0 && k < n) { scur = k; SFX.tick(); } else if (IN.ny < 0) { st = 'select'; t = 0; } }
       if (c) { let hit = false; shelfIds().forEach((id, i) => { const x = SH.x0 + (i % SH.n) * (SH.w + SH.gx), y = SH.y0[Math.floor(i / SH.n)]; if (inR(c, x, y - 4, SH.w, SH.h + 4)) { scur = i; hit = true; SFX.tick(); } }); if (!hit) { st = 'select'; t = 0; } }
-      if (IN.ok) { const id = shelfIds()[scur], w = WORLDS[parseInt(id, 10) - 1]; if (w && worldTapes(w) === w.levels.length && window.makeBonus) { const B = window.makeBonus(w.n, LEVELS); if (B) { SFX.switch(); return DD.start(B, { onSave: record, onExit: r => { record(r); st = 'shelf'; t = 0; DD.setScene(scene); } }); } } SFX.buzz(); }
+      if (IN.ok) { const id = shelfIds()[scur], w = WORLDS[parseInt(id, 10) - 1]; if (w && worldTapes(w) === w.levels.length && window.makeBonus) { const B = window.makeBonus(w.n, LEVELS); if (B) { SFX.switch(); return DD.start(B, { perks: perks(), onSave: record, onExit: r => { record(r); st = 'shelf'; t = 0; DD.setScene(scene); } }); } } SFX.buzz(); }
       if (IN.back) { st = 'select'; t = 0; SFX.switch(); }
     } else if (st === 'levels') {
       const n = world.levels.length;
       pvRoll();
       if (IN.ny) { lcur = (lcur + IN.ny + n) % n; SFX.tick(); }
       let go = IN.ok;
-      if (c) { world.levels.forEach((l, i) => { if (inR(c, ROW.x - 1, rowY(i) - 1, ROW.w + 2, compact() ? 28 : 34)) { if (i === lcur) go = true; else { lcur = i; SFX.tick(); } } }); if (inR(c, PV.x - 3, PV.y - 3, PV.w + 6, PV.h + 6)) go = true; if (c.y >= 160) { st = 'select'; t = 0; } }
+      if (c) { world.levels.forEach((l, i) => { if (inR(c, ROW.x - 1, rowY(i) - 1, ROW.w + 2, compact() ? 28 : 34)) { if (i === lcur) go = true; else { lcur = i; SFX.tick(); } } }); if (inR(c, PV.x - 3, PV.y - 3, PV.w + 6, PV.h + 6)) go = true; if (inR(c, VW - 58, 0, 58, 15)) { openStore(() => { st = 'levels'; t = 0; }); return; } if (c.y >= 160) { st = 'select'; t = 0; } }
+      if (IN.store) { openStore(() => { st = 'levels'; t = 0; }); return; }
       if (go && st === 'levels') {
         const id = world.levels[lcur].id;
         if (have(id) && !stageUnlocked(world, lcur)) { SFX.buzz(); note = 'BEAT ' + world.levels[lcur - 1].id.toUpperCase() + ' FIRST'; noteT = 60; }
@@ -567,7 +578,7 @@
     if (tt > 100) {
       rect('#2a1408', 94, 160, 132, 17); rect('#c98f22', 94, 160, 132, 1); rect('#c98f22', 94, 176, 132, 1); rect('#c98f22', 94, 160, 1, 17); rect('#c98f22', 225, 160, 1, 17);
       rect('#4f0f24', 96, 162, 128, 13);
-      if (blink(tt, 28)) text('PRESS START', 160, 164, '#fff6c0', 2, '#7a2a10', 'center');
+      if (blink(tt, 28)) text('PRESS ANY BUTTON', 160, 164, '#fff6c0', 2, '#7a2a10', 'center');
     }
     if (tt > 100 && tt < 124) rect('rgba(255,248,214,' + ((124 - tt) / 24 * 0.5).toFixed(2) + ')', 0, 0, VW, VH);
     if (msg && tt > 100) ctext(msg, 150, '#ff8080', 1);
@@ -639,8 +650,15 @@
     const tot = WORLDS.reduce((s, x) => s + worldBags(x), 0), mx = WORLDS.reduce((s, x) => s + worldMax(x), 0);
     tubIcon(60, 4, '#d8202c'); text(tot + '/' + mx, 68, 5, '#fff6d4', 1, null);
     rect('#2a0e1a', VW - 60, 2, 58, 11); text('OPTIONS', VW - 31, 5, '#ffd27a', 1, null, 'center');
+    storeBtn(VW - 98, 2, 36, 'STORE', tt);
   }
 
+  function storeBtn(x, y, w, label, tt) {   // the HEI store's button: a coin and the label, the coin glinting when something is affordable
+    const S = window.DDStore; if (!S) return;
+    const can = S.canBuy(), hop = can ? Math.round(Math.abs(Math.sin(tt / 9)) * 1) : 0;
+    rect('#2a0e1a', x, y, w, 11); if (can) rect('#c98f22', x, y + 10, w, 1);
+    S.icon('rewards', x + 2, y + 1 - hop, 1); text(label, x + 12, y + 3, can && Math.floor(tt / 20) % 2 ? '#fffbd0' : '#ffd27a', 1, null);
+  }
   function curtainBg(tt) { rect('#120610', 0, 0, VW, VH); for (let x = -CURT + (-tt * 0.05 % CURT); x < VW + CURT; x += CURT) spr('w2_curtain', x + CURT / 2, 216); rect('rgba(10,4,14,0.8)', 0, 0, VW, VH); rect('#2a0e1a', 0, 0, VW, 14); rect('#c98f22', 0, 14, VW, 1); }
   function drawNote() { if (noteT > 0) { rect('#0a0408', 0, 150, VW, 11); ctext(note, 152, '#ff8080', 1); } }
   function drawOptions() {
@@ -831,6 +849,7 @@
     rect(lt ? 'rgba(240,235,245,0.55)' : 'rgba(6,2,8,0.62)', 0, 30, VW, VH - 30);
     rect(w.band, 0, 0, VW, 28); rect(w.accent, 0, 28, VW, 2);
     text('WORLD ' + w.n, 8, 4, w.accent, 2, '#000'); text(w.title, 8, 19, w.fg, 1, SHD(w)); text(w.seasons, VW - 8, 19, w.fg, 1, SHD(w), 'right');
+    storeBtn(VW - 56, 3, 52, 'HEI STORE', tt);
     const cm = compact(), H = cm ? 26 : 32;
     w.levels.forEach((l, i) => {
       const sk = Math.min(1, Math.max(0, (tt - i * 4) / 16)), slide = Math.round((1 - (1 + 2.7 * (sk - 1) ** 3 + 1.7 * (sk - 1) ** 2)) * -VW) + Math.round(rowNudge[i] || 0);   // rows fly in from the left, one after another
@@ -872,7 +891,7 @@
     if (!cm) w.dots.forEach((n, i) => { const sp = w.dots.length > 2 ? [30, 60, 90, 120][i] : [50, 110][i], ph = Math.sin(tt / 11 + i * 1.9), hy = Math.abs(ph) * 6; drawDot(n, hy > 4.5 ? (Math.cos(tt / 11 + i * 1.9) * ph > 0 ? 'jump' : 'fall') : hy < 0.8 ? 'land' : 'apex', sp, 158 - Math.round(hy), i % 2 === 1, 1, 1); });
     if (noteT > 0) ctext(note, 142, '#ff8080', 1);
     rect('rgba(0,0,0,0.55)', 0, 160, VW, 20);
-    ctext(DD.padUsed ? 'CROSS: PLAY    CIRCLE: BACK' : 'JUMP: PLAY    X: BACK', 168, w.fg, 1, '#000');
+    ctext(DD.padUsed ? 'CROSS: PLAY    SQUARE: HEI STORE    CIRCLE: BACK' : 'JUMP: PLAY    H: HEI STORE    X: BACK', 168, w.fg, 1, '#000');
   }
 
   // screen changes: the last frame of the old screen is pulled up out of the gate like film, the new one comes in under it
@@ -887,7 +906,7 @@
     if (tr && st !== 'rewind') rwStop();
     if (pvTr && st !== 'levels') pvStop();   // the poster's footage only runs on the stage list   // never leave a trailer running under another screen
     if (st === 'load') { bg('#2a0e1a', '#0e070c'); ctext('LOADING', VH / 2 - 3, '#fff', 1); return; }
-    if (st === 'rewind') drawRewind(); else if (st === 'fork') drawFork(); else if (st === 'title') drawTitle(); else if (st === 'select') drawSelect(); else if (st === 'era') drawEra(); else if (st === 'shelf') drawShelf(); else if (st === 'options') drawOptions(); else if (st === 'jukebox') drawJukebox(); else drawLevels();
+    if (st === 'rewind') drawRewind(); else if (st === 'fork') drawFork(); else if (st === 'title') drawTitle(); else if (st === 'select') drawSelect(); else if (st === 'era') drawEra(); else if (st === 'shelf') drawShelf(); else if (st === 'options') drawOptions(); else if (st === 'jukebox') drawJukebox(); else if (st === 'store') { if (window.DDStore) window.DDStore.draw(); } else drawLevels();
     if (wipe && wipeT < WIPE) {
       const k = wipeT / WIPE, e = k * k * (3 - 2 * k), y = -Math.round(e * (VH + 8));
       ctx.drawImage(wipe, 0, y);
@@ -905,7 +924,7 @@
     const pl = []; WORLDS.forEach(w => ['tim', 'gregg'].forEach(who => pl.push(portraitSpr(who, w)))); DD.loadSprites(pl); DD.loadSprites(Object.values(BOSS_ART).map(a => a[0]));   // each world's own host portraits, if its level lists them
     setTimeout(() => { for (let i = +Q.get('ff') || 0; i > 0; i--) step({ nx: 0, ny: 0 }); }, 0);   // ?ff=N fast-forwards the menu N frames (for screenshots)
     const era = +Q.get('era'), wd = +Q.get('world');
-    const bn = +Q.get('bonus'); if (bn && window.makeBonus) { const B = window.makeBonus(bn, LEVELS); if (B) return DD.start(B, { onSave: record, onExit: r => { record(r); st = 'shelf'; t = 0; DD.setScene(scene); } }); }   // ?bonus=N: straight into world N's screening (testing)
+    const bn = +Q.get('bonus'); if (bn && window.makeBonus) { const B = window.makeBonus(bn, LEVELS); if (B) return DD.start(B, { perks: perks(), onSave: record, onExit: r => { record(r); st = 'shelf'; t = 0; DD.setScene(scene); } }); }   // ?bonus=N: straight into world N's screening (testing)
     if (link && have(link)) return playLevel(link, true);   // a direct link plays with the whole cast
     if (link) msg = 'NO SUCH LEVEL: ' + link.toUpperCase();
     if (era >= 1 && era <= WORLDS.length) { cur = era - 1; return enterWorld(cur); }

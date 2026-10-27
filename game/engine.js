@@ -107,6 +107,8 @@ const SFX = {
   skid: () => noise(0.12, 0.05, 1800),
   stomp: () => { tone(700, 160, 0.14, 'square', 0.08); noise(0.08, 0.08, 1200); },
   pop: p => { tone(1046 * p, 1046 * p, 0.04, 'square', 0.035); tone(1568 * p, 1568 * p, 0.07, 'square', 0.035, 0.04); },
+  star: () => [523, 659, 784, 1046, 1318, 1568, 2093].forEach((f, i) => tone(f, f, 0.09, 'square', 0.045, i * 0.05)),   // GERM FREE starts
+  shield: () => { tone(220, 220, 0.05, 'square', 0.07); tone(880, 1320, 0.16, 'triangle', 0.06, 0.05); },   // MISTRIAL: a hit that doesn't count
   ko: p => { tone(180 * p, 900 * p, 0.18, 'sawtooth', 0.05); noise(0.15, 0.08, 2400); },
   scuffle: () => noise(0.5, 0.06, 3000),
   hurt: () => tone(500, 90, 0.35, 'sawtooth', 0.08),
@@ -138,6 +140,8 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+let padNote = null, padSeen = {};   // padNote { s, until }: a strip saying a controller just showed up (or went away). readInput polls for pads every frame, so the first
+const notePad = s => { padNote = { s, until: performance.now() + 2500 }; };   // button or stick push the browser passes on connects it, connection events or not
 const KJ = ['KeyZ', 'Space', 'KeyK', 'ArrowUp', 'KeyW'], KS = ['KeyX', 'KeyC', 'KeyJ', 'KeyL', 'ShiftLeft', 'ShiftRight', 'Tab'];
 const ORDER = ['sam', 'mel', 'cloud', 'baxter'];
 const PORTRAITS = ORDER.map((dot, i) => ({ dot, x: VW - 84 + i * 20, y: 4, w: 18, h: 22 }));
@@ -159,23 +163,28 @@ function readInput() {
   let ok = hit(['Enter', 'Space', 'KeyZ']);   // menu confirm (jp also fires on ArrowUp, so menus use ok/back)
   let nx = (hit(['ArrowRight', 'KeyD']) ? 1 : 0) - (hit(['ArrowLeft', 'KeyA']) ? 1 : 0), ny = (hit(['ArrowDown', 'KeyS']) ? 1 : 0) - (hit(['ArrowUp', 'KeyW']) ? 1 : 0);
   ORDER.forEach((dot, i) => { if (hits['Digit' + (i + 1)]) pick = dot; });
-  let back = hit(['Escape', 'KeyX', 'Backspace']), spPrev = false, again = false, opt = hit(['KeyO']);
+  let back = hit(['Escape', 'KeyX', 'Backspace']), spPrev = false, again = false, opt = hit(['KeyO']), store = hit(['KeyH']);
   if (Object.keys(hits).length) padUsed = false;   // a key was pressed: show keyboard prompts
-  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  let anyIn = Object.keys(hits).length > 0 || !!click;   // any key, click or controller button at all: "press start" screens take it
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [], live = {};
   for (const p of pads) {   // PS4 / standard layout: 0 cross, 1 circle, 2 square, 3 triangle, 4 L1, 5 R1, 9 options, 12-15 d-pad
-    if (!p) continue;
+    if (!p || p.connected === false) continue;
+    live[p.index] = true; if (!padSeen[p.index]) { padSeen[p.index] = true; notePad('CONTROLLER CONNECTED'); }
     const ax = p.axes[0] || 0, ay = p.axes[1] || 0, B = i => !!(p.buttons[i] && p.buttons[i].pressed), was = padPrev[p.index] || {}, nav = padNav[p.index] || {};
-    const pd = ay > 0.5 || B(13), pj = B(0), pc = B(1), psw = B(5), pl1 = B(4), pt = B(3), ps = B(9);
-    if (pj || pc || psw || pl1 || ps || B(12) || B(13) || B(14) || B(15) || Math.abs(ax) > 0.4 || Math.abs(ay) > 0.5) padUsed = true;
+    const pd = ay > 0.5 || B(13), pj = B(0), pc = B(1), psw = B(5), pl1 = B(4), pt = B(3), ps = B(9), psq = B(2);
+    const pa = p.buttons.some(b => b && b.pressed) || p.axes.slice(0, 4).some(a => Math.abs(a) > 0.5);   // anything on the pad: every button (PS, touchpad, share too) and either stick
+    if (pa) padUsed = true;
+    anyIn = anyIn || (pa && !was.a);
     l = l || ax < -0.4 || B(14); r = r || ax > 0.4 || B(15); d = d || pd;
     j = j || pj; ok = ok || (pj && !was.j); jp = jp || (pj && !was.j); sp = sp || (psw && !was.sw); spPrev = spPrev || (pl1 && !was.l1);
-    start = start || (ps && !was.s); opt = opt || (ps && !was.s); dp = dp || (pd && !was.d); back = back || (pc && !was.c); again = again || (pt && !was.t);
-    padPrev[p.index] = { j: pj, sw: psw, l1: pl1, s: ps, d: pd, c: pc, t: pt };
+    start = start || (ps && !was.s); opt = opt || (ps && !was.s); dp = dp || (pd && !was.d); back = back || (pc && !was.c); again = again || (pt && !was.t); store = store || (psq && !was.q);
+    padPrev[p.index] = { j: pj, sw: psw, l1: pl1, s: ps, d: pd, c: pc, t: pt, q: psq, a: pa };
     const nl = ax < -0.5 || B(14), nr = ax > 0.5 || B(15), nu = ay < -0.5 || B(12);
     nx += (nr && !nav.r ? 1 : 0) - (nl && !nav.l ? 1 : 0); ny += (pd && !nav.d ? 1 : 0) - (nu && !nav.u ? 1 : 0); padNav[p.index] = { l: nl, r: nr, u: nu, d: pd };
   }
+  for (const i in padSeen) if (!live[i]) { delete padSeen[i]; delete padPrev[i]; notePad('CONTROLLER DISCONNECTED'); }
   if (SCRIPT) { const s = SCRIPT(G ? G.frame : 0); l = s.l; r = s.r; j = s.j; jp = s.jp; d = !!s.d; dp = !!s.dp; sp = !!s.sp; pick = s.pick || null; start = !!s.start; ok = !!s.ok; nx = s.nx | 0; ny = s.ny | 0; }   // start/ok/nx/ny: pause-menu input for tests
-  Object.assign(IN, { l, r, d, j, jp, dp, sp, spPrev: !SCRIPT && spPrev, pick, start, nx, ny, ok, back, click, opt: !SCRIPT && opt, quit: hit(['KeyQ']) });
+  Object.assign(IN, { l, r, d, j, jp, dp, sp, spPrev: !SCRIPT && spPrev, pick, start, nx, ny, ok, back, click, opt: !SCRIPT && opt, store: !SCRIPT && store, any: !SCRIPT && anyIn, quit: hit(['KeyQ']) });
   if (again && G && G.done && G.done.card) G.restartReq = true;   // triangle on the results card: play it again
   if (hits.KeyR && G) G.restartReq = true;
   for (const k in hits) delete hits[k];
@@ -196,6 +205,7 @@ const P = {
   slamWind: 9, slamV: 8,           // Baxter: hang, then drop
   stompBounce: 3.9, stompBounceHeld: 5.3,
 };
+const P0 = Object.assign({}, P);   // the base feel; build() puts it back, then applies the HEI store's jump and speed upgrades
 const DOTS = {
   sam: { w: 12, h: 20, name: 'SAM', col: '#f89a3a', how: 'JUMP AGAIN IN THE AIR' },
   mel: { w: 12, h: 14, name: 'MEL', col: '#8a54e2', how: 'TINY. RUN TO ROLL INTO FANS' },
@@ -214,6 +224,10 @@ const ov = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.
 const cx = e => e.x + e.w / 2, bot = e => e.y + e.h;
 
 function build() {
+  Object.assign(P, P0);
+  const K = (!TR && DD.opts && DD.opts.perks) || {};   // the HEI store's upgrades (store.js perks()); never in a trailer or the node tests
+  if (K.speed > 1) for (const k of ['walk', 'run', 'melRun', 'accWalk', 'accRun', 'airAcc']) P[k] *= K.speed;
+  if (K.jump > 1) { P.jump *= K.jump; P.dj *= K.jump; }
   grid = new Uint8Array(L.W * L.H); gkind = new Array(L.W * L.H).fill(null);
   bodies = []; fans = []; pops = []; loose = []; parts = [];
   for (const [k, x, y, w, h] of L.SOLID) {
@@ -231,6 +245,7 @@ function build() {
     banner: null, cp: null, cardT: (L.CARD_LANES || []).map(() => 0), gateRespawn: 0, done: null, restartReq: false, combo: 0, comboT: 0,
     secrets: {}, heads: {}, cards: [], seen: { sam: true }, denyT: 0, met: {}, bq: [], things: {}, s: {}, boss: null,   // s: free scratch space for level scripts
     intro: 0, dlg: { q: [], cur: null, last: null, show: 0, gap: 0 }, lineSeen: {}, fall: null, pm: { sel: 0 }, hudGot: 0, cntT: 0, cntDir: 1, bagN: 0, bagWig: [0, 0, 0, 0, 0],
+    pk: K, shield: K.shield || 0, takes: K.takes || 0, star: K.star || 0, perkT: 0,   // what's left of this run's MISTRIAL hits, TAKE TWO falls and GERM FREE frames
   };
   let start = { x: 16, y: 20 * TS };
   for (const th of L.THINGS) {
@@ -252,6 +267,7 @@ function build() {
   for (const [x, y] of L.CLOUD_ARC || []) addPop(x, y, 'cloud');
   popsTotal = pops.length;
   unbury();
+  if (K.bags) G.got = G.hudGot = Math.min(popsTotal, Math.ceil(popsTotal * K.bags / 5));   // OUTSIDE FOOD: bags already in hand
   G.bagN = Math.floor(5 * bagFrac());
   if (L.boss) G.boss = makeBoss(L.boss);
   G.owned = ((DD.opts && DD.opts.dots) || ORDER).filter(k => k in DOTS); if (!G.owned.length) G.owned = ['sam'];   // the Dots in the cast so far (menu.js hands them over; all four otherwise)
@@ -483,18 +499,19 @@ function loseBag(x, y, frac = 1) {   // a pit costs one bag (a fifth of the stag
   if (n <= 0) return;
   G.got -= n; G.bagLost = (G.bagLost || 0) + 1; if (G.got > 0 && G.got < Math.ceil(popsTotal / 5)) vo('lastbag');
   float(x, y - 14, frac < 1 ? '-1/2 BAG' : '-1 BAG', '#ff8080');
-  const back = Math.floor(n * BURST_KEEP), pieces = Math.min(12, Math.max(1, back));
+  const back = Math.floor(n * Math.min(1, BURST_KEEP + (G.pk.keep || 0))), pieces = Math.min(12, Math.max(1, back)), life = BURST_LIFE + (G.pk.life || 0);   // FIVE-SECOND RULE
   for (let i = 0; i < pieces; i++) {   // each piece carries its share; grab them before they blink out
     const v = Math.floor(back / pieces) + (i < back % pieces ? 1 : 0), a = Math.PI * (0.15 + 0.7 * i / Math.max(1, pieces - 1));
-    if (v > 0) loose.push({ x, y: y + 6, vx: -Math.cos(a) * (1.4 + Math.random()), vy: -2.6 - Math.sin(a) * 1.6, life: BURST_LIFE, wait: 18, v });
+    if (v > 0) loose.push({ x, y: y + 6, vx: -Math.cos(a) * (1.4 + Math.random()), vy: -2.6 - Math.sin(a) * 1.6, life, wait: 18, v });
   }
 }
 function hurt(fromX) {
   const p = G.pl;
-  if (p.inv > 0 || G.done || (G.boss && G.boss.dead)) return;
+  if (p.inv > 0 || G.done || (G.boss && G.boss.dead) || G.star > 0) return;   // GERM FREE: nothing hurts
   if (TR) { p.inv = 36; p.vx = sign(cx(p) - fromX || 1) * 2.4; p.vy = -3.2; p.slam = 0; p.rolling = false; G.hitstop = 3; G.shake = 4; return; }   // trailer: the knock-back reads, nothing is lost
   p.inv = 100; rumble(0.7, 0.4, 180); p.vx = sign(cx(p) - fromX || 1) * 2.6; p.vy = -3.4; p.slam = 0; p.rolling = false;
   if (p.h !== DOTS[p.dot].h) { p.y -= DOTS[p.dot].h - p.h; p.h = DOTS[p.dot].h; }
+  if (G.shield > 0) { G.shield--; G.perkT = 40; G.hitstop = 5; G.shake = 3; SFX.shield(); stars(cx(p), p.y + p.h / 2, 8, '#ffd27a'); float(cx(p), p.y - 14, "DIDN'T COUNT!", '#ffe680'); return; }   // MISTRIAL: the knock-back, not the bag
   loseBag(cx(p), p.y, 0.5);
   G.hitstop = 5; G.shake = 4; SFX.hurt(); vo(G.boss && G.boss.engaged && !G.boss.dead ? 'boss_taunt' : 'hurt');
 }
@@ -504,6 +521,11 @@ function updatePlayer() {
   if (IN.jp) p.buf = P.buffer; else if (p.buf > 0) p.buf--;
   p.held = IN.j;
   if (p.inv > 0) p.inv--;
+  if (G.star > 0) {   // GERM FREE: counts down only while you're playing; rainbow sparkles trail off the Dot
+    if (G.star === G.pk.star) { SFX.star(); float(cx(p), p.y - 14, 'GERM FREE!', '#ffe680'); }
+    if (--G.star === 0) { SFX.wind(); float(cx(p), p.y - 10, 'GERMS ARE BACK', '#cfc6bc'); }
+    if (G.frame % 3 === 0 && !TR) parts.push({ x: p.x + Math.random() * p.w, y: p.y + Math.random() * p.h, vx: (Math.random() - 0.5) * 0.8, vy: -0.4 - Math.random() * 0.6, life: 22, max: 22, r: 1.5, col: 'hsl(' + ((G.frame * 12 + Math.random() * 90) % 360 | 0) + ',95%,65%)', star: true, g: 0 });
+  }
 
   // carried by a moving card
   if (p.onGround && p.ground && p.ground.kind === 'card') moveX(p, p.ground.vx);
@@ -637,7 +659,8 @@ function updateFall() {   // the respawn happens when the iris is shut (t = FALL
     G.lastRespawn = G.frame; G.landed = false;
     Object.assign(p, { x: G.safe.x, y: G.safe.y + p.h - DOTS[p.dot].h, h: DOTS[p.dot].h, vx: 0, vy: 0, inv: 60, rolling: false, slam: 0 });
     G.cam.y = clamp(bot(p) - VH * 0.62, 0, LH - VH); updateCamera(true); SFX.wind();
-    loseBag(cx(p), p.y);   // the pit's bag bursts out where you come back in
+    if (G.takes > 0) { G.takes--; G.perkT = 40; float(cx(p), p.y - 14, 'TAKE TWO!', '#ffe680'); stars(cx(p), p.y + p.h / 2, 8, '#ffe680'); }   // TAKE TWO: this fall is free
+    else loseBag(cx(p), p.y);   // the pit's bag bursts out where you come back in
   }
   if (f.t >= FALL_OUT + FALL_IN) G.fall = null;
 }
@@ -709,12 +732,13 @@ function popHead(f, vx, vy) {
 function fling(f, dir, chain = 0) {
   popHead(f, dir * (1 + Math.random()), -4.5 - Math.random());
   f.state = 'flung'; f.vx = dir * (3.4 + Math.min(chain, 4) * 0.3); f.vy = -3.2; f.t = 0; f.say = null;
-  addGot(3, cx(f), f.y); SFX.ko(1 + Math.min(chain, 8) * 0.12); G.hitstop = Math.max(G.hitstop, 2);
+  addGot(3 + (G.pk.foam || 0), cx(f), f.y); SFX.ko(1 + Math.min(chain, 8) * 0.12); G.hitstop = Math.max(G.hitstop, 2);   // FOAM HEADS adds to the knockout
   f.chain = chain;
 }
 function stompFan(f) {   // the foam head pops off and the embarrassed fan underneath runs for it
   popHead(f, (Math.random() - 0.5) * 2.5, -4.2);
   f.state = 'flee'; f.t = 0; f.fleeDir = sign(cx(f) - cx(G.pl)) || 1; f.dir = f.fleeDir; f.vy = -2.2;
+  if (G.pk.foam) { G.got += G.pk.foam; burst(cx(f), f.y, G.pk.foam); float(cx(f), f.y - 22, '+' + G.pk.foam, '#ffe680'); }   // FOAM HEADS
   say(f, '!!', '#d8202c', 40);
 }
 function spray(x, y, type) {   // what flies out of a fandom brawl
@@ -820,8 +844,18 @@ function interact() {
       if (p.slam === 2) continue;
       p.vy = -(p.held ? P.stompBounceHeld : P.stompBounce); p.y = f.y - p.h; p.usedDJ = false; p.airMax = Math.max(p.airMax, Math.abs(p.vx));
       p.sy = 1.3; p.sx = 0.75; G.hitstop = 3; SFX.stomp(); stars(cx(f), f.y, 6);
-    } else if (p.inv <= 0) {   // a fan mob: they bump you around and grab some popcorn
+    } else if (G.star > 0) fling(f, sign(cx(f) - cx(p)) || p.face);   // GERM FREE: they bounce off
+    else if (p.inv <= 0) {   // a fan mob: they bump you around and grab some popcorn
       hurt(cx(f)); say(f, '♥', '#d8202c', 50); float(cx(p), p.y - 10, 'MOBBED!', '#ffb0c8');
+    }
+  }
+  if (G.pk.magnet) {   // POPCORN MAGNET: a kernel in range locks on and homes in, speeding up as it comes
+    const mx = cx(p), my = p.y + p.h / 2, R = G.pk.magnet;
+    for (const c of pops.concat(loose)) {
+      if (c.got || c.wait > 0) continue;
+      const dx = mx - c.x, dy = my - c.y, d = Math.hypot(dx, dy) || 1;
+      if (!c.mag && d > R) continue;
+      c.mag = Math.min(9, (c.mag || 1.5) + 0.3); const s = Math.min(d, c.mag); c.x += dx / d * s; c.y += dy / d * s; if (c.vx !== undefined) { c.vx = 0; c.vy = 0; }
     }
   }
   // popcorn
@@ -1141,12 +1175,14 @@ function cardSetup(d) {   // lay out the count-up timeline (card clock c, in fra
   let rl = [rating]; if (rating.length > 34) { const k = rating.startsWith('FIVE BAGS AND ') ? 13 : rating.lastIndexOf(' ', 34); rl = [rating.slice(0, k), rating.slice(k + 1)]; }   // two lines when the extra runs long
   Object.assign(d, { card: true, c: 0, bags, cnt0, cdur, bag0, six, g0, tally, rating, rl, r0, next: nxt, n0, END: (nxt ? n0 + (nxt.length + 6) * 2 : r0 + rating.length * 2) + 24 + (DD.opts && DD.opts.joins ? 130 : 0) });
   G.dlg.q.length = 0; G.dlg.cur = null;
+  if (!TR && DD.opts && DD.opts.perks && window.DDStore) d.hei = window.DDStore.award(result());   // the HEI store's pay-out (store.js award)
 }
 function updateResults() {
   const d = G.done; if (!d) return;
   if (!d.card) { if (d.t >= 50 && (!(G.dlg.cur || G.dlg.q.length) || d.t >= 300)) cardSetup(d); return; }   // goal lines get to play over the closed iris first
-  if (IN.click) { if (d.c > d.END && IN.click.y > VH - 30 && IN.click.x > VW / 2) { G.restartReq = true; return; } IN.jp = true; }   // click: skip, then continue (bottom right: play it again)
-  if (d.c > d.END) { if (IN.jp || IN.start) leave(false); return; }
+  const sto = DD.opts && DD.opts.store;   // the menu's stages can stop at the HEI store on the way to the next one
+  if (IN.click) { if (d.c > d.END && IN.click.y > VH - 30 && IN.click.x > VW * (sto ? 0.62 : 0.5)) { G.restartReq = true; return; } if (sto && d.c > d.END && IN.click.y > VH - 30 && IN.click.x > VW * 0.38) { leave(false, { store: true }); return; } IN.jp = true; }   // click: skip, then continue (bottom right: play it again)
+  if (d.c > d.END) { if (sto && (IN.sp || IN.store)) leave(false, { store: true }); else if (IN.jp || IN.start) leave(false); return; }
   if (IN.jp && d.c > 12) { d.c = d.END + 1; return; }   // jump skips the count-up
   const c = ++d.c;
   if (c === d.r0) vo('rating', { bags: d.bags, bonus: d.rating !== RATINGS[d.bags] }); if (d.six && c === d.g0 + 6) vo('six');   // Tim reads the rating out
@@ -1202,7 +1238,15 @@ function drawResults() {
     if (c >= j0 && ready(jn)) { const z = Math.min(1, 22 / IMG[jn].height), ar = c - j0 - 40, pose = k < 1 ? 'walk' + (Math.floor(c / 6) % 4) : ar < 8 ? 'land' : ar % 200 < 6 ? 'blink' : 'idle'; drawDot(jn, pose, sx, 152, true, z, z, k < 1 ? -0.08 : 0); }   // walks on with a real walk cycle
     if (c >= j0 + 40) { const s = D.name + ' JOINED THE CAST: ' + D.how; text(typed(s, j0 + 40), VW / 2 - 14 - Math.floor((s.length * 4 - 1) / 2), 146, D.col, 1, '#000'); }
   }
-  if (c > d.END - 24 && Math.floor(d.t / 30) % 2) text(padUsed ? (DD.opts && DD.opts.onExit ? 'CROSS: CONTINUE   TRIANGLE: AGAIN' : 'TRIANGLE: PLAY AGAIN') : DD.opts && DD.opts.onExit ? 'JUMP: CONTINUE   R: AGAIN' : 'PRESS R TO PLAY AGAIN', VW / 2, 156, '#fff', 1, '#000', 'center');
+  if (d.hei && c >= d.tally + 18) {   // HEI Points, top right of the card: a coin and the pay-out
+    const k = clamp((c - d.tally - 18) / 24, 0, 1), n = Math.round(d.hei.n * k), S = window.DDStore;
+    if (c === d.tally + 18) SFX.bag();
+    if (S) S.icon('rewards', VW - 70, 18, 1, d.t);
+    text('+' + n, VW - 59, 18, '#ffe680', 2, '#0a1a4a'); text('HEI POINTS', VW - 70, 30, '#fff6d4', 1, '#0a1a4a');
+    if (d.hei.first) text('FIRST CLEAR', VW - 70, 39, '#94e0cc', 1, '#0a1a4a');
+  }
+  const sto = DD.opts && DD.opts.store;
+  if (c > d.END - 24 && Math.floor(d.t / 30) % 2) text(padUsed ? (DD.opts && DD.opts.onExit ? (sto ? 'CROSS: CONTINUE  SQUARE: STORE  TRIANGLE: AGAIN' : 'CROSS: CONTINUE   TRIANGLE: AGAIN') : 'TRIANGLE: PLAY AGAIN') : DD.opts && DD.opts.onExit ? (sto ? 'JUMP: CONTINUE   X: HEI STORE   R: AGAIN' : 'JUMP: CONTINUE   R: AGAIN') : 'PRESS R TO PLAY AGAIN', VW / 2, 156, '#fff', 1, '#000', 'center');
   else if (c <= d.END - 24 && Math.floor(d.t / 30) % 2) text('JUMP: SKIP', VW / 2, 156, '#7a90d8', 1, null, 'center');
   ctx.restore(); ctx.globalAlpha = 1;
 }
@@ -1213,7 +1257,7 @@ function step() {
   readInput();
   if (G.restartReq) { restart(); return; }
   G.frame++;
-  if (G.state === 'title') { if (IN.jp || IN.start || IN.sp || IN.click) { G.state = 'play'; try { localStorage.setItem('dd_controls_seen', '1'); } catch (e) {} } return; }   // the level title wipe (introStrip) takes over from here
+  if (G.state === 'title') { if (IN.jp || IN.start || IN.sp || IN.click || IN.any) { G.state = 'play'; try { localStorage.setItem('dd_controls_seen', '1'); } catch (e) {} } return; }   // the level title wipe (introStrip) takes over from here
   if (G.state === 'pause') { updatePause(); return; }
   if ((IN.start || (IN.click && inBox(IN.click, PAUSEBTN.x - 2, PAUSEBTN.y - 2, PAUSEBTN.w + 4, PAUSEBTN.h + 4))) && !G.done) { G.state = 'pause'; G.pm.sel = 0; SFX.tick(); return; }
   if (G.intro < INTRO_T) { if (++G.intro === 60) playLines('start'); }
@@ -1449,7 +1493,16 @@ function rimFor(X, Y) {   // how much rim light the Dot needs: measures the set 
   }
   return clamp((78 - rimLum) / 60, 0, 1) * 0.5;
 }
-function drawPlayer() {
+function drawPlayer() {   // GERM FREE wraps the Dot in a cycling rainbow (a hue filter, and a glow behind for browsers without canvas filters)
+  const st = G.star > 0 && !G.done && (G.star > 120 || Math.floor(G.star / 6) % 2);   // it flickers out over the last two seconds
+  if (!st) return drawDotNow();
+  const p = G.pl, X = wx(cx(p)), Y = wy(p.y + p.h / 2), hue = (G.frame * 14) % 360;
+  ctx.save(); const gl = ctx.createRadialGradient(X, Y, 2, X, Y, p.h * 0.9);
+  gl.addColorStop(0, `hsla(${hue},100%,70%,0.55)`); gl.addColorStop(1, `hsla(${(hue + 120) % 360},100%,60%,0)`); ctx.fillStyle = gl; ctx.fillRect(X - p.h, Y - p.h, p.h * 2, p.h * 2);
+  ctx.filter = `hue-rotate(${hue}deg) saturate(2.4) brightness(1.2)`;
+  try { drawDotNow(); } finally { ctx.restore(); }
+}
+function drawDotNow() {
   const p = G.pl;
   if (p.inv > 0 && p.inv <= 72 && Math.floor(p.inv / 3) % 2 && !G.done) return;
   const X = wx(cx(p)), Y = wy(bot(p)), pose = dotPose(p);
@@ -1700,6 +1753,7 @@ function drawHUDCore() {
   const bf = bagFrac() * 5, bags = Math.floor(bf), frac = bf % 1;
   for (let i = 0; i < 5; i++) { const w = G.bagWig[i]; drawBag(bx + i * 11 - 4, -6, i < bags ? 1 : i === bags ? frac : 0, 0.75, w > 0 ? Math.sin(w * 0.9) * 0.4 * (w / 34) : 0, 0.5 * (w > 0 ? 1 + 0.2 * Math.sin(w / 34 * Math.PI) : 1)); }
   if (G.vhs) spr('vhs', bx + 5 * 11 + 4, 16, false, 0.5, 0.5);
+  drawPerkHUD();
   // the Dots, top right: the one you are is a framed portrait, the rest are little coloured pips (click one, press 1-4, or switch)
   const P = PORTRAITS, wOf = q => G.pl.dot === q.dot ? 18 : 11, total = P.reduce((s, q) => s + wOf(q), 0) + 2 * (P.length - 1);
   let x = VW - 3 - total;
@@ -1714,6 +1768,22 @@ function drawHUDCore() {
     ctx.fillStyle = 'rgba(10,4,8,0.78)'; ctx.fillRect(q.x + 1 + shake, q.y + 1, q.w - 2, q.h - 2);
     const im = IMG[q.dot];
     if (ready(q.dot)) { const k = Math.min(1, 14 / im.width, 17 / im.height); ctx.save(); ctx.translate(q.x + q.w / 2 + shake, q.y + q.h - 2); ctx.scale(k, k); ctx.drawImage(im, -im.width / 2, -im.height); ctx.restore(); }
+  }
+}
+function drawPerkHUD() {   // under the popcorn strip: MISTRIAL hits and TAKE TWO falls left, and the GERM FREE clock
+  const S = window.DDStore, items = [];
+  if (G.shield > 0) items.push(['shield', 'x' + G.shield]); if (G.takes > 0) items.push(['takes', 'x' + G.takes]); if (G.star > 0) items.push(['star', null]);
+  if (!items.length || !S) return;
+  const w = items.reduce((s, it) => s + (it[1] ? 11 + it[1].length * 4 : 36) + 3, 3), pw = G.perkT > 0 ? Math.round(Math.sin(G.perkT / 40 * Math.PI * 4) * 2) : 0;
+  if (G.perkT > 0) G.perkT--;
+  pill(3, 20, w, 12, 0.6); let x = 6;
+  for (const [id, n] of items) {
+    S.icon(id, x, 22 + (id !== 'star' ? pw : 0), 1, G.frame);
+    if (n) { text(n, x + 10, 24, '#fff6d4', 1, null); x += 11 + n.length * 4 + 3; continue; }
+    const k = G.star / (G.pk.star || 1), bw = Math.ceil(24 * k), fl = G.star < 120 && Math.floor(G.star / 6) % 2;   // the clock: a rainbow bar that runs down
+    ctx.fillStyle = '#000'; ctx.fillRect(x + 10, 24, 26, 5);
+    for (let i = 0; i < bw; i++) { ctx.fillStyle = fl ? '#fff' : `hsl(${(G.frame * 6 + i * 15) % 360},90%,62%)`; ctx.fillRect(x + 11 + i, 25, 1, 3); }
+    x += 39;
   }
 }
 function drawHUD() {
@@ -1801,14 +1871,21 @@ function frame(now) {
     acc += Math.min(100, now - last); last = now;
     while (acc >= 1000 / 60) { acc -= 1000 / 60; if (scene) { readInput(); scene.step(IN); } else step(); }
     if (scene) scene.draw(ctx); else render();
+    drawPadNote(now);
   } catch (e) { if (frameErrs++ < 20) console.error('[frame]', e); }
+}
+function drawPadNote(now) {   // over the menu and the game alike, fading out at the end
+  if (!padNote) return;
+  const left = padNote.until - now; if (left <= 0) { padNote = null; return; }
+  ctx.globalAlpha = Math.min(1, left / 300); ctx.fillStyle = '#0a0408'; ctx.fillRect(0, VH - 13, VW, 13);
+  text(padNote.s, VW / 2, VH - 10, '#9ac8a0', 1, null, 'center'); ctx.globalAlpha = 1;
 }
 function run() { if (!looping) { looping = true; last = performance.now(); requestAnimationFrame(frame); } }
 function setScene(s) { scene = s; run(); }   // a menu scene {step(IN), draw(ctx)} replaces the game until start() is called
-function leave(quit) {   // level over (or quit from pause): hand the result to opts.onExit
+function leave(quit, extra) {   // level over (or quit from pause): hand the result to opts.onExit (extra: { store: true } stops at the HEI store)
   const o = DD.opts && DD.opts.onExit; if (!o || G.left) return;
   G.left = true;
-  o(quit ? { id: L.id, quit: true } : result());
+  o(quit ? { id: L.id, quit: true } : Object.assign(result(), extra));
 }
 const result = () => ({ id: L.id, got: G.got, total: popsTotal, bags: Math.floor(5 * bagFrac()), vhs: G.vhs, fact: G.factGot || null, allPop: pops.length > 0 && pops.every(c => c.got), boss: !!(G.done && G.done.boss) });
 function restart() {   // play it again: a won run is saved first (opts.onSave), so AGAIN on the results card never throws the win away

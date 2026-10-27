@@ -1,14 +1,15 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><title>Dootle Dots</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <style>
   html, body { margin: 0; height: 100%; background: #0e070c; overflow: hidden; }
   canvas { display: block; margin: 0 auto; image-rendering: pixelated; image-rendering: crisp-edges; }
 </style></head>
 <body><canvas id="c" width="320" height="180"></canvas>
 <script>
-// The game needs a keyboard. A phone or tablet (touch, and no hovering pointer or a mobile browser) gets the desktop-only card
-// in desktop.js instead of the game; a key press there, or ?desktop, loads the game anyway. Everything else loads on demand:
+// A phone or tablet (touch, and no hovering pointer or a mobile browser) gets the game plus the touch controls in touch.js;
+// ?desktop, or a key press remembered for the session, loads the plain keyboard game instead. ?card shows the old desktop-only
+// card in desktop.js, kept for previews. Everything else loads on demand:
 // levels all at once at boot (menu.js), music track by track as the game reaches it (music.js), voice clips and sprites as played.
 (function () {
   var Q = new URLSearchParams(location.search), kb = false;
@@ -17,8 +18,8 @@
   var phone = /Android|iPhone|iPad|iPod|Mobile|Silk|Opera Mini/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);   // iPadOS calls itself a Mac
   var hover = matchMedia('(any-hover: hover)').matches;
   var mobile = !kb && !Q.has('desktop') && touch && (phone || !hover);
-  var list = mobile ? ['engine.js', 'desktop.js']
-    : ['classics.js', 'engine.js', 'worlds.js', 'bonus.js', 'posters.js', 'menu.js', 'music/cues.js', 'music.js', 'voice/clips.js', 'voice/cues.js', 'voice.js'];
+  var list = Q.has('card') ? ['engine.js', 'desktop.js']
+    : ['classics.js', 'engine.js', 'worlds.js', 'bonus.js', 'posters.js', 'store.js', 'menu.js', 'music/cues.js', 'music.js', 'voice/clips.js', 'voice/cues.js', 'voice.js'].concat(mobile ? ['touch.js'] : []);
   for (var i = 0; i < list.length; i++) { var s = document.createElement('script'); s.src = list[i]; s.async = false; document.body.appendChild(s); }
 })();
 </script>

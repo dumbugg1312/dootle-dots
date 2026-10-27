@@ -187,7 +187,8 @@
 
   window.DDStore = {
     UP, COST, MAX, perks, award, icon, canBuy, open, step, draw, buy, nudge,
-    own, act, setAct, reload() { load(); }, get pts() { return S.pts; }, get earned() { return S.earned; },
+    own, act, setAct, reload() { load(); try { UNL = localStorage.getItem(UKEY) === '1'; } catch (e) { UNL = false; } },   // after LOAD / CLEAR DATA
+    get pts() { return S.pts; }, get earned() { return S.earned; },
     get unlimited() { return UNL; }, setUnlimited, get back() { return back; }, get cur() { return cur; }, set cur(i) { cur = i; },
   };
 })();
