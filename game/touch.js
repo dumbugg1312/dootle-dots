@@ -76,19 +76,20 @@
     if (!el || !root.contains(el)) return null;
     return el === pad || pad.contains(el) ? 'pad' : el === jumpB ? 'jump' : el === swB ? 'sw' : el === pauseB ? 'pause' : null;
   }
+  function begin(t) {   // a finger lands (or moves after a blur dropped it): the zone under it decides what it holds
+    const z = zoneAt(t); if (!z) return;
+    if (z === 'pause') { tap('KeyP'); return; }
+    const f = { zone: z, codes: [] }; fingers.set(t.identifier, f);
+    setCodes(f, z === 'pad' ? padCodes(t) : [z === 'jump' ? 'KeyZ' : 'KeyX']);
+    (z === 'pad' ? pad : z === 'jump' ? jumpB : swB).classList.add('on');
+  }
   root.addEventListener('touchstart', e => {
     e.preventDefault(); root.classList.remove('kb');
-    for (const t of e.changedTouches) {
-      const z = zoneAt(t); if (!z) continue;
-      if (z === 'pause') { tap('KeyP'); continue; }
-      const f = { zone: z, codes: [] }; fingers.set(t.identifier, f);
-      setCodes(f, z === 'pad' ? padCodes(t) : [z === 'jump' ? 'KeyZ' : 'KeyX']);
-      (z === 'pad' ? pad : z === 'jump' ? jumpB : swB).classList.add('on');
-    }
+    for (const t of e.changedTouches) begin(t);
   }, { passive: false });
   root.addEventListener('touchmove', e => {
     e.preventDefault();
-    for (const t of e.changedTouches) { const f = fingers.get(t.identifier); if (f && f.zone === 'pad') setCodes(f, padCodes(t)); }
+    for (const t of e.changedTouches) { const f = fingers.get(t.identifier); if (!f) begin(t); else if (f.zone === 'pad') setCodes(f, padCodes(t)); }
   }, { passive: false });
   function end(e) {
     e.preventDefault();

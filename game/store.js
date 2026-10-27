@@ -11,7 +11,7 @@
   const KEY = 'dootledots.hei.v1', UKEY = 'dootledots.unlimitedhei', MAX = 5;
   const COST = [15, 30, 50, 75, 100];   // tiers 1-5: 270 maxes one upgrade; a first clear pays about 40, a replay about 25
   const pl = (n, w) => n + ' ' + w + (n === 1 ? '' : 'S');
-  const jumpPct = n => Math.round((Math.pow(1 + 0.03 * n, 2) - 1) * 100);   // jump height goes with the square of the launch speed
+  const JUMP_PCT = [0, 6, 12, 17, 24, 30, 36], jumpPct = n => JUMP_PCT[n];   // measured in the engine (tests/store.js): how much higher a full jump goes, standing and running averaged
   const UP = [   // kind 0 passive, 1 active
     { id: 'bags', name: 'OUTSIDE FOOD', kind: 0, say: n => n > 5 ? "START EVERY STAGE WITH FIVE FULL BAGS AND A SPARE SIXTH, SO A HIT OR TWO CAN'T COST YOU THE FIVE" : 'START EVERY STAGE WITH ' + pl(n, 'BAG') + ' OF POPCORN ALREADY IN HAND' },
     { id: 'shield', name: 'MISTRIAL', kind: 0, say: n => n === 1 ? "IN EVERY STAGE, THE FIRST HIT YOU TAKE DOESN'T COUNT" : "IN EVERY STAGE, THE FIRST " + n + " HITS YOU TAKE DON'T COUNT" },

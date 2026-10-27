@@ -158,7 +158,8 @@
   let st = 'load', t = 0, cur = 0, lcur = 0, world = null, note = null, noteT = 0, msg = '';
   const lift = WORLDS.map(() => 0), vel = WORLDS.map(() => 0);
   // world select: one featured card for the highlighted world, and a rack of twelve numbered tape spines on a shelf under it
-  const CARD = { x: 40, y: 22, w: 240, h: 80 }, SP = { w: 20, h: 38, gx: 4, x0: 18, y: 116 };
+  const CARD = { x: 40, y: 18, w: 240, h: 60 }, SP = { w: 22, h: 72, gx: 3, x0: 12, y: 82 };
+  const spineSeasons = w => w.seasons.split(' + ')[0];   // what's printed up the spine: SEASONS 11-12 (the Oscars ride along on the card)
   const slot = i => ({ x: SP.x0 + i * (SP.w + SP.gx), y: SP.y });
   let swT = 0;   // frames since the highlight moved: the featured picture flashes like a tape being pushed in
   const compact = () => world && world.levels.length > 2, rowY = i => compact() ? 34 + i * 31 : 44 + i * 40;   // four stages a world get slimmer rows
@@ -589,20 +590,23 @@
 
   // ---------------------------------------------------------------- world select: a shelf of VHS sleeves
   const wrapRows = (str, n) => { const rows = []; let row = ''; str.split(' ').forEach(wd => { if (row && (row + ' ' + wd).length > n) { rows.push(row); row = wd; } else row = row ? row + ' ' + wd : wd; }); if (row) rows.push(row); return rows; };
-  function spine(i, w, open, on, tt) {   // a tape spine in the rack: era colours, a paper label with the world's number; dark and unlabelled until you get there
-    const s = slot(i), x = s.x, y = Math.round(s.y - lift[i]), W = SP.w, H = SP.h, locked = worldOpen(w) && !open, next = locked && WORLDS[i - 1] && worldUnlocked(WORLDS[i - 1]);
+  function spine(i, w, open, on, tt) {   // a tape in the rack: the number on the top band, the era's name and seasons printed up the spine; dim until you get there
+    const s = slot(i), x = s.x, y = Math.round(s.y - lift[i]), W = SP.w, H = SP.h, locked = worldOpen(w) && !open, next = locked && WORLDS[i - 1] && worldUnlocked(WORLDS[i - 1]), soon = !worldOpen(w);
     rect('rgba(0,0,0,0.45)', x + 2, s.y + 2, W, H);   // shadow on the shelf back
     if (on) { const pul = 0.55 + 0.45 * Math.sin(tt / 6); rect(w.accent, x - 2, y - 2, W + 4, H + 4); rect('rgba(255,255,255,' + (0.5 * pul).toFixed(2) + ')', x - 2, y - 2, W + 4, 1); }
     rect(on ? '#fff' : '#000', x - 1, y - 1, W + 2, H + 2);
-    rect(open ? w.band : '#1a1016', x, y, W, H);
-    rect(open ? w.accent : '#2a2028', x, y, W, 3); rect(open ? shade(w.band, 0.6) : '#120c10', x, y + H - 3, W, 3);
-    rect(open ? '#f4ecd8' : (next && blink(tt, 24) ? '#4a3a30' : '#2a2228'), x + 2, y + 6, W - 4, 16);   // the paper label
-    if (open) rect(w.accent, x + 2, y + 6, W - 4, 1);
-    text(String(w.n), x + W / 2, y + 9, open ? '#1a1218' : (next ? '#ffb070' : '#4a4048'), 2, null, 'center');
-    if (open) { const dn = idsOf(w).filter(beaten).length, n = w.levels.length; for (let k = 0; k < n; k++) rect(k < dn ? w.accent : 'rgba(0,0,0,0.35)', x + 3 + k * Math.floor((W - 6) / n), y + 26, Math.floor((W - 6) / n) - 1, 3); }   // stages beaten, as ticks down the spine
-    if (worldMarks(w) === w.levels.length * 3) { rect('#ffe680', x + W / 2 - 1, y + 30, 2, 6); rect('#ffe680', x + W / 2 - 3, y + 32, 6, 2); }   // every mark: a gold star
-    if (!open) { if (next) { for (let k = 0; k < 3; k++) rect('#ffb070', x + W / 2 - 1 + (k === 1 ? 0 : 0), y + 27 + k * 3, 2, 2); }   // a dotted thread down to the next tape
-      else { rect('#000', x + W / 2 - 3, y + 28, 6, 5); rect('#3a3038', x + W / 2 - 2, y + 29, 4, 3); rect('#000', x + W / 2 - 2, y + 25, 1, 3); rect('#000', x + W / 2 + 1, y + 25, 1, 3); rect('#000', x + W / 2 - 1, y + 25, 2, 1); } }   // a tiny padlock
+    rect(open ? w.band : shade(w.band, 0.45), x, y, W, H);
+    rect(open ? w.accent : shade(w.accent, 0.45), x, y, W, 11);   // the number band
+    text(String(w.n), x + W / 2, y + 3, open ? (lumOf(w.accent) > 150 ? '#1a1218' : '#fff6d4') : '#c8b8c0', 1, null, 'center');
+    rect(open ? '#f4ecd8' : (soon ? '#2a2228' : '#4a3e44'), x + 2, y + 13, W - 4, H - 17);   // the paper label
+    rect(open ? shade(w.accent, 0.9) : '#000', x + 2, y + 13, W - 4, 1);
+    ctx.save(); ctx.translate(x, y + H - 6); ctx.rotate(-Math.PI / 2);   // reads up the spine
+    text(w.short, 0, 4, open ? '#1a1218' : (soon ? '#5a4e58' : '#c8b8c0'), 1, null);
+    text(spineSeasons(w), 0, 12, open ? shade(w.accent, 0.8) : (soon ? '#4a3e48' : '#9a8a90'), 1, null);
+    ctx.restore();
+    if (open) { const dn = idsOf(w).filter(beaten).length, n = w.levels.length, pw = Math.floor((W - 6) / n); for (let k = 0; k < n; k++) rect(k < dn ? w.accent : 'rgba(0,0,0,0.3)', x + 3 + k * pw, y + H - 3, pw - 1, 2); }   // stages beaten, as ticks along the foot
+    if (worldMarks(w) === w.levels.length * 3) star4(x + W - 5, y + 5, '#ffe680');   // every mark: a gold star
+    if (next && blink(tt, 24)) { rect('#ffb070', x - 1, y - 1, W + 2, 1); rect('#ffb070', x - 1, y + H, W + 2, 1); }   // the next tape to open
     if (!on) rect('rgba(8,2,12,' + (open ? 0.1 : 0.22) + ')', x, y, W, H);
   }
   function featured(w, tt) {   // the big card: a 2x picture of the world, its name and seasons, its line, and the run so far
@@ -612,7 +616,7 @@
     rect(open ? w.bg : shade(w.bg, 0.4), x, y, C.w, C.h);
     rect(open ? w.band : shade(w.band, 0.4), x, y, C.w, 4);   // a thin era band along the top
     // picture, at twice the rack's scale
-    const px = x + 8, py = y + 12, PW = 84, PH = 52;
+    const px = x + 8, py = y + 4, PW = 84, PH = 52;
     rect('#000', px - 2, py - 2, PW + 4, PH + 4); rect(open ? w.accent : '#4a3a40', px - 2, py - 2, PW + 4, 1);
     ctx.save(); ctx.translate(px, py); ctx.scale(2, 2); thumb(w, 0, 0, open, tt); ctx.restore();
     if (open) { const g = (tt * 1.3) % 110 - 20; if (g > -10 && g < PW + 14) { clipRect(px, py, PW, PH); ctx.beginPath(); ctx.moveTo(px + g, py); ctx.lineTo(px + g + 12, py); ctx.lineTo(px + g - 4, py + PH); ctx.lineTo(px + g - 16, py + PH); ctx.closePath(); ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.fill(); ctx.restore(); } }   // a glint sweeps the picture
@@ -620,19 +624,11 @@
     if (!open) { rect('rgba(8,4,12,0.66)', px, py, PW, PH); text(locked ? 'LOCKED' : 'COMING SOON', px + PW / 2, py + PH / 2 - 3, '#d8c8d0', 1, '#000', 'center'); }
     // the right column: number, title, seasons, the line
     const tx = x + 104, cw = C.w - 112;
-    text('WORLD ' + w.n, tx, y + 12, open ? w.accent : dim, 2, SHD(w) ? '#000' : null);
-    text(w.title, tx, y + 30, open ? w.fg : dim, 1, SHD(w));
-    text(w.seasons, tx, y + 39, dim, 1, SHD(w));
+    text('WORLD ' + w.n, tx, y + 5, open ? w.accent : dim, 2, SHD(w) ? '#000' : null);
+    text(w.title, tx, y + 21, open ? w.fg : dim, 1, SHD(w));
+    text(w.seasons, tx, y + 30, dim, 1, SHD(w));
     const line = open ? w.tag : locked ? (pw && worldUnlocked(pw) ? 'BEAT ' + pw.boss + ' TO OPEN IT' : 'OPENS AFTER WORLD ' + (w.n - 1)) : 'COMING SOON';
-    wrapRows(line, Math.floor(cw / 4)).slice(0, 2).forEach((r, k) => text(r, tx, y + 52 + k * 9, open ? w.fg : '#ffb070', 1, SHD(w)));
-    // the run so far, under the picture
-    if (open) {
-      const sy = y + C.h - 11, full = worldMarks(w) === w.levels.length * 3;
-      tubIcon(px, sy, '#d8202c'); text(worldBags(w) + '/' + worldMax(w), px + 8, sy + 1, open ? w.fg : dim, 1, SHD(w));
-      vhsIcon(px + 36, sy + 1, '#e8504a'); text(worldVhs(w) + '/' + w.levels.length, px + 47, sy + 1, w.fg, 1, SHD(w));
-      star4(px + 66, sy + 4, full ? '#ffe680' : w.fg); text(worldMarks(w) + '/' + w.levels.length * 3, px + 70, sy + 1, full ? '#ffe680' : w.fg, 1, SHD(w));
-      const dn = idsOf(w).filter(beaten).length; text(dn === w.levels.length ? 'CLEARED' : dn + '/' + w.levels.length + ' STAGES', x + C.w - 8, sy + 1, dn === w.levels.length ? w.accent : dim, 1, SHD(w), 'right');
-    }
+    wrapRows(line, Math.floor(cw / 4)).slice(0, 2).forEach((r, k) => text(r, tx, y + 41 + k * 9, open ? w.fg : '#ffb070', 1, SHD(w)));
   }
   function drawSelect() {
     const tt = t;
@@ -652,12 +648,19 @@
     rect('#2a0e1a', 2, 2, 52, 11); vhsIcon(5, 4, '#e8504a'); text('SHELF', 17, 5, Math.floor(tt / 20) % 2 ? '#fffbd0' : '#ffd27a', 1, null);   // up, or click
     rect('#2a0e1a', VW - 60, 2, 58, 11); text('OPTIONS', VW - 31, 5, '#ffd27a', 1, null, 'center');
     storeBtn(VW - 98, 2, 36, 'STORE', tt);
-    if (noteT > 0) { rect('#0a0408', 0, CARD.y + CARD.h + 3, VW, 11); ctext(note, CARD.y + CARD.h + 5, '#ff8080', 1); }
-    // footer: the total, and the buttons
+    if (noteT > 0) { rect('#0a0408', 0, CARD.y + CARD.h + 2, VW, 11); ctext(note, CARD.y + CARD.h + 4, '#ff8080', 1); }
+    // the total, top left by the shelf
     const tot = WORLDS.reduce((s, x) => s + worldBags(x), 0), mx = WORLDS.reduce((s, x) => s + worldMax(x), 0);
+    tubIcon(60, 4, '#d8202c'); text(tot + '/' + mx, 68, 5, '#fff6d4', 1, null);
+    // footer: the highlighted world's run so far, and the buttons
+    const w = WORLDS[cur], fy = VH - 9;
     rect('rgba(0,0,0,0.55)', 0, VH - 12, VW, 12);
-    tubIcon(6, VH - 10, '#d8202c'); text(tot + '/' + mx, 14, VH - 9, '#ffd27a', 1, null);
-    text(DD.padUsed ? 'CROSS: PLAY    SQUARE: HEI STORE    CIRCLE: BACK' : 'JUMP: PLAY    H: HEI STORE    X: BACK', VW - 6, VH - 9, '#d8c8d0', 1, null, 'right');
+    if (worldPlay(w)) { const full = worldMarks(w) === w.levels.length * 3, dn = idsOf(w).filter(beaten).length;
+      tubIcon(6, fy - 1, '#d8202c'); text(worldBags(w) + '/' + worldMax(w), 14, fy, '#ffd27a', 1, null);
+      vhsIcon(40, fy, '#e8504a'); text(worldVhs(w) + '/' + w.levels.length, 51, fy, '#ffd27a', 1, null);
+      star4(70, fy + 3, full ? '#ffe680' : '#9ac8a0'); text(worldMarks(w) + '/' + w.levels.length * 3, 74, fy, full ? '#ffe680' : '#9ac8a0', 1, null);
+      text(dn === w.levels.length ? 'CLEARED' : dn + '/' + w.levels.length + ' STAGES', 98, fy, dn === w.levels.length ? w.accent : '#d8c8d0', 1, null); }
+    text(DD.padUsed ? 'CROSS: PLAY    SQUARE: STORE    CIRCLE: BACK' : 'JUMP: PLAY    H: STORE    X: BACK', VW - 6, fy, '#d8c8d0', 1, null, 'right');
   }
 
   function storeBtn(x, y, w, label, tt) {   // the HEI store's button: a coin and the label, the coin glinting when something is affordable
