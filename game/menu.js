@@ -16,7 +16,7 @@
   function record(r) {
     if (!r || r.quit || !r.id) return;
     const o = PROG[r.id] || {};
-    PROG[r.id] = { bags: Math.max(o.bags || 0, r.bags || 0), got: Math.max(o.got || 0, r.got || 0), total: r.total || o.total || 0, vhs: !!(o.vhs || r.vhs), fact: o.fact || r.fact || null, allPop: !!(o.allPop || r.allPop) };
+    PROG[r.id] = { bags: Math.max(o.bags || 0, r.bags || 0), got: Math.max(o.got || 0, r.got || 0), total: r.total || o.total || 0, vhs: !!(o.vhs || r.vhs), fact: o.fact || r.fact || null, allPop: !!(o.allPop || r.allPop), six: !!(o.six || r.six) };   // six: won at six bags (the HEI store's SIX BAGS)
     try { localStorage.setItem(KEY, JSON.stringify(PROG)); } catch (e) { /* storage blocked: progress lasts this session */ }
   }
   const marks = id => { const p = PROG[id] || {}; return (p.allPop ? 1 : 0) + (p.vhs ? 1 : 0) + (p.fact ? 1 : 0); };   // a stage's three goals: every kernel, the tape, the blue card
@@ -157,8 +157,10 @@
   // ---- scenes
   let st = 'load', t = 0, cur = 0, lcur = 0, world = null, note = null, noteT = 0, msg = '';
   const lift = WORLDS.map(() => 0), vel = WORLDS.map(() => 0);
-  const SL = { cols: 6, w: 48, h: 60, gx: 4, x0: 6, y0: [19, 87] };
-  const slot = i => ({ x: SL.x0 + (i % SL.cols) * (SL.w + SL.gx), y: SL.y0[Math.floor(i / SL.cols)] });
+  // world select: one featured card for the highlighted world, and a rack of twelve numbered tape spines on a shelf under it
+  const CARD = { x: 40, y: 22, w: 240, h: 80 }, SP = { w: 20, h: 38, gx: 4, x0: 18, y: 116 };
+  const slot = i => ({ x: SP.x0 + i * (SP.w + SP.gx), y: SP.y });
+  let swT = 0;   // frames since the highlight moved: the featured picture flashes like a tape being pushed in
   const compact = () => world && world.levels.length > 2, rowY = i => compact() ? 34 + i * 31 : 44 + i * 40;   // four stages a world get slimmer rows
 
   // ---- Gregg's shelf: every Popcorn Classic tape, one per stage, in world order (classics.js)
@@ -166,7 +168,7 @@
   const shelfIds = () => [].concat(...WORLDS.map(idsOf)).filter(id => window.CLASSICS && CLASSICS[id]);
   let scur = 0;
   function openShelf() { st = 'shelf'; t = 0; scur = 0; SFX.switch(); }
-  function selectTo(i) { if (i === cur) return; cur = i; sTape(); }
+  function selectTo(i) { if (i === cur) return; cur = i; swT = 10; sTape(); }
   const eraLine = w => { const V = window.DDVoice; if (V && w && worldOpen(w)) V.say('world', { world: w.n }); };   // opening a world: its era says its line (game/voice/cues.js)
   // ---- the rewind between World 1 and World 2: the last Oscar special stops, the tape rewinds through every era, and Season One plays.
   // Every era is a live trailer, the real engine playing the real stages (DD.trailer): its first stage, a cut to a second stage, then the boss
@@ -433,14 +435,15 @@
       return;
     }
     if (st === 'select') {
-      if (hover && hover.dirty) { hover.dirty = false; for (let i = 0; i < WORLDS.length; i++) { const s = slot(i); if (inR(hover, s.x, s.y - 6, SL.w, SL.h + 6)) { selectTo(i); break; } } }
+      if (swT > 0) swT--;
+      if (hover && hover.dirty) { hover.dirty = false; for (let i = 0; i < WORLDS.length; i++) { const s = slot(i); if (inR(hover, s.x - 2, s.y - 8, SP.w + 4, SP.h + 10)) { selectTo(i); break; } } }
       if (IN.nx) { const n = Math.max(0, Math.min(WORLDS.length - 1, cur + IN.nx)); if (n !== cur) selectTo(n); }
-      if (IN.ny < 0 && cur < SL.cols) openShelf();   // up from the top row: Gregg's shelf
-      else if (IN.ny) { const n = cur + IN.ny * SL.cols; if (n >= 0 && n < WORLDS.length) selectTo(n); }
+      if (IN.ny < 0) openShelf();   // up: Gregg's shelf
       if (c && inR(c, 0, 0, 58, 14)) { openShelf(); return; }
       if ((c && inR(c, VW - 62, 0, 62, 14)) || IN.opt) { openOptions(); return; }
       if ((c && inR(c, VW - 98, 0, 36, 14)) || IN.store) { openStore(() => { st = 'select'; t = 0; }); return; }
-      if (c) { for (let i = 0; i < WORLDS.length; i++) { const s = slot(i); if (inR(c, s.x, s.y - 6, SL.w, SL.h + 6)) { if (i === cur) enterWorld(cur); else selectTo(i); break; } } }
+      if (c) { let hit = false; for (let i = 0; i < WORLDS.length; i++) { const s = slot(i); if (inR(c, s.x - 2, s.y - 8, SP.w + 4, SP.h + 10)) { hit = true; if (i === cur) enterWorld(cur); else selectTo(i); break; } }
+        if (!hit && inR(c, CARD.x, CARD.y, CARD.w, CARD.h)) enterWorld(cur); }   // the featured card is the big PLAY button
       if (IN.ok) enterWorld(cur);
       if (IN.back) { st = 'title'; t = 130; }
     } else if (st === 'options') {
@@ -585,72 +588,76 @@
   }
 
   // ---------------------------------------------------------------- world select: a shelf of VHS sleeves
-  function sleeve(i, w, open, on, tt) {
-    const s = slot(i), lf = lift[i], x = s.x, y = Math.round(s.y - lf), W = SL.w, H = SL.h, k = open ? 1 : 0.45;
-    const c = n => open ? n : shade(n, 0.5);
-    rect('rgba(0,0,0,0.4)', x + 3, s.y + 2, W, H);   // shadow on the back wall
+  const wrapRows = (str, n) => { const rows = []; let row = ''; str.split(' ').forEach(wd => { if (row && (row + ' ' + wd).length > n) { rows.push(row); row = wd; } else row = row ? row + ' ' + wd : wd; }); if (row) rows.push(row); return rows; };
+  function spine(i, w, open, on, tt) {   // a tape spine in the rack: era colours, a paper label with the world's number; dark and unlabelled until you get there
+    const s = slot(i), x = s.x, y = Math.round(s.y - lift[i]), W = SP.w, H = SP.h, locked = worldOpen(w) && !open, next = locked && WORLDS[i - 1] && worldUnlocked(WORLDS[i - 1]);
+    rect('rgba(0,0,0,0.45)', x + 2, s.y + 2, W, H);   // shadow on the shelf back
     if (on) { const pul = 0.55 + 0.45 * Math.sin(tt / 6); rect(w.accent, x - 2, y - 2, W + 4, H + 4); rect('rgba(255,255,255,' + (0.5 * pul).toFixed(2) + ')', x - 2, y - 2, W + 4, 1); }
     rect(on ? '#fff' : '#000', x - 1, y - 1, W + 2, H + 2);
-    rect(c(w.bg), x, y, W, H);
-    rect(c(w.band), x, y, W, 13); rect(c(w.accent), x, y + 13, W, 1);
-    text(String(w.n), x + 3, y + 2, c(w.accent), 2, SHD(w) ? '#000' : null);
-    for (let b = 0; b < 9; b++) { rect(shade(w.bg, 0.55), x + 24 + b * 2 + (b % 3 ? 0 : 1), y + 3, b % 3 === 0 ? 2 : 1, 7); }   // barcode
-    rect('#000', x + 2, y + 15, 44, 28); rect(c(w.accent), x + 2, y + 15, 44, 1);
-    thumb(w, x + 3, y + 16, open, tt);
-    if (worldMarks(w) === w.levels.length * 3) { rect('#ffe680', x + 40, y + 3, 2, 8); rect('#ffe680', x + 37, y + 6, 8, 2); }   // every mark in the world: a gold star
-    if (on && open) {   // glint sweeps the picture now and then
-      const g = (tt * 1.3) % 90 - 20; if (g > -10 && g < 56) { clipRect(x + 3, y + 16, 42, 26); ctx.beginPath(); ctx.moveTo(x + 3 + g, y + 16); ctx.lineTo(x + 3 + g + 8, y + 16); ctx.lineTo(x + 3 + g - 2, y + 42); ctx.lineTo(x + 3 + g - 10, y + 42); ctx.closePath(); ctx.fillStyle = 'rgba(255,255,255,0.28)'; ctx.fill(); ctx.restore(); }
-    }
-    text(w.short, x + 24, y + 44, c(w.fg), 1, SHD(w), 'center');
-    rect('rgba(0,0,0,0.3)', x, y + H - 11, W, 11);
+    rect(open ? w.band : '#1a1016', x, y, W, H);
+    rect(open ? w.accent : '#2a2028', x, y, W, 3); rect(open ? shade(w.band, 0.6) : '#120c10', x, y + H - 3, W, 3);
+    rect(open ? '#f4ecd8' : (next && blink(tt, 24) ? '#4a3a30' : '#2a2228'), x + 2, y + 6, W - 4, 16);   // the paper label
+    if (open) rect(w.accent, x + 2, y + 6, W - 4, 1);
+    text(String(w.n), x + W / 2, y + 9, open ? '#1a1218' : (next ? '#ffb070' : '#4a4048'), 2, null, 'center');
+    if (open) { const dn = idsOf(w).filter(beaten).length, n = w.levels.length; for (let k = 0; k < n; k++) rect(k < dn ? w.accent : 'rgba(0,0,0,0.35)', x + 3 + k * Math.floor((W - 6) / n), y + 26, Math.floor((W - 6) / n) - 1, 3); }   // stages beaten, as ticks down the spine
+    if (worldMarks(w) === w.levels.length * 3) { rect('#ffe680', x + W / 2 - 1, y + 30, 2, 6); rect('#ffe680', x + W / 2 - 3, y + 32, 6, 2); }   // every mark: a gold star
+    if (!open) { if (next) { for (let k = 0; k < 3; k++) rect('#ffb070', x + W / 2 - 1 + (k === 1 ? 0 : 0), y + 27 + k * 3, 2, 2); }   // a dotted thread down to the next tape
+      else { rect('#000', x + W / 2 - 3, y + 28, 6, 5); rect('#3a3038', x + W / 2 - 2, y + 29, 4, 3); rect('#000', x + W / 2 - 2, y + 25, 1, 3); rect('#000', x + W / 2 + 1, y + 25, 1, 3); rect('#000', x + W / 2 - 1, y + 25, 2, 1); } }   // a tiny padlock
+    if (!on) rect('rgba(8,2,12,' + (open ? 0.1 : 0.22) + ')', x, y, W, H);
+  }
+  function featured(w, tt) {   // the big card: a 2x picture of the world, its name and seasons, its line, and the run so far
+    const C = CARD, x = C.x, y = C.y, open = worldPlay(w), locked = worldOpen(w) && !open, pw = WORLDS[cur - 1], lt = !SHD(w), dim = lt ? '#5a4a60' : '#a89aa0';
+    rect('rgba(0,0,0,0.5)', x + 4, y + 4, C.w, C.h);
+    rect('#000', x - 2, y - 2, C.w + 4, C.h + 4); rect(open ? w.accent : '#4a3a40', x - 1, y - 1, C.w + 2, C.h + 2);
+    rect(open ? w.bg : shade(w.bg, 0.4), x, y, C.w, C.h);
+    rect(open ? w.band : shade(w.band, 0.4), x, y, C.w, 4);   // a thin era band along the top
+    // picture, at twice the rack's scale
+    const px = x + 8, py = y + 12, PW = 84, PH = 52;
+    rect('#000', px - 2, py - 2, PW + 4, PH + 4); rect(open ? w.accent : '#4a3a40', px - 2, py - 2, PW + 4, 1);
+    ctx.save(); ctx.translate(px, py); ctx.scale(2, 2); thumb(w, 0, 0, open, tt); ctx.restore();
+    if (open) { const g = (tt * 1.3) % 110 - 20; if (g > -10 && g < PW + 14) { clipRect(px, py, PW, PH); ctx.beginPath(); ctx.moveTo(px + g, py); ctx.lineTo(px + g + 12, py); ctx.lineTo(px + g - 4, py + PH); ctx.lineTo(px + g - 16, py + PH); ctx.closePath(); ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.fill(); ctx.restore(); } }   // a glint sweeps the picture
+    if (swT > 0) rect('rgba(255,246,220,' + (0.06 * swT).toFixed(2) + ')', px, py, PW, PH);   // the tape went in
+    if (!open) { rect('rgba(8,4,12,0.66)', px, py, PW, PH); text(locked ? 'LOCKED' : 'COMING SOON', px + PW / 2, py + PH / 2 - 3, '#d8c8d0', 1, '#000', 'center'); }
+    // the right column: number, title, seasons, the line
+    const tx = x + 104, cw = C.w - 112;
+    text('WORLD ' + w.n, tx, y + 12, open ? w.accent : dim, 2, SHD(w) ? '#000' : null);
+    text(w.title, tx, y + 30, open ? w.fg : dim, 1, SHD(w));
+    text(w.seasons, tx, y + 39, dim, 1, SHD(w));
+    const line = open ? w.tag : locked ? (pw && worldUnlocked(pw) ? 'BEAT ' + pw.boss + ' TO OPEN IT' : 'OPENS AFTER WORLD ' + (w.n - 1)) : 'COMING SOON';
+    wrapRows(line, Math.floor(cw / 4)).slice(0, 2).forEach((r, k) => text(r, tx, y + 52 + k * 9, open ? w.fg : '#ffb070', 1, SHD(w)));
+    // the run so far, under the picture
     if (open) {
-      tubIcon(x + 3, y + H - 9, '#d8202c'); text(worldBags(w) + '/' + worldMax(w), x + 10, y + H - 8, '#fff6d4', 1, null);
-      w.levels.slice(0, 2).forEach((l, k) => vhsMini(x + 31 + k * 9, y + H - 9, !!(PROG[l.id] && PROG[l.id].vhs)));
-    } else {
-      rect('rgba(8,4,12,0.62)', x + 3, y + 16, 42, 26);
-      if (worldOpen(w)) { text('LOCKED', x + 24, y + 26, '#c8b8c0', 1, '#000', 'center'); if (WORLDS[i - 1] && worldUnlocked(WORLDS[i - 1])) text('NEXT', x + 24, y + H - 8, '#ffb070', 1, null, 'center'); }   // a world you haven't reached yet
-      else { text('COMING', x + 24, y + 22, '#c8b8c0', 1, '#000', 'center'); text('SOON', x + 24, y + 30, '#c8b8c0', 1, '#000', 'center');
-      text('SOON', x + 24, y + H - 8, '#9a8a90', 1, null, 'center'); }
+      const sy = y + C.h - 11, full = worldMarks(w) === w.levels.length * 3;
+      tubIcon(px, sy, '#d8202c'); text(worldBags(w) + '/' + worldMax(w), px + 8, sy + 1, open ? w.fg : dim, 1, SHD(w));
+      vhsIcon(px + 36, sy + 1, '#e8504a'); text(worldVhs(w) + '/' + w.levels.length, px + 47, sy + 1, w.fg, 1, SHD(w));
+      star4(px + 66, sy + 4, full ? '#ffe680' : w.fg); text(worldMarks(w) + '/' + w.levels.length * 3, px + 70, sy + 1, full ? '#ffe680' : w.fg, 1, SHD(w));
+      const dn = idsOf(w).filter(beaten).length; text(dn === w.levels.length ? 'CLEARED' : dn + '/' + w.levels.length + ' STAGES', x + C.w - 8, sy + 1, dn === w.levels.length ? w.accent : dim, 1, SHD(w), 'right');
     }
-    if (!on) rect('rgba(8,2,12,' + (open ? 0.12 : 0.18) + ')', x, y, W, H);
-    // spine notch / tape window at the sleeve's lower corner
-    rect('#000', x + 2, y + H - 2, 44, 2);
   }
   function drawSelect() {
     const tt = t;
     rect('#120610', 0, 0, VW, VH);
     for (let x = -CURT + (-tt * 0.05 % CURT); x < VW + CURT; x += CURT) spr('w2_curtain', x + CURT / 2, 216);
     rect('rgba(10,4,14,0.72)', 0, 0, VW, VH);
-    for (let i = 0; i < 2; i++) {   // wooden shelves
-      const y = SL.y0[i] + SL.h;
-      rect('#000', 0, y, VW, 6); rect('#94683c', 0, y + 1, VW, 1); rect('#6a4626', 0, y + 2, VW, 2); rect('#3a2414', 0, y + 4, VW, 2);
-      rect('rgba(0,0,0,0.5)', 0, y + 6, VW, 2);
-    }
-    for (let i = 0; i < WORLDS.length; i++) if (i !== cur) sleeve(i, WORLDS[i], worldPlay(WORLDS[i]), false, tt);
-    sleeve(cur, WORLDS[cur], worldPlay(WORLDS[cur]), true, tt);   // the selected one last, so it sits in front
+    { const y = SP.y + SP.h;   // the wooden shelf the rack sits on
+      rect('#000', 0, y, VW, 6); rect('#94683c', 0, y + 1, VW, 1); rect('#6a4626', 0, y + 2, VW, 2); rect('#3a2414', 0, y + 4, VW, 2); rect('rgba(0,0,0,0.5)', 0, y + 6, VW, 2); }
+    for (let i = 0; i < WORLDS.length; i++) if (i !== cur) spine(i, WORLDS[i], worldPlay(WORLDS[i]), false, tt);
+    spine(cur, WORLDS[cur], worldPlay(WORLDS[cur]), true, tt);   // the highlighted one last, so it sits in front
+    featured(WORLDS[cur], tt);
     // header: a marquee
     rect('#2a0e1a', 0, 0, VW, 14); rect('#c98f22', 0, 14, VW, 1);
     for (let x = 4, i = 0; x < VW; x += 8, i++) { rect((i + Math.floor(tt / 6)) % 3 === 0 ? '#fffbd0' : '#8a5a1c', x, 6, 2, 2); }
     rect('#2a0e1a', 60, 0, 200, 14);
     ctext('SELECT A WORLD', 2, '#ffe680', 2, '#7a2a10');
-    rect('#2a0e1a', 2, 2, 52, 11); vhsIcon(5, 4, '#e8504a'); text('SHELF', 17, 5, cur < SL.cols && Math.floor(tt / 20) % 2 ? '#fffbd0' : '#ffd27a', 1, null);   // up from the top row, or click
-    // info panel
-    const w = WORLDS[cur], open = worldPlay(w), locked = worldOpen(w) && !open, pw = WORLDS[cur - 1];
-    rect('#0a0408', 0, 156, VW, 24); rect(w.accent, 0, 156, VW, 1); rect(shade(w.accent, 0.5), 0, 157, VW, 1);
-    text(w.title + '   ' + w.seasons, VW / 2, 159, open ? w.accent : '#9a8a90', 1, '#000', 'center');
-    text(open ? w.tag : locked ? (pw && worldUnlocked(pw) ? 'NEXT. BEAT ' + pw.boss + ' TO OPEN IT' : 'LOCKED') : 'COMING SOON', VW / 2, 167, open ? '#fff6d4' : locked ? '#ffb070' : '#9a8a90', 1, null, 'center');
-    if (open) {
-      const n = w.levels.filter(l => have(l.id)).length;
-      tubIcon(VW / 2 - 66, 173, '#d8202c'); text(worldBags(w) + '/' + worldMax(w) + ' BAGS', VW / 2 - 59, 174, '#ffd27a', 1, null);
-      vhsIcon(VW / 2 - 12, 174, '#e8504a'); text(worldVhs(w) + '/' + w.levels.length + ' VHS', VW / 2 - 1, 174, '#ffd27a', 1, null);
-      text(worldMarks(w) + '/' + w.levels.length * 3 + ' MARKS', VW / 2 + 38, 174, worldMarks(w) === w.levels.length * 3 ? '#ffe680' : '#9ac8a0', 1, null);
-    }
-    if (noteT > 0) { rect('#0a0408', 0, 144, VW, 11); ctext(note, 146, '#ff8080', 1); }
-    // total bags, top left by the shelf
-    const tot = WORLDS.reduce((s, x) => s + worldBags(x), 0), mx = WORLDS.reduce((s, x) => s + worldMax(x), 0);
-    tubIcon(60, 4, '#d8202c'); text(tot + '/' + mx, 68, 5, '#fff6d4', 1, null);
+    rect('#2a0e1a', 2, 2, 52, 11); vhsIcon(5, 4, '#e8504a'); text('SHELF', 17, 5, Math.floor(tt / 20) % 2 ? '#fffbd0' : '#ffd27a', 1, null);   // up, or click
     rect('#2a0e1a', VW - 60, 2, 58, 11); text('OPTIONS', VW - 31, 5, '#ffd27a', 1, null, 'center');
     storeBtn(VW - 98, 2, 36, 'STORE', tt);
+    if (noteT > 0) { rect('#0a0408', 0, CARD.y + CARD.h + 3, VW, 11); ctext(note, CARD.y + CARD.h + 5, '#ff8080', 1); }
+    // footer: the total, and the buttons
+    const tot = WORLDS.reduce((s, x) => s + worldBags(x), 0), mx = WORLDS.reduce((s, x) => s + worldMax(x), 0);
+    rect('rgba(0,0,0,0.55)', 0, VH - 12, VW, 12);
+    tubIcon(6, VH - 10, '#d8202c'); text(tot + '/' + mx, 14, VH - 9, '#ffd27a', 1, null);
+    text(DD.padUsed ? 'CROSS: PLAY    SQUARE: HEI STORE    CIRCLE: BACK' : 'JUMP: PLAY    H: HEI STORE    X: BACK', VW - 6, VH - 9, '#d8c8d0', 1, null, 'right');
   }
 
   function storeBtn(x, y, w, label, tt) {   // the HEI store's button: a coin and the label, the coin glinting when something is affordable
@@ -869,8 +876,10 @@
       if (boss) { const bx = X + 13 + l.id.length * 8 + 4; rect(ok ? '#c01820' : '#4a2428', bx, y + 5, 22, 9); text('BOSS', bx + 11, y + 7, '#fff', 1, null, 'center'); }
       if (on) { const ax = X + 4 + Math.round(Math.abs(Math.sin(tt / 8)) * 2); for (let k = 0; k < 4; k++) rect('#fff', ax + k, y + (cm ? 7 : 10) + k, 1, 8 - k * 2); }   // a little arrow
       if (!ok) { if (blink(tt, 40) || !on) text(shut ? 'LOCKED' : 'SOON', X + Wd - 10, y + (cm ? 17 : 21), dim, 1, SHD(w), 'right'); return; }
-      for (let b = 0; b < 5; b++) { const got = p && b < p.bags; rect(lt ? 'rgba(0,0,0,0.35)' : '#000', X + Wd - 41 + b * 6, y + 5, 5, 7); rect(got ? '#ffe680' : (lt ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.14)'), X + Wd - 40 + b * 6, y + 6, 3, 5); if (got) rect('#d8202c', X + Wd - 40 + b * 6, y + 9, 3, 1); }   // best bags, as tiny tubs
-      if (p && p.allPop) { const sx = X + Wd - 50, sy = y + 5; rect('#ffe680', sx + 2, sy, 1, 7); rect('#ffe680', sx, sy + 2, 5, 3); rect('#c98f22', sx + 1, sy + 5, 3, 1); }   // every kernel: a gold star
+      const s6 = p && p.six ? 6 : 0;   // a six-bag win: the tubs shift left for a red sixth
+      if (s6) { rect('#000', X + Wd - 17, y + 5, 5, 7); rect('#e8302a', X + Wd - 16, y + 6, 3, 5); rect('#fff6d4', X + Wd - 16, y + 9, 3, 1); }
+      for (let b = 0; b < 5; b++) { const got = p && b < p.bags; rect(lt ? 'rgba(0,0,0,0.35)' : '#000', X + Wd - 41 - s6 + b * 6, y + 5, 5, 7); rect(got ? '#ffe680' : (lt ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.14)'), X + Wd - 40 - s6 + b * 6, y + 6, 3, 5); if (got) rect('#d8202c', X + Wd - 40 - s6 + b * 6, y + 9, 3, 1); }   // best bags, as tiny tubs
+      if (p && p.allPop) { const sx = X + Wd - 50 - s6, sy = y + 5; rect('#ffe680', sx + 2, sy, 1, 7); rect('#ffe680', sx, sy + 2, 5, 3); rect('#c98f22', sx + 1, sy + 5, 3, 1); }   // every kernel: a gold star
     }
     function drawPoster(tt) {
       const l = w.levels[lcur], id = l.id, ok = have(id) && stageUnlocked(w, lcur), shut = have(id) && !ok, p = PROG[id], P = PV;

@@ -244,7 +244,7 @@ function build() {
     frame: 0, state: Q.has('warp') || Q.has('sim') ? 'play' : 'title', got: 0, vhs: false, hitstop: 0, shake: 0,
     banner: null, cp: null, cardT: (L.CARD_LANES || []).map(() => 0), gateRespawn: 0, done: null, restartReq: false, combo: 0, comboT: 0,
     secrets: {}, heads: {}, cards: [], seen: { sam: true }, denyT: 0, met: {}, bq: [], things: {}, s: {}, boss: null,   // s: free scratch space for level scripts
-    intro: 0, dlg: { q: [], cur: null, last: null, show: 0, gap: 0 }, lineSeen: {}, fall: null, pm: { sel: 0 }, hudGot: 0, cntT: 0, cntDir: 1, bagN: 0, bagWig: [0, 0, 0, 0, 0],
+    intro: 0, dlg: { q: [], cur: null, last: null, show: 0, gap: 0 }, lineSeen: {}, fall: null, pm: { sel: 0 }, hudGot: 0, cntT: 0, cntDir: 1, bagN: 0, bagWig: [0, 0, 0, 0, 0, 0],
     pk: K, shield: K.shield || 0, takes: K.takes || 0, star: K.star || 0, perkT: 0,   // what's left of this run's MISTRIAL hits, TAKE TWO falls and GERM FREE frames
   };
   let start = { x: 16, y: 20 * TS };
@@ -267,7 +267,7 @@ function build() {
   for (const [x, y] of L.CLOUD_ARC || []) addPop(x, y, 'cloud');
   popsTotal = pops.length;
   unbury();
-  if (K.bags) G.got = G.hudGot = Math.min(popsTotal, Math.ceil(popsTotal * K.bags / 5));   // OUTSIDE FOOD: bags already in hand
+  if (K.bags) G.got = G.hudGot = Math.ceil(popsTotal * Math.min(6, K.bags) / 5);   // OUTSIDE FOOD: bags already in hand (level 6, with SIX BAGS: five and a spare)
   G.bagN = Math.floor(5 * bagFrac());
   if (L.boss) G.boss = makeBoss(L.boss);
   G.owned = ((DD.opts && DD.opts.dots) || ORDER).filter(k => k in DOTS); if (!G.owned.length) G.owned = ['sam'];   // the Dots in the cast so far (menu.js hands them over; all four otherwise)
@@ -1171,9 +1171,10 @@ const SIX_T = 100;   // frames of the six-bag gag
 function cardSetup(d) {   // lay out the count-up timeline (card clock c, in frames)
   const bags = Math.floor(5 * bagFrac()), cdur = clamp(Math.round(G.got * 0.4), 16, 80), cnt0 = 8, bag0 = cnt0 + cdur + 14;
   const six = bags === 5, g0 = bag0 + bags * 20 + 4, tally = g0 + 6 + (six ? SIX_T : 0), cl = classic();   // five bags: Tim tries to add a sixth, Gregg cites the VFA maximum
-  const rating = bags === 5 && cl ? 'FIVE BAGS AND ' + cl.garnish : RATINGS[bags], nxt = nextTease(), r0 = tally + 40, n0 = r0 + rating.length * 2 + 16;
-  let rl = [rating]; if (rating.length > 34) { const k = rating.startsWith('FIVE BAGS AND ') ? 13 : rating.lastIndexOf(' ', 34); rl = [rating.slice(0, k), rating.slice(k + 1)]; }   // two lines when the extra runs long
-  Object.assign(d, { card: true, c: 0, bags, cnt0, cdur, bag0, six, g0, tally, rating, rl, r0, next: nxt, n0, END: (nxt ? n0 + (nxt.length + 6) * 2 : r0 + rating.length * 2) + 24 + (DD.opts && DD.opts.joins ? 130 : 0) });
+  const sixWin = six && !!(G.pk && G.pk.six);   // the HEI store's SIX BAGS: this time the sixth bag stays
+  const rating = sixWin ? (cl ? 'SIX BAGS AND ' + cl.garnish : "SIX BAGS. TIM'S CALL.") : bags === 5 && cl ? 'FIVE BAGS AND ' + cl.garnish : RATINGS[bags], nxt = nextTease(), r0 = tally + 40, n0 = r0 + rating.length * 2 + 16;
+  let rl = [rating]; if (rating.length > 34) { const k = / BAGS AND /.test(rating) ? rating.indexOf(' AND ') + 4 : rating.lastIndexOf(' ', 34); rl = [rating.slice(0, k), rating.slice(k + 1)]; }   // two lines when the extra runs long
+  Object.assign(d, { card: true, c: 0, bags, cnt0, cdur, bag0, six, sixWin, g0, tally, rating, rl, r0, next: nxt, n0, END: (nxt ? n0 + (nxt.length + 6) * 2 : r0 + rating.length * 2) + 24 + (DD.opts && DD.opts.joins ? 130 : 0) });
   G.dlg.q.length = 0; G.dlg.cur = null;
   if (!TR && DD.opts && DD.opts.perks && window.DDStore) d.hei = window.DDStore.award(result());   // the HEI store's pay-out (store.js award)
 }
@@ -1185,11 +1186,11 @@ function updateResults() {
   if (d.c > d.END) { if (sto && (IN.sp || IN.store)) leave(false, { store: true }); else if (IN.jp || IN.start) leave(false); return; }
   if (IN.jp && d.c > 12) { d.c = d.END + 1; return; }   // jump skips the count-up
   const c = ++d.c;
-  if (c === d.r0) vo('rating', { bags: d.bags, bonus: d.rating !== RATINGS[d.bags] }); if (d.six && c === d.g0 + 6) vo('six');   // Tim reads the rating out
+  if (c === d.r0 && !d.sixWin) vo('rating', { bags: d.bags, bonus: d.rating !== RATINGS[d.bags] }); if (d.six && c === d.g0 + 6) vo('six');   // Tim reads the rating out
   if (c > d.cnt0 && c <= d.cnt0 + d.cdur && (c - d.cnt0) % 3 === 0) SFX.count((c - d.cnt0) / 3);
   for (let i = 0; i < d.bags; i++) if (c === d.bag0 + i * 20 + 12) { SFX.bag(); d.pop = { i, t: 0 }; }
   if (d.pop) d.pop.t++;
-  if (d.six) { const t = c - d.g0; if (t === 18) SFX.bag(); if (t === 50 || t === 64) SFX.tick(); }
+  if (d.six) { const t = c - d.g0; if (t === 18) SFX.bag(); if (d.sixWin) { if (t === 50) SFX.goal(); } else if (t === 50 || t === 64) SFX.tick(); }
   if (c === d.tally) G.vhs ? SFX.vhs() : SFX.tick(); if (c === d.tally + 18) SFX.tick();
   if (c >= d.r0 && c < d.r0 + d.rating.length * 2 && c % 4 === 0) SFX.tick();
   if (d.next && c >= d.n0 && c < d.n0 + (d.next.length + 6) * 2 && c % 4 === 0) SFX.tick();
@@ -1206,9 +1207,10 @@ function drawResults() {
   ctx.fillStyle = '#0e2e7a'; for (let x = 26; x < VW - 26; x += 12) { ctx.fillRect(x, 11, 6, 4); ctx.fillRect(x, 165, 6, 4); }
   const gt = d.six ? c - d.g0 : -1;
   if (gt >= 0 && gt < 50) text('TIM: SIX BAGS. MY CALL.', VW / 2, 20, '#94e0cc', 2, '#0a1a4a', 'center');
-  else if (gt >= 50 && gt < SIX_T) text('GREGG: FIVE IS THE HIGHEST.', VW / 2, 20, '#ffe680', 2, '#0a1a4a', 'center');
-  else text("GREGG'S RATING:", VW / 2, 20, '#fff', 2, '#0a1a4a', 'center');
-  if (gt >= 0 && gt < SIX_T) {   // the sixth bag slides in from Tim's side, then Gregg knocks it off the scale
+  else if (gt >= 50 && gt < SIX_T) text(d.sixWin ? "IT'S SIX BAGS CINEMA TIME." : 'GREGG: FIVE IS THE HIGHEST.', VW / 2, 20, d.sixWin ? '#94e0cc' : '#ffe680', 2, '#0a1a4a', 'center');
+  else text(d.sixWin && gt >= SIX_T ? "TIM'S RATING:" : "GREGG'S RATING:", VW / 2, 20, d.sixWin && gt >= SIX_T ? '#94e0cc' : '#fff', 2, '#0a1a4a', 'center');
+  if (d.sixWin && gt >= 18) { const sx = VW / 2 - 61 + 5 * 26, p = gt >= 50 && gt < 64 ? Math.round(Math.sin((gt - 50) / 14 * Math.PI) * 5) : 0; drawBag(sx, 38 - p, 1, 0.35, 0, 1 + p * 0.04); }   // SIX BAGS: the sixth stays on the scale
+  else if (gt >= 0 && gt < SIX_T) {   // the sixth bag slides in from Tim's side, then Gregg knocks it off the scale
     const sx = VW / 2 - 61 + 5 * 26, x = gt < 18 ? sx + (VW + 10 - sx) * (1 - gt / 18) ** 2 : sx, fall = Math.max(0, gt - 64);
     drawBag(x + fall * 1.5, 38 + fall * fall * 0.12, 1, 0.35, fall * 0.12, 1);
     if (gt >= 50 && gt < 64) text('VFA RULES', sx + 8, 30, '#ff5a5a', 1, '#000', 'center');
@@ -1618,7 +1620,7 @@ function updateHUD() {   // the popcorn counter bounces when it changes; a bag w
   if (G.got !== G.hudGot) { G.cntDir = sign(G.got - G.hudGot); G.cntT = 12; G.hudGot = G.got; }
   if (G.cntT > 0) G.cntT--;
   const nb = Math.floor(5 * bagFrac());
-  if (nb > G.bagN) { for (let i = G.bagN; i < nb; i++) G.bagWig[i] = 34; SFX.bag(); }
+  if (nb > G.bagN) { for (let i = G.bagN; i < nb; i++) G.bagWig[i] = 34; if (nb === 5 && G.pk && G.pk.six) G.bagWig[5] = 34; SFX.bag(); }
   G.bagN = nb;
   for (let i = 0; i < 5; i++) if (G.bagWig[i] > 0) G.bagWig[i]--;
 }
@@ -1746,13 +1748,14 @@ function drawHUDCore() {
   // the popcorn strip: kernel, count and the five tubs it's worth, at half size
   const bo = G.cntT > 0 ? Math.round(Math.sin(G.cntT / 12 * Math.PI) * 2) : 0;   // counter hop
   const gp = G.hudPopT > 0 ? 1 + Math.sin(G.hudPopT / 8 * Math.PI) * 0.45 : 1; if (G.hudPopT > 0) G.hudPopT--;
-  const num = String(G.got), bx = 19 + Math.max(3, num.length) * 4 + 3, end = bx + 5 * 11 + (G.vhs ? 11 : 0) + 1;
+  const NB = G.pk && G.pk.six ? 6 : 5, num = String(G.got), bx = 19 + Math.max(3, num.length) * 4 + 3, end = bx + NB * 11 + (G.vhs ? 11 : 0) + 1;   // NB: SIX BAGS adds a sixth tub
   pill(3, 3, end - 3, 15, 0.6); ctx.fillStyle = 'rgba(255,240,210,0.18)'; ctx.fillRect(4, 3, end - 5, 1);   // a faint lit edge
   spr('pop', 10, 16 - bo, false, gp, gp);
   text(num, 18, 8 - bo, G.cntT > 0 ? (G.cntDir > 0 ? '#ffe680' : '#ff8080') : '#fff6d4', 1);
   const bf = bagFrac() * 5, bags = Math.floor(bf), frac = bf % 1;
   for (let i = 0; i < 5; i++) { const w = G.bagWig[i]; drawBag(bx + i * 11 - 4, -6, i < bags ? 1 : i === bags ? frac : 0, 0.75, w > 0 ? Math.sin(w * 0.9) * 0.4 * (w / 34) : 0, 0.5 * (w > 0 ? 1 + 0.2 * Math.sin(w / 34 * Math.PI) : 1)); }
-  if (G.vhs) spr('vhs', bx + 5 * 11 + 4, 16, false, 0.5, 0.5);
+  if (NB > 5) { const w = G.bagWig[5], on = bags >= 5; if (on) { ctx.fillStyle = 'rgba(232,48,42,0.55)'; ctx.fillRect(bx + 5 * 11 - 3, 4, 9, 13); } drawBag(bx + 5 * 11 - 4, -6, on ? 1 : 0, 0.75, w > 0 ? Math.sin(w * 0.9) * 0.4 * (w / 34) : 0, 0.5 * (w > 0 ? 1 + 0.2 * Math.sin(w / 34 * Math.PI) : 1)); }   // the sixth: lit red once all five are full
+  if (G.vhs) spr('vhs', bx + NB * 11 + 4, 16, false, 0.5, 0.5);
   drawPerkHUD();
   // the Dots, top right: the one you are is a framed portrait, the rest are little coloured pips (click one, press 1-4, or switch)
   const P = PORTRAITS, wOf = q => G.pl.dot === q.dot ? 18 : 11, total = P.reduce((s, q) => s + wOf(q), 0) + 2 * (P.length - 1);
@@ -1887,7 +1890,7 @@ function leave(quit, extra) {   // level over (or quit from pause): hand the res
   G.left = true;
   o(quit ? { id: L.id, quit: true } : Object.assign(result(), extra));
 }
-const result = () => ({ id: L.id, got: G.got, total: popsTotal, bags: Math.floor(5 * bagFrac()), vhs: G.vhs, fact: G.factGot || null, allPop: pops.length > 0 && pops.every(c => c.got), boss: !!(G.done && G.done.boss) });
+const result = () => ({ id: L.id, six: !!(G.pk && G.pk.six) && bagFrac() >= 1, got: G.got, total: popsTotal, bags: Math.floor(5 * bagFrac()), vhs: G.vhs, fact: G.factGot || null, allPop: pops.length > 0 && pops.every(c => c.got), boss: !!(G.done && G.done.boss) });
 function restart() {   // play it again: a won run is saved first (opts.onSave), so AGAIN on the results card never throws the win away
   if (G.done && !G.left && DD.opts && DD.opts.onSave) DD.opts.onSave(result());
   build(); G.state = 'play';
