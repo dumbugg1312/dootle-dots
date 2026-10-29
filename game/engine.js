@@ -13,8 +13,8 @@ const cv = document.getElementById('c'), ctx = cv.getContext('2d', { willReadFre
 const Q = new URLSearchParams(location.search);
 const NOPAUSE = !!window.DD_NOPAUSE || Q.has('sim');   // headless tests and bot sims: dialogue and cards run alongside play instead of pausing it
 
-function fit() {
-  const s = Math.min(innerWidth / VW, innerHeight / VH), k = s >= 1 ? Math.floor(s) : s;
+function fit() {   // fill the window edge to edge (16:9, so bars only on the side that doesn't match), even when that is not a whole number of pixels
+  const k = Math.min(innerWidth / VW, innerHeight / VH);
   cv.style.width = VW * k + 'px'; cv.style.height = VH * k + 'px';
   cv.style.marginTop = Math.max(0, Math.floor((innerHeight - VH * k) / 2)) + 'px';
 }
@@ -99,6 +99,8 @@ function noise(dur, vol = 0.1, freq = 800, delay = 0) {
   s.buffer = b; f.type = 'lowpass'; f.frequency.value = freq; g.gain.value = vol;
   s.connect(f); f.connect(g); g.connect(MASTER); s.start(t);
 }
+let CUT = null;   // the cutscene playing (game/cutscene.js, DD.setCut): it holds the stage while it runs and draws over it
+const cue = (kind, o) => { const C = window.DDCut; return !!(C && !TR && !NOPAUSE && L && G && C.cue(kind, o)); };   // a stage moment that may open a cutscene: 'open', 'boss_in', 'boss_out', 'goal', 'tick'
 const vo = (h, o) => { const V = window.DDVoice; if (V && !TR) V.say(h, o); };   // the trailer never talks   // soundbites (game/voice.js)
 const SFX = {
   jump: () => tone(260, 620, 0.13, 'square', 0.06),
@@ -446,9 +448,9 @@ function hitBoss(n = 1) {   // one hit on the boss: false if it is out of the fi
   G.hitstop = Math.max(G.hitstop, 6); G.shake = Math.max(G.shake, 6); SFX.ko(0.8); vo('boss_hit');
   const ph = (B.cfg.phases || []).filter(q => B.hp <= q.at).length;
   if (B.hp <= 0) {
-    B.dead = true; B.endT = B.cfg.endDelay || 100; SFX.slam(); G.shake = 10; vo('boss_defeat');
+    B.dead = true; B.endT = B.cfg.endDelay || 100; SFX.slam(); G.shake = 10;
     if (B.cfg.onDefeat) B.cfg.onDefeat(G, B);
-    playLines('bossDefeat');
+    if (!cue('boss_out')) { vo('boss_defeat'); playLines('bossDefeat'); }   // a knockout scene says its own lines
   } else if (ph > B.phase) {
     B.phase = ph; const q = B.cfg.phases[ph - 1];
     vo('boss_phase', { ph }); banner(q.say || 'PHASE ' + (ph + 1), 100, q.sub || ''); if (q.enter) q.enter(G, B);
@@ -460,12 +462,14 @@ function hitBoss(n = 1) {   // one hit on the boss: false if it is out of the fi
 function updateBoss() {
   const B = G.boss; if (!B) return;
   if (!B.engaged && (!B.arena || cx(G.pl) > B.arena[0] + 24)) {   // crossing into the arena locks the camera and the walls
-    B.engaged = true; banner(B.name, 110, B.cfg.sub || ''); SFX.slam(); vo('boss_intro');
+    B.engaged = true;
+    const cut = cue('boss_in');   // a boss's entrance scene brings its own title card and lines
+    if (!cut) { banner(B.name, 110, B.cfg.sub || ''); SFX.slam(); vo('boss_intro'); }
     if (B.cfg.onEngage) B.cfg.onEngage(G, B);
-    playLines('boss');
+    if (!cut) playLines('boss');
   }
   if (B.inv > 0) B.inv--; if (B.flash > 0) B.flash--;
-  if (B.dead && --B.endT === 0) endLevel(1, 0, true);   // defeat ends the level after a short beat
+  if (B.dead && !CUT && --B.endT === 0) endLevel(1, 0, true);   // defeat ends the level after a short beat
 }
 function drawBossHUD() {   // the boss's name and health pips, in a slim plate at the top centre
   const B = G.boss; if (!B || !B.engaged) return;
@@ -902,8 +906,8 @@ function interact() {
   const B = G.boss; if (B && B.engaged && B.arena && !B.dead) p.x = clamp(p.x, B.arena[0], B.arena[1] - p.w);   // arena walls
 }
 function finish(goal) {
-  const frac = clamp((bot(goal) - bot(G.pl)) / goal.h, 0, 1);
-  endLevel(frac, Math.round(frac * 10));
+  const frac = clamp((bot(goal) - bot(G.pl)) / goal.h, 0, 1), go = () => endLevel(frac, Math.round(frac * 10));
+  if (!cue('goal', { then: go })) go();   // a stage-end scene (a Dot joining) plays first
 }
 function endLevel(frac = 1, bonus = 0, boss = false) {   // the level is won: bonus popcorn, results card
   if (G.done || TR) return;   // a trailer never finishes a stage
@@ -1259,6 +1263,8 @@ function step() {
   readInput();
   if (G.restartReq) { restart(); return; }
   G.frame++;
+  if (CUT) { if (CUT.step(IN)) { if (CUT.live) cutLive(); updateParts(); if (G.shake > 0) G.shake *= 0.86; return; } CUT = null; }   // a cutscene holds the stage
+  if (!G.cutOpen) { G.cutOpen = true; if (cue('open')) return; }   // the stage's opening scene, before the controls card and the title wipe
   if (G.state === 'title') { if (IN.jp || IN.start || IN.sp || IN.click || IN.any) { G.state = 'play'; try { localStorage.setItem('dd_controls_seen', '1'); } catch (e) {} } return; }   // the level title wipe (introStrip) takes over from here
   if (G.state === 'pause') { updatePause(); return; }
   if ((IN.start || (IN.click && inBox(IN.click, PAUSEBTN.x - 2, PAUSEBTN.y - 2, PAUSEBTN.w + 4, PAUSEBTN.h + 4))) && !G.done) { G.state = 'pause'; G.pm.sel = 0; SFX.tick(); return; }
@@ -1267,7 +1273,7 @@ function step() {
   updateDlg();
   if (G.shake > 0) G.shake *= 0.86;
   if (G.hitstop > 0) { G.hitstop--; return; }
-  if (!G.done) updatePlayer(); else { G.pl.vy = Math.min(G.pl.vy + 0.3, 4); const r = moveY(G.pl, G.pl.vy); if (r) G.pl.vy = 0; G.pl.sx += (1 - G.pl.sx) * 0.2; G.pl.sy += (1 - G.pl.sy) * 0.2; }
+  if (!G.done) { updatePlayer(); cue('tick'); } else { G.pl.vy = Math.min(G.pl.vy + 0.3, 4); const r = moveY(G.pl, G.pl.vy); if (r) G.pl.vy = 0; G.pl.sx += (1 - G.pl.sx) * 0.2; G.pl.sy += (1 - G.pl.sy) * 0.2; }
   updateWorld();
   updateFans();
   if (!G.done) interact();
@@ -1314,6 +1320,7 @@ function wx(x) { return Math.round(x - G.cam.x); }
 function wy(y) { return Math.round(y - G.cam.y); }
 function drawBodies() {
   for (const b of bodies) {
+    if (b.cutHide) continue;   // a cutscene has this one off stage
     const X = wx(b.x), Y = wy(b.y);
     if (X > VW + 64 || X + b.w < -64) continue;
     switch (b.kind) {
@@ -1733,7 +1740,7 @@ function drawFGLayer() {
 const dlgUp = () => !!(G.dlg.cur || G.dlg.show > 0.05);
 let hudA = 0;
 function hudWanted() {   // the HUD steps aside for the title card, the level wipe, a dialogue that holds play, the blue card, the pause menu and the win
-  if (DD.hideHUD || G.state !== 'play' || G.done || G.intro < INTRO_T) return false;
+  if (DD.hideHUD || CUT || G.state !== 'play' || G.done || G.intro < INTRO_T) return false;
   if (!NOPAUSE && (G.dlg.cur || G.dlg.q.length || G.fact)) return false;
   return true;
 }
@@ -1849,18 +1856,23 @@ function drawTitle() {
   ORDER.forEach((n, i) => { const ph = Math.sin(G.frame / 10 + i); drawDot(n, ph < -0.4 ? 'jump' : ph > 0.85 ? 'land' : 'idle', VW / 2 - 48 + i * 32, 158 + Math.round(ph * 2)); });
   if (Math.floor(G.frame / 30) % 2) text('PRESS JUMP TO START', VW / 2, 168, '#fff', 1, '#000', 'center');
 }
+function cutLive() {   // a live cutscene: the stage keeps running around a Dot who stands still
+  for (const k of ['l', 'r', 'd', 'j', 'jp', 'dp', 'sp']) IN[k] = false; IN.pick = null; IN.nx = 0;
+  if (!G.done) updatePlayer(); updateWorld(); updateFans();
+}
 function render() {
   ctx.imageSmoothingEnabled = false;
   const sh = G.shake > 0.3 ? G.shake : 0, ox = (Math.random() - 0.5) * sh * 2, oy = (Math.random() - 0.5) * sh * 2;
   ctx.save(); ctx.translate(Math.round(ox), Math.round(oy));
-  drawBG(); drawTiles(); drawDepth(); hook('drawMid', ctx, G); drawBodies(); drawPops(); drawFans(); drawPlayer(); drawFGLayer(); hook('drawFG', ctx, G); drawParts(); drawGoalFlags(); drawDoorCues();
+  drawBG(); drawTiles(); drawDepth(); hook('drawMid', ctx, G); drawBodies(); drawPops(); drawFans(); if (!(CUT && CUT.hidePlayer)) drawPlayer(); if (CUT) CUT.drawWorld(ctx); drawFGLayer(); hook('drawFG', ctx, G); drawParts(); drawGoalFlags(); drawDoorCues();
   ctx.restore();
   drawGrade();
-  introIris(); drawFallIris(); drawEndIris();
+  if (!CUT) introIris(); drawFallIris(); drawEndIris();
   drawHUD();
-  drawDialog();
-  introStrip();
-  if (G.state === 'title') drawTitle();
+  if (!CUT) drawDialog();
+  if (!CUT) introStrip();
+  if (CUT) CUT.drawOver(ctx);   // letterbox, captions and cards
+  if (G.state === 'title' && !CUT) drawTitle();
   if (G.state === 'pause') drawPause();
   drawResults();
 }
@@ -2181,6 +2193,7 @@ Object.defineProperties(DD, Object.getOwnPropertyDescriptors({
   part: o => parts.push(o),
   T, setTile, boxFree, moveX, moveY, ov, cx, bot, clamp, sign, wx, wy, setDot, door,
   defineEntity, collectDefs, addEntity, spawn, hitBoss, endLevel, start, setScene, leave, trailer,
+  setCut: c => { CUT = c; }, get cut() { return CUT; },   // cutscenes (game/cutscene.js)
   get trailing() { return !!TR; },   // a trailer is running (DD.trailer)
   get padUsed() { return padUsed; }, rumble,
   say: sayLine, lines: playLines,   // narrators: DD.say(who, text, opts), DD.lines(name, again)

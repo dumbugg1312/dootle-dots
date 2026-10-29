@@ -134,5 +134,11 @@
     if (cur) cur.pause();
     const a = new Audio('voice/' + c.f); a.volume = 0.95 * (window.DDVol ? window.DDVol.get('voice') : 1); a.play().catch(() => {}); cur = a; curKey = 'preview';
   }
-  window.DDVoice = { say, preview, get on() { return on; }, set on(v) { on = !!v; }, get run() { return run; } };
+  function clip(id) {   // a cutscene's line: that clip now, whatever the stage's pacing; its length in seconds, or 0 when it can't play (voices off, or a clip that failed QA)
+    const c = BY[id]; if (!on || !c) return 0;
+    return play(c) ? c.d : 0;
+  }
+  function hush() { if (cur) { cur.pause(); cur = null; } }   // a skipped cutscene stops its line
+  const line = id => BY[id] ? BY[id].line : null;   // a clip's words, for its caption
+  window.DDVoice = { say, preview, clip, hush, line, get on() { return on; }, set on(v) { on = !!v; }, get run() { return run; } };
 })();

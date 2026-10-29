@@ -110,7 +110,7 @@
   const portrait = matchMedia('(orientation: portrait)');
   (portrait.addEventListener ? portrait.addEventListener.bind(portrait, 'change') : portrait.addListener.bind(portrait))(() => releaseAll());
 
-  // ---- scale: fill the screen's height even when that is not a whole number of pixels (engine.js floors it; this runs after it)
+  // ---- scale: same fill as engine.js, refit on rotation and when the phone's toolbars slide in and out
   function fit() {
     const k = Math.min(innerWidth / VW, innerHeight / VH);
     cv.style.width = VW * k + 'px'; cv.style.height = VH * k + 'px';

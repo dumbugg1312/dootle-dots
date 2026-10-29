@@ -158,11 +158,12 @@
   let st = 'load', t = 0, cur = 0, lcur = 0, world = null, note = null, noteT = 0, msg = '';
   const lift = WORLDS.map(() => 0), vel = WORLDS.map(() => 0);
   // world select: the sleeves in one long row on a shelf that scrolls sideways, the highlighted one kept in view
-  const SL = { w: 56, h: 70, pitch: 62, m: 12, y: 32 }, ROWW = () => WORLDS.length * SL.pitch - (SL.pitch - SL.w);
+  const SL = { w: 56, h: 70, pitch: 62, m: 14, y: 30 }, ROWW = () => WORLDS.length * SL.pitch - (SL.pitch - SL.w);
   let scroll = 0;   // how far the shelf has slid left, eased toward scrollTo()
   const scrollTo = () => Math.max(0, Math.min(ROWW() - (VW - 2 * SL.m), cur * SL.pitch + SL.w / 2 - VW / 2));
   const slot = i => ({ x: Math.round(SL.m + i * SL.pitch - scroll), y: SL.y });
-  const STRIP = { y: 114, w: 9, gx: 3 }, stripX = i => Math.round(VW / 2 - (WORLDS.length * (STRIP.w + STRIP.gx) - STRIP.gx) / 2) + i * (STRIP.w + STRIP.gx);   // the row of tiny tapes under the shelf: one per world
+  const DOTS = { y: 112, gx: 8 }, dotX = i => Math.round(VW / 2 - ((WORLDS.length - 1) * DOTS.gx) / 2) + i * DOTS.gx;   // one dot a world under the shelf, with an arrow each side
+  const UNIT = { top: 22, bot: 106, post: 9 };   // the shelf unit: its top lip, its plank, and the posts at each side the row slides behind
   const sleeveSeasons = w => w.seasons.split(' + ')[0];   // what the sleeve says: SEASONS 11-12 (the Oscars and Decker ride along in the panel below)
   const HB = { shelf: [2, 2, 52], store: [VW - 98, 2, 36], opt: [VW - 60, 2, 58] };   // the header buttons: x, y, w (11 tall)
   const compact = () => world && world.levels.length > 2, rowY = i => compact() ? 34 + i * 31 : 44 + i * 40;   // four stages a world get slimmer rows
@@ -441,8 +442,9 @@
     if (st === 'select') {
       scroll += (scrollTo() - scroll) * 0.25; if (Math.abs(scrollTo() - scroll) < 0.3) scroll = scrollTo();
       const onSleeve = pt => { for (let i = 0; i < WORLDS.length; i++) { const s = slot(i); if (s.x + SL.w > 0 && s.x < VW && inR(pt, s.x, s.y - 6, SL.w, SL.h + 6)) return i; } return -1; };
-      const onStrip = pt => { for (let i = 0; i < WORLDS.length; i++) if (inR(pt, stripX(i) - 1, STRIP.y - 3, STRIP.w + 2, 12)) return i; return -1; };
-      if (hover && hover.dirty) { hover.dirty = false; const i = onSleeve(hover); if (i >= 0) selectTo(i); }
+      const onStrip = pt => { for (let i = 0; i < WORLDS.length; i++) if (inR(pt, dotX(i) - 4, DOTS.y - 4, DOTS.gx, 11)) return i; return -1; };
+      const onArrow = pt => inR(pt, dotX(0) - 28, DOTS.y - 6, 22, 15) ? -1 : inR(pt, dotX(WORLDS.length - 1) + 6, DOTS.y - 6, 22, 15) ? 1 : 0;
+      if (hover && hover.dirty) hover.dirty = false;   // pointing at a sleeve does nothing: the shelf only moves on a click or the arrow keys
       if (IN.nx) { const n = Math.max(0, Math.min(WORLDS.length - 1, cur + IN.nx)); if (n !== cur) selectTo(n); }
       if (IN.ny < 0) openShelf();   // up: Gregg's shelf
       if (c && inR(c, HB.shelf[0] - 2, 0, HB.shelf[2] + 4, 15)) { openShelf(); return; }
@@ -451,7 +453,7 @@
       if (c) { const i = onSleeve(c), k = onStrip(c);
         if (i >= 0) { if (i === cur) enterWorld(cur); else selectTo(i); }
         else if (k >= 0) selectTo(k);
-        else if (c.y >= SL.y - 6 && c.y < SL.y + SL.h + 8) { if (c.x < SL.m && cur > 0) selectTo(cur - 1); else if (c.x >= VW - SL.m && cur < WORLDS.length - 1) selectTo(cur + 1); } }   // the shelf's edges: one step along
+        else { const d = onArrow(c) || (c.y >= UNIT.top && c.y < UNIT.bot ? (c.x < SL.m ? -1 : c.x >= VW - SL.m ? 1 : 0) : 0); const n = cur + d; if (d && n >= 0 && n < WORLDS.length) selectTo(n); } }   // the arrows, or the shelf's edges: one step along
       if (IN.ok) enterWorld(cur);
       if (IN.back) { st = 'title'; t = 130; }
     } else if (st === 'options') {
@@ -605,7 +607,6 @@
     rect(c(w.bg), x, y, W, H);
     rect(c(w.band), x, y, W, 13); rect(c(w.accent), x, y + 13, W, 1);
     text(String(w.n), x + 3, y + 2, c(w.accent), 2, SHD(w) ? '#000' : null);
-    for (let b = 0; b < 9; b++) { rect(shade(w.bg, 0.55), x + W - 24 + b * 2 + (b % 3 ? 0 : 1), y + 3, b % 3 === 0 ? 2 : 1, 7); }   // barcode
     rect('#000', x + 2, y + 15, W - 4, 28); rect(c(w.accent), x + 2, y + 15, W - 4, 1);
     thumb(w, x + 3, y + 16, open, tt, PW);
     if (worldMarks(w) === w.levels.length * 3) { rect('#ffe680', x + W - 8, y + 3, 2, 8); rect('#ffe680', x + W - 11, y + 6, 8, 2); }   // every mark in the world: a gold star
@@ -628,23 +629,29 @@
     rect('#000', x + 2, y + H - 2, W - 4, 2);   // the tape window along the sleeve's foot
   }
   function drawSelect() {
-    const tt = t;
+    const tt = t, U = UNIT;
     rect('#120610', 0, 0, VW, VH);
     for (let x = -CURT + (-tt * 0.05 % CURT); x < VW + CURT; x += CURT) spr('w2_curtain', x + CURT / 2, 216);
     rect('rgba(10,4,14,0.72)', 0, 0, VW, VH);
-    { const y = SL.y + SL.h;   // the wooden shelf
-      rect('#000', 0, y, VW, 6); rect('#94683c', 0, y + 1, VW, 1); rect('#6a4626', 0, y + 2, VW, 2); rect('#3a2414', 0, y + 4, VW, 2); rect('rgba(0,0,0,0.5)', 0, y + 6, VW, 2); }
+    // the shelf unit: a dark wood back, a lip along the top, the plank the sleeves stand on, and a post at each side
+    rect('#000', 0, U.top - 7, VW, U.bot - U.top + 13);
+    rect('#1e1208', 1, U.top - 6, VW - 2, U.bot - U.top + 6);
+    for (let y = U.top + 6; y < U.bot; y += 5) rect('rgba(0,0,0,0.22)', 1, y, VW - 2, 1);   // the grain
+    rect('rgba(0,0,0,0.35)', 1, U.top - 6, VW - 2, 8);   // shade under the marquee
+    const plank = y => { rect('#000', 0, y, VW, 6); rect('#94683c', 0, y + 1, VW, 1); rect('#6a4626', 0, y + 2, VW, 2); rect('#3a2414', 0, y + 4, VW, 2); };
+    plank(U.bot);
+    rect('rgba(0,0,0,0.5)', 0, U.bot + 6, VW, 3);
+    clipRect(U.post, U.top - 6, VW - 2 * U.post, U.bot - U.top + 6);   // the row slides behind the posts
     const vis = i => { const s = slot(i); return s.x + SL.w + 4 > 0 && s.x - 4 < VW; };
     for (let i = 0; i < WORLDS.length; i++) if (i !== cur && vis(i)) sleeve(i, WORLDS[i], worldPlay(WORLDS[i]), false, tt);
     sleeve(cur, WORLDS[cur], worldPlay(WORLDS[cur]), true, tt);   // the selected one last, so it sits in front
-    { const mx = ROWW() - (VW - 2 * SL.m), ay = SL.y + SL.h / 2 - 4, k = Math.round(Math.abs(Math.sin(tt / 10)) * 2);   // more shelf that way: an arrow at the edge
-      rect('rgba(10,4,14,0.9)', 0, SL.y - 8, SL.m - 6, SL.h + 14); rect('rgba(10,4,14,0.9)', VW - SL.m + 6, SL.y - 8, SL.m - 6, SL.h + 14);
-      if (scroll > 1) text('<', 4 - k, ay, '#ffd27a', 2, '#000'); if (scroll < mx - 1) text('>', VW - 12 + k, ay, '#ffd27a', 2, '#000'); }
-    for (let i = 0; i < WORLDS.length; i++) {   // the strip: every tape on the shelf at a glance, the selected one lit
-      const w = WORLDS[i], x = stripX(i), on = i === cur, open = worldPlay(w);
-      rect('#000', x - 1, STRIP.y - 1, STRIP.w + 2, 8); rect(open ? w.band : '#2a2028', x, STRIP.y, STRIP.w, 6); rect(open ? w.accent : '#3a3038', x, STRIP.y, STRIP.w, 2);
-      if (on) { rect('#fff', x - 1, STRIP.y - 1, STRIP.w + 2, 1); rect('#fff', x - 1, STRIP.y + 6, STRIP.w + 2, 1); rect('#fff', x - 1, STRIP.y, 1, 6); rect('#fff', x + STRIP.w, STRIP.y, 1, 6); }
-    }
+    ctx.restore();
+    for (const px of [0, VW - U.post]) { rect('#000', px, U.top - 7, U.post, U.bot - U.top + 13); rect('#5a3a1e', px + 1, U.top - 6, U.post - 2, U.bot - U.top + 11); rect('#7a5230', px + 1, U.top - 6, 1, U.bot - U.top + 11); rect('#2e1a0c', px + U.post - 2, U.top - 6, 1, U.bot - U.top + 11); }   // the posts, up to the marquee
+    { const mx = ROWW() - (VW - 2 * SL.m), k = Math.round(Math.abs(Math.sin(tt / 10)) * 1);   // under the shelf: an arrow each way when there's more, and a dot a world
+      text('<', dotX(0) - 20 - k, DOTS.y - 3, scroll > 1 ? '#ffd27a' : '#3a2a30', 2, scroll > 1 ? '#000' : null);
+      text('>', dotX(WORLDS.length - 1) + 12 + k, DOTS.y - 3, scroll < mx - 1 ? '#ffd27a' : '#3a2a30', 2, scroll < mx - 1 ? '#000' : null);
+      for (let i = 0; i < WORLDS.length; i++) { const w = WORLDS[i], x = dotX(i), on = i === cur, open = worldPlay(w);
+        if (on) { rect('#fff', x - 2, DOTS.y - 2, 5, 5); rect(w.accent, x - 1, DOTS.y - 1, 3, 3); } else rect(open ? '#c8b8c0' : '#4a3a40', x - 1, DOTS.y - 1, 3, 3); } }
     // header: a marquee, with the buttons
     rect('#2a0e1a', 0, 0, VW, 14); rect('#c98f22', 0, 14, VW, 1);
     for (let x = 4, i = 0; x < VW; x += 8, i++) { rect((i + Math.floor(tt / 6)) % 3 === 0 ? '#fffbd0' : '#8a5a1c', x, 6, 2, 2); }
@@ -655,17 +662,19 @@
     storeBtn(HB.store[0], HB.store[1], HB.store[2], 'STORE', tt, hover && inR(hover, HB.store[0] - 2, 0, HB.store[2] + 4, 15));
     const tot = WORLDS.reduce((s, x) => s + worldBags(x), 0), mx = WORLDS.reduce((s, x) => s + worldMax(x), 0);   // the total, by the shelf button
     tubIcon(60, 4, '#d8202c'); text(tot + '/' + mx, 68, 5, '#fff6d4', 1, null);
-    // info panel: the selected world's name, its line, and the run so far
-    const w = WORLDS[cur], open = worldPlay(w), locked = worldOpen(w) && !open, pw = WORLDS[cur - 1], IY = 130;
-    rect('#0a0408', 0, IY, VW, 30); rect(w.accent, 0, IY, VW, 1); rect(shade(w.accent, 0.5), 0, IY + 1, VW, 1);
-    text(w.title + '   ' + w.seasons, VW / 2, IY + 5, open ? w.accent : '#9a8a90', 1, '#000', 'center');
-    text(open ? w.tag : locked ? (pw && worldUnlocked(pw) ? 'NEXT. BEAT ' + pw.boss + ' TO OPEN IT' : 'LOCKED') : 'COMING SOON', VW / 2, IY + 13, open ? '#fff6d4' : locked ? '#ffb070' : '#9a8a90', 1, null, 'center');
-    if (open) {
-      tubIcon(VW / 2 - 66, IY + 20, '#d8202c'); text(worldBags(w) + '/' + worldMax(w) + ' BAGS', VW / 2 - 59, IY + 21, '#ffd27a', 1, null);
-      vhsIcon(VW / 2 - 12, IY + 21, '#e8504a'); text(worldVhs(w) + '/' + w.levels.length + ' VHS', VW / 2 - 1, IY + 21, '#ffd27a', 1, null);
-      text(worldMarks(w) + '/' + w.levels.length * 3 + ' MARKS', VW / 2 + 38, IY + 21, worldMarks(w) === w.levels.length * 3 ? '#ffe680' : '#9ac8a0', 1, null);
+    // the bill: the selected world's name in big type, its seasons, its line, and the run so far
+    const w = WORLDS[cur], open = worldPlay(w), locked = worldOpen(w) && !open, pw = WORLDS[cur - 1], IY = 122, IH = 44;
+    rect('rgba(0,0,0,0.5)', 8, IY + 2, VW - 16, IH); rect('#000', 7, IY - 1, VW - 14, IH + 2); rect('#0e0608', 8, IY, VW - 16, IH);
+    rect(open ? w.accent : '#4a3a40', 8, IY, VW - 16, 2); rect(open ? shade(w.accent, 0.4) : '#2a1a20', 8, IY + IH - 1, VW - 16, 1);
+    text(w.title, VW / 2, IY + 6, open ? w.accent : '#9a8a90', 2, '#000', 'center');
+    text(w.seasons, VW / 2, IY + 18, open ? '#ffd27a' : '#7a6a70', 1, null, 'center');
+    text(open ? w.tag : locked ? (pw && worldUnlocked(pw) ? 'NEXT. BEAT ' + pw.boss + ' TO OPEN IT' : 'LOCKED') : 'COMING SOON', VW / 2, IY + 27, open ? '#fff6d4' : locked ? '#ffb070' : '#9a8a90', 1, null, 'center');
+    if (noteT > 0) { rect('#0e0608', 8, IY + 35, VW - 16, 8); ctext(note, IY + 36, '#ff8080', 1); }   // BEAT ... FIRST, where the run would be
+    else if (open) {
+      tubIcon(VW / 2 - 66, IY + 35, '#d8202c'); text(worldBags(w) + '/' + worldMax(w) + ' BAGS', VW / 2 - 59, IY + 36, '#ffd27a', 1, null);
+      vhsIcon(VW / 2 - 12, IY + 36, '#e8504a'); text(worldVhs(w) + '/' + w.levels.length + ' VHS', VW / 2 - 1, IY + 36, '#ffd27a', 1, null);
+      text(worldMarks(w) + '/' + w.levels.length * 3 + ' MARKS', VW / 2 + 38, IY + 36, worldMarks(w) === w.levels.length * 3 ? '#ffe680' : '#9ac8a0', 1, null);
     }
-    if (noteT > 0) { rect('#0a0408', 0, IY + 19, VW, 10); ctext(note, IY + 21, '#ff8080', 1); }   // BEAT ... FIRST, on the panel's third row
     rect('rgba(0,0,0,0.55)', 0, VH - 12, VW, 12);
     ctext(DD.padUsed ? 'CROSS: PLAY    SQUARE: STORE    CIRCLE: BACK' : 'JUMP: PLAY    H: STORE    X: BACK', VH - 9, '#d8c8d0', 1, null);
   }
