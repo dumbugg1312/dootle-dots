@@ -350,7 +350,7 @@
   const ROTL = () => ((window.CUES && window.CUES.rotation) || []).filter(n => !(window.DDMusic && window.DDMusic.missing(n)));   // songs fetch when highlighted (game/music.js)
   const songTitle = n => ((window.CUES && window.CUES.titles) || {})[n] || n.toUpperCase().replace(/-/g, ' ');
   let ocur = 0, jcur = 1, clearArm = 0;
-  const CLR = 10;   // the CLEAR DATA row
+  const CLR = 11;   // the CLEAR DATA row
   const VOLS = [['music', 'MUSIC'], ['sfx', 'SOUND EFFECTS'], ['voice', 'VOICES']];   // rows 0-2: volume sliders (left / right, or click the bar)
   const OPTS = () => {
     const m = MUS(), sh = m && m.prefs && m.prefs.shuffle;
@@ -359,10 +359,12 @@
       ['UNLOCK ALL LEVELS: ' + (ALL ? 'ON' : 'OFF'), ALL ? 'EVERY WORLD AND STAGE IS OPEN' : 'WORLDS OPEN ONE BOSS AT A TIME'],
       ['UNLOCK ALL DOTS: ' + (ALLD ? 'ON' : 'OFF'), ALLD ? 'ALL FOUR DOTS FROM THE FIRST STAGE' : 'THE DOTS JOIN ONE STAGE AT A TIME'],
       ['UNLIMITED HEI POINTS: ' + (unl() ? 'ON' : 'OFF'), unl() ? 'EVERY UPGRADE IN THE HEI STORE IS FREE' : 'EARN HEI POINTS BY BEATING STAGES'],
+      ['CUTSCENES: ' + (cutsEvery() ? 'EVERY TIME' : 'FIRST TIME'), cutsEvery() ? 'SCENES PLAY ON EVERY VISIT TO A STAGE' : 'EACH SCENE PLAYS THE FIRST TIME YOU GET THERE'],   // game/cutscene.js
       ['SAVE DATA', 'DOWNLOAD YOUR SAVE AS A FILE'], ['LOAD DATA', 'OPEN A SAVE FILE'],
       [clearArm ? 'PRESS AGAIN TO CLEAR' : 'CLEAR DATA', 'ERASE ALL PROGRESS ON THIS COMPUTER'], ['BACK', '']];
   };
   const unl = () => !!(window.DDStore && window.DDStore.unlimited);
+  const cutsEvery = () => !!(window.DDCut && window.DDCut.every);
   function openOptions() { st = 'options'; t = 0; ocur = 0; clearArm = 0; SFX.switch(); }
   let inGame = null;   // { st, t, done } while the options are up over a paused level (the pause menu's OPTIONS); BACK hands it back
   function optBack() {
@@ -398,13 +400,14 @@
     else if (i === 2) { ALL = !ALL; try { localStorage.setItem(UKEY, ALL ? '1' : '0'); } catch (e) {} if (!ALL) ALL = Q.has('unlock'); SFX.tick(); }
     else if (i === 3) { ALLD = !ALLD; try { localStorage.setItem(DKEY, ALLD ? '1' : '0'); } catch (e) {} SFX.tick(); }
     else if (i === 4) { if (window.DDStore) window.DDStore.setUnlimited(!unl()); SFX.tick(); }
-    else if (i === 5) saveData();
-    else if (i === 6) loadData();
+    else if (i === 5) { if (window.DDCut) window.DDCut.every = !cutsEvery(); SFX.tick(); }
+    else if (i === 6) saveData();
+    else if (i === 7) loadData();
     else if (i === CLR - 3) { if (clearArm) { clearArm = 0; clearData(); } else { clearArm = 1; SFX.buzz(); } }
     else optBack();
   }
   const SLX = 150, SLW = 9;   // the sliders' bar: left edge and notch width
-  const OY = i => 21 + i * 11, JB = { x: [14, 166], y0: 36, dy: 12, per: 9 };
+  const OY = i => 22 + i * 10, JB = { x: [14, 166], y0: 36, dy: 12, per: 9 };
   const jPos = k => ({ x: JB.x[Math.floor(k / JB.per)], y: JB.y0 + (k % JB.per) * JB.dy });   // song k (0-based) on the jukebox page
   function jukeDo(i) {
     const m = MUS(), list = ROTL(); if (!m) return;
@@ -461,8 +464,8 @@
       if (IN.ny) { ocur = (ocur + IN.ny + n) % n; if (ocur !== CLR) clearArm = 0; SFX.tick(); }
       if (IN.nx && ocur < 3) { const V = window.DDVol, k = VOLS[ocur][0]; if (V) { V.set(k, V.level(k) + IN.nx); if (k === 'sfx') SFX.tick(); else if (k === 'voice' && window.DDVoice && window.DDVoice.preview) window.DDVoice.preview(); } }
       else if (IN.nx && ocur >= 4 && ocur <= 7) optDo(ocur);
-      if (c && c.y >= OY(0) - 3 && c.y < OY(2) + 8 && c.x >= SLX && c.x < SLX + 10 * SLW) { const i = Math.floor((c.y - OY(0) + 3) / 11), V = window.DDVol; if (i >= 0 && i < 3 && V) { ocur = i; V.set(VOLS[i][0], Math.round((c.x - SLX) / SLW + 0.5)); SFX.tick(); } }
-      else if (c) { for (let i = 0; i < n; i++) if (inR(c, 40, OY(i) - 3, VW - 80, 11)) { if (i === ocur) optDo(i); else { ocur = i; if (i !== CLR) clearArm = 0; SFX.tick(); } } }
+      if (c && c.y >= OY(0) - 3 && c.y < OY(2) + 8 && c.x >= SLX && c.x < SLX + 10 * SLW) { const i = Math.floor((c.y - OY(0) + 3) / 10), V = window.DDVol; if (i >= 0 && i < 3 && V) { ocur = i; V.set(VOLS[i][0], Math.round((c.x - SLX) / SLW + 0.5)); SFX.tick(); } }
+      else if (c) { for (let i = 0; i < n; i++) if (inR(c, 40, OY(i) - 3, VW - 80, 10)) { if (i === ocur) optDo(i); else { ocur = i; if (i !== CLR) clearArm = 0; SFX.tick(); } } }
       else if (IN.ok) optDo(ocur);
       if (IN.back || IN.opt) optBack();
     } else if (st === 'jukebox') {

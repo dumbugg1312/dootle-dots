@@ -298,8 +298,8 @@
         if (s.flash > 0) s.flash--;
         if (B && B.flash > 0 && B.flash === B.cfg.inv - 1) s.flash = 5;                       // a white pop on every hit
         if (s.cameo > 0) s.cameo--;
-        if (s.fin) s.fin++;
-        if (B && B.dead && s.fin % 40 === 1) { const a = B.arena; confettiBurst(a[0] + 60 + Math.random() * (a[1] - a[0] - 120), FLOOR_Y - 60, 24, 6); }
+        if (s.fin && !DD.cut) s.fin++;   // the ending scene (game/cuts/w12.js) holds the credits: the counter starts when it is over
+        if (B && B.dead && !DD.cut && s.fin % 40 === 1) { const a = B.arena; confettiBurst(a[0] + 60 + Math.random() * (a[1] - a[0] - 120), FLOOR_Y - 60, 24, 6); }
         if (s.ovation && G.frame % 50 === 0 && B && !B.dead) confettiBurst(B.arena[0] + 40 + Math.random() * (B.arena[1] - B.arena[0] - 80), 100, 10, 1);
       },
       drawMid(ctx, G) {   // the Baxter cameo: the blue mascot sprints in, bonks New Amato from behind and sprints off
@@ -317,7 +317,7 @@
         confetti(ctx, G, ov ? 70 : 20, ov ? 1.4 : 1); DD.art.motes(G, '#fff0c8', 14, 0.3);
         const v = ctx.createRadialGradient(VW / 2, VH / 2, 70, VW / 2, VH / 2, 200); v.addColorStop(0, 'rgba(10,4,24,0)'); v.addColorStop(1, 'rgba(10,4,24,0.45)'); ctx.fillStyle = v; ctx.fillRect(0, 0, VW, VH);
         if (s.flash > 0) { ctx.fillStyle = 'rgba(255,255,255,' + (s.flash / 14) + ')'; ctx.fillRect(0, 0, VW, VH); }
-        if (B && B.dead) {   // the ending: letterbox bars slide in and the credits roll while the confetti falls
+        if (B && B.dead && !DD.cut) {   // the ending: letterbox bars slide in and the credits roll while the confetti falls (after the ending scene, if one plays)
           const t = s.fin, bar = Math.min(26, t * 0.8);
           ctx.fillStyle = '#000'; ctx.fillRect(0, 0, VW, bar); ctx.fillRect(0, VH - bar, VW, bar);
           const k = Math.min(1, Math.max(0, (t - 30) / 40)), out = Math.min(1, Math.max(0, (END - t) / 30));

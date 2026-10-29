@@ -726,7 +726,7 @@ const SAYS = {   // fan chatter: Greggheads are VHS purists who quote Gregg, Tim
 };
 const INTRO = { gh: ['GREGGHEADS', "GREGG'S FANS. SORT OF VHS FREAKS"], th: ['TIMHEADS', "TIM'S FANS. IT'S HIS SHOW"] };
 function say(f, txt, col = '#1a0e14', t = 70) { f.say = { txt, col, t }; }
-const hush = () => !!(G && G.dlg && (G.dlg.cur || G.dlg.q.length || G.dlg.show > 0 || (G.intro < INTRO_T && L && L.lines && L.lines.start && !G.lineSeen.start)));   // the dialogue box is up, or the opening lines are about to be
+const hush = () => !!CUT || !!(G && G.dlg && (G.dlg.cur || G.dlg.q.length || G.dlg.show > 0 || (G.intro < INTRO_T && L && L.lines && L.lines.start && !G.lineSeen.start)));   // the dialogue box is up, or the opening lines are about to be
 function popHead(f, vx, vy) {
   if (f.headless) return;
   f.headless = true;
@@ -1800,7 +1800,7 @@ function drawHUD() {
   const want = hudWanted();
   hudA += ((want ? 1 : 0) - hudA) * 0.2; if (!want && hudA < 0.03) hudA = 0;
   if (hudA > 0) { ctx.save(); ctx.globalAlpha = hudA; drawHUDCore(); drawBossHUD(); ctx.restore(); }
-  if (G.cards.length && G.intro >= INTRO_T) {   // NEW FAN card: slides in under the popcorn counter, holds, slides out
+  if (G.cards.length && G.intro >= INTRO_T && !CUT) {   // NEW FAN card: slides in under the popcorn counter, holds, slides out
     const c = G.cards[0], k = Math.min(1, c.t / 14, (240 - c.t) / 14), X = Math.round(-176 + 180 * (1 - Math.pow(1 - k, 3))), Y = 22;   // play never stops for it
     const [name, sub] = INTRO[c.type], [l1, l2] = sub.split('. ');
     ctx.fillStyle = 'rgba(10,4,8,0.82)'; ctx.fillRect(X, Y, 172, 30);

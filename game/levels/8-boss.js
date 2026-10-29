@@ -224,7 +224,9 @@
       [40, 18, 1], [42, 17, 1], [44, 17, 1], [46, 18, 1], [52, 16, 4], [56, 20, 2], [28, 20, 4], [2, 17, 1]],
     sprites: ['w8_joker', 'w8_joker_smog', 'w8_joker_hurt', 'w8_joker_open', 'w8_joker_picket', 'w8_joker_ram',
       'w8_f_wed', 'w8_t_wed', 'w8_drape', 'w8_column', 'w8_trellis', 'w8_wedtable', 'w8_arthurtv', 'w8_dirchair', 'w8_guitar', 'w8_flowers_a', 'w8_flowers_b', 'w8_strlights',
-      'w8_flag', 'w8_timwed_full', 'w8_bond'],
+      'w8_flag', 'w8_timwed_full', 'w8_bond',
+      'w8_brick', 'w8_marquee', 'w8_armchair', 'w8_armchair_r', 'w8_popcart', 'w8_timceo', 'w8_coffee', 'w8_lamp', 'w8_hills_far', 'w8_hills_near', 'w8_mesa_a', 'w8_mesa_b',
+      'w8_cactus_a', 'w8_cactus_b', 'w8_sun', 'w8_timranch', 'w8_greggranch', 'w8_scrub', 'w8_drum'],   // the second line: the boss_out cutaways (cuts/w8.js)
     portraits: { joker: 'w8_portrait_joker', bond: 'w8_portrait_bond', wed: 'w8_portrait_wed', ceo: 'w8_portrait_ceo' },
     names: { joker: 'JOKER GREGG', bond: 'BOND GREGG', wed: 'WEDDING TIM', ceo: 'HEI CEO TIM' },
     lines: {   // design/VOICE.md. Sources: the 7th Oscar Special (the Mobile VFA's entrance, the Arthur museum), S12 last-night-in-soho-antlers (Gregg refusing popcorn ratings, for the NO RATINGS banner)

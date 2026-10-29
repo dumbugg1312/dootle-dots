@@ -219,7 +219,7 @@
     THINGS: [['dot', 1, 20], ['tim_ocx', 50, 19]],
     POPCORN: [[8, 20, 3], [20, 20, 3], [27, 20, 3], [37, 20, 3], [52, 20, 2], [4, 18, 3], [57, 18, 3], [17, 15, 4], [43, 15, 4], [30, 12, 4], [11, 15, 5], [49, 15, 5], [24, 14, 3], [37, 14, 3]],
     sprites: ['w7_timocx', 'w7_timocx_throw', 'w7_timocx_hurt', 'w7_timocx_rage', 'w7_vrset', 'w7_fallO', 'w7_fallX', 'w7_fallC', 'w7_floor', 'w7_plinth', 'w7_truss', 'w7_can',
-              'w7_tub', 'w7_rio', 'w7_bucket', 'w7_chair', 'w7_vrcam', 'w7_ladder', 'w7_portrait_tim', 'w7_portrait_gregg'],
+              'w7_tub', 'w7_rio', 'w7_bucket', 'w7_chair', 'w7_vrcam', 'w7_ladder', 'w7_portrait_tim', 'w7_portrait_gregg', 'w7_gregg_seat'],   // w7_gregg_seat: the boss cutscenes (cuts/w7.js)
     portraits: { tim: 'w7_portrait_tim', gregg: 'w7_portrait_gregg' },
     intro: { bg: '#05070c', fg: '#ffffff', edge: '#3fd6ff' },
     boss: {
