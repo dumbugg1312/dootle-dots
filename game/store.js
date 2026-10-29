@@ -226,7 +226,7 @@
     UP, SIX, COST, MAX, perks, lvl, items, revealed, sixOn, award, icon, canBuy, open, step, draw, buy, nudge,
     own, act, setAct, reload() { load(); try { UNL = localStorage.getItem(UKEY) === '1'; } catch (e) { UNL = false; } },   // after LOAD / CLEAR DATA
     get pts() { return S.pts; }, get earned() { return S.earned; },
-    bank(n) { if (!UNL) { S.pts = Math.max(0, S.pts + n); save(); } }, poor() { poorT = 14; }, get backLabel() { return label; },   // the casino's stakes and pay-outs
+    bank(n) { if (!UNL) { S.pts = Math.max(0, S.pts + n); save(); } }, poor() { poorT = 14; }, get backLabel() { return label; }, get tab() { return tab; }, set tab(v) { tab = v ? 1 : 0; },   // the casino's stakes and pay-outs
     get unlimited() { return UNL; }, setUnlimited, get back() { return back; }, get cur() { return cur; }, set cur(i) { cur = i; },
   };
 })();

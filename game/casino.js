@@ -153,65 +153,200 @@
     else bannerUp(back === stake ? 'STAKE BACK +' + back : '+' + back, '#fff6d4', 1, 80);
   }
 
-  // ================================================================ drawing pieces
-  const SPR = { kernel: ['kernel', 2], pop: ['pop', 2], cup: ['cup', 1], tub: ['tub', 1], vhs: ['vhs', 1], gregg: ['portrait_gregg', 1], tim: ['portrait_tim', 1], card: ['card', 0.75] };
+  // ================================================================ drawing pieces: the game's art kit (DD.art) and crisp pixel shapes, no smooth arcs
+  const A = DD.art, mix = (h, k) => A ? A.mix(h, k) : h;
+  const box = (x, y, w, h, base, o) => A ? A.box(Math.round(x), Math.round(y), w, h, base, o) : rect(base, x, y, w, h);
+  const glow = (x, y, r, col, a) => { if (A) A.glow(x, y, r, col, a); };
+  const GOLD = ['#fff6c0', '#ffe27a', '#f0c84a', '#d89a28', '#b06a18'], NEON = ['#ffe0d0', '#ff9a7a', '#ff5a40', '#e02a24', '#9a1418'];
+  function logo(str, cx, y, s, ramp = GOLD, glint = null, out = '#3a1408', drop = '#7a3a10') {   // big type like the menu's: outline, drop shadow, a colour ramp per font row, a glint
+    const w = str.length * 4 * s - s, x = Math.round(cx - w / 2);
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]]) text(str, x + dx, y + dy, out, s, null);
+    if (s > 1) text(str, x + 2, y + 3, drop, s, null);
+    for (let r = 0; r < 5; r++) { ctx.save(); ctx.beginPath(); ctx.rect(x - 4, y + r * s, w + 8, s); ctx.clip(); text(str, x, y, ramp[r], s, null); ctx.restore(); }
+    if (glint !== null) { ctx.save(); ctx.beginPath(); ctx.moveTo(glint, y - 4); ctx.lineTo(glint + 10, y - 4); ctx.lineTo(glint + 2, y + 5 * s + 4); ctx.lineTo(glint - 8, y + 5 * s + 4); ctx.closePath(); ctx.clip(); text(str, x, y, '#ffffff', s, null); ctx.restore(); }
+  }
+  function ell(cx, cy, rx, ry, col, half = 0) {   // a filled ellipse from pixel rows (half: 1 lower half only, -1 upper)
+    for (let dy = half > 0 ? 0 : -ry; dy <= (half < 0 ? 0 : ry); dy++) { const w = Math.round(rx * Math.sqrt(Math.max(0, 1 - (dy / (ry + 0.5)) ** 2))); if (w > 0) rect(col, cx - w, cy + dy, w * 2, 1); }
+  }
+  function rrect(x, y, w, h, r, col) {   // a rounded rectangle from pixel rows
+    for (let i = 0; i < h; i++) { const k = i < r ? r - i - 0.5 : i >= h - r ? i - (h - r) + 0.5 : -1, ins = k < 0 ? 0 : Math.round(r - Math.sqrt(Math.max(0, r * r - k * k))); rect(col, x + ins, y + i, w - ins * 2, 1); }
+  }
+  function rbox(x, y, w, h, r, base, out) {   // a rounded, shaded plate: outline, body, lit top, shaded foot
+    rrect(x - 1, y - 1, w + 2, h + 2, r + 1, out || mix(base, -0.7)); rrect(x, y, w, h, r, base);
+    rect(mix(base, 0.35), x + r, y, w - r * 2, 1); rect(mix(base, -0.4), x + r, y + h - 1, w - r * 2, 1);
+  }
+  const cache = {};
+  function bake(key, w, h, paint) {   // draw once to a small canvas, then blit it
+    if (cache[key]) return cache[key];
+    const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
+    paint((col, x, y, ww = 1, hh = 1) => { g.fillStyle = col; g.fillRect(x, y, ww, hh); }, g);
+    return (cache[key] = c);
+  }
+  function pmap(rows, pal, x, y, s = 1, tt = 0) {   // a pixel map: '.' is clear, 'x' runs the rainbow
+    rows.forEach((row, r) => { for (let c = 0; c < row.length; c++) { const ch = row[c]; if (ch === '.') continue; ctx.fillStyle = ch === 'x' ? rainbow(r + c, tt) : pal[ch]; ctx.fillRect(x + c * s, y + r * s, s, s); } });
+  }
+  // round things, lit from the top left
+  function roundSpr(key, r, fn) { return bake(key, r * 2 + 1, r * 2 + 1, P => { for (let j = 0; j <= r * 2; j++) for (let i = 0; i <= r * 2; i++) { const dx = i - r, dy = j - r, d = Math.hypot(dx, dy); if (d > r + 0.35) continue; const c = fn(d, Math.atan2(dy, dx), dx, dy); if (c) P(c, i, j); } }); }
+  const CHIPC = a => a >= 1000 ? '#e8b030' : a >= 100 ? '#2a2430' : a >= 50 ? '#2a5ad8' : a >= 25 ? '#1a9a4a' : a >= 10 ? '#d8202c' : '#ece6dc';
+  function chip(x, y, amt, r = 5, n = 1) {   // a stack of n chips, its foot at (x, y + r)
+    const col = CHIPC(amt), edge = amt >= 100 && amt < 1000 ? '#e8c060' : amt < 10 ? '#3a6ad8' : '#fff6e8';
+    const img = roundSpr('chip' + col + r, r, (d, a, dx, dy) => {
+      if (d > r - 0.6) return mix(col, -0.65);
+      const lit = -(dx + dy) / (r * 2) * 0.3;
+      if (d > r - 2.1) { const k = ((a + Math.PI) / (Math.PI / 3)) % 1; return k < 0.35 ? mix(edge, lit) : mix(col, lit); }
+      if (d > r - 3) return mix(col, -0.3 + lit);
+      return mix(col, 0.12 + lit);
+    });
+    const side = mix(col, -0.45);
+    for (let k = 0; k < n; k++) { const yy = Math.round(y - k * 2); rect('rgba(0,0,0,0.35)', x - r + 1, yy + r - 1, r * 2, 2); rect(side, x - r + 1, yy + 1, r * 2 - 1, r); ctx.drawImage(img, Math.round(x - r), yy - r); }
+  }
+  function coin(x, y) { ctx.drawImage(roundSpr('coin', 5, (d, a, dx, dy) => d > 4.4 ? '#6a3a08' : d > 3.4 ? mix('#e8b030', -(dx + dy) * 0.05) : (dx + dy < -3 ? '#fff0a0' : (Math.abs(dx) < 1 && Math.abs(dy) < 2.5) || (Math.abs(dy) < 1 && Math.abs(dx) < 2.5) ? '#b07a18' : '#d89a28')), Math.round(x - 5), Math.round(y - 5)); }
+  function ball(x, y) { rect('rgba(0,0,0,0.45)', Math.round(x) - 1, Math.round(y) + 1, 4, 2); ctx.drawImage(roundSpr('ball', 2, (d, a, dx, dy) => d > 1.9 ? '#8a8a98' : dx + dy < -1 ? '#ffffff' : '#e8e8f0'), Math.round(x - 2), Math.round(y - 2)); }
+  function bead(x, y, r, col) { ctx.drawImage(roundSpr('bead' + col + r, r, (d, a, dx, dy) => d > r - 0.6 ? mix(col, -0.6) : dx + dy < -r * 0.9 ? mix(col, 0.6) : mix(col, -(dx + dy) / (r * 4))), Math.round(x - r), Math.round(y - r)); }
+
+  // ---- slot symbols: sprites at whole sizes only, a drawn 7 and a drawn WILD card
+  const SPR = { kernel: ['kernel', 2], pop: ['pop', 2], cup: ['cup', 1], tub: ['tub', 1], vhs: ['vhs', 1], gregg: ['portrait_gregg', 1], tim: ['portrait_tim', 1], card: ['card', 1] };
   const BOSSES = [['w10_portrait_rat', 10], ['w11_portrait_new', 11], ['w12_portrait_amato', 12]];
-  if (DD.loadSprites) DD.loadSprites(['kernel', 'pop', 'cup', 'tub', 'vhs', 'portrait_gregg', 'portrait_tim', 'card', 'gregg', 'tim', 'w10_portrait_rat', 'w11_portrait_new', 'w12_portrait_amato']);
-  function sym(k, cx, cy, s = 1, alpha = 1, face = 0, tt = 0) {   // a slot symbol centred on cx, cy
+  if (DD.loadSprites) DD.loadSprites(['kernel', 'pop', 'cup', 'tub', 'vhs', 'portrait_gregg', 'portrait_tim', 'card', 'gregg', 'tim', 'w10_portrait_rat', 'w11_portrait_new', 'w12_portrait_amato', 'w2_curtain']);
+  const SEVEN = (() => {   // a 16 x 22 seven: outline, body, lit edge, shaded edge
+    const W = 16, H = 22, inS = (x, y) => (y >= 1 && y <= 4 && x >= 1 && x <= 14) || (y > 4 && y <= 20 && x >= Math.round(10.5 - (y - 5) * 0.42) && x < Math.round(10.5 - (y - 5) * 0.42) + 4);
+    const g = []; for (let y = 0; y < H; y++) { let row = ''; for (let x = 0; x < W; x++) { if (inS(x, y)) row += !inS(x - 1, y) || !inS(x, y - 1) ? 'l' : !inS(x + 1, y) || !inS(x, y + 1) ? 'd' : 'r'; else row += [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => inS(x + a, y + b)) ? 'k' : '.'; } g.push(row); }
+    return g;
+  })();
+  function sevenSym(cx, cy, tt, hot) { const pal = { k: '#3a0806', r: hot ? rainbow(0, tt) : '#e8302a', l: '#ff9a7a', d: '#9a1410' }; if (hot) glow(cx, cy, 18, '#ff6a4a', 0.3); pmap(SEVEN, pal, Math.round(cx - 8), Math.round(cy - 11)); }
+  function wildSym(cx, cy, tt) {
+    const x = Math.round(cx - 13), y = Math.round(cy - 9);
+    rrect(x - 1, y - 1, 28, 20, 3, rainbow(0, tt)); rrect(x, y, 26, 18, 2, '#7ad8e8'); rect('#c8f4fa', x + 2, y + 1, 22, 1); rect('#3a98b0', x + 2, y + 16, 22, 1);
+    rect('#2a6a8a', x + 3, y + 3, 20, 1); text('WILD', cx, y + 7, '#10304a', 1, null, 'center'); rect('#2a6a8a', x + 3, y + 13, 20, 1);
+    if (Math.floor(tt / 10) % 3 === 0) { rect('#fff', x + 21, y + 2, 1, 3); rect('#fff', x + 20, y + 3, 3, 1); }
+  }
+  function sym(k, cx, cy, alpha = 1, face = 0, tt = 0, hot = false) {   // a reel symbol centred on cx, cy
     const n = SYM[k];
-    if (n === 'seven') { const sz = Math.max(1, Math.round(4 * s)); text('7', cx - 1.5 * sz + 1, cy - 2.5 * sz, alpha < 1 ? '#a04040' : '#e8302a', sz, alpha < 1 ? null : '#ffd27a'); return; }
-    if (n === 'wild') { spr('card', cx, cy + 5 * s, false, 0.8 * s, 0.8 * s * 1.6, 0, alpha); if (s >= 0.9) text('WILD', cx, cy + 6, rainbow(0, tt), 1, '#10202a', 'center'); return; }
-    if (n === 'boss') { const b = BOSSES[face % 3]; spr(b[0], cx, cy + 12 * s, false, s, s, 0, alpha); return; }
-    const [im, sc] = SPR[n]; spr(im, cx, cy + (n === 'pop' ? 10 : n === 'kernel' ? 13 : 12) * s * (sc > 1 ? 1 : 1), false, sc * s, sc * s, 0, alpha);
+    if (alpha < 1) ctx.globalAlpha = alpha;
+    if (n === 'seven') sevenSym(cx, cy, tt, hot);
+    else if (n === 'wild') wildSym(cx, cy, tt);
+    else if (n === 'boss') spr(BOSSES[face % 3][0], cx, cy + 12);
+    else { const [im, sc] = SPR[n]; spr(im, cx, cy + (n === 'pop' ? 10 : n === 'kernel' ? 13 : 12), false, sc, sc); }
+    ctx.globalAlpha = 1;
   }
-  function chip(x, y, amt, r = 5) {
-    const col = amt >= 1000 ? '#e8b030' : amt >= 100 ? '#262028' : amt >= 50 ? '#2a5ad8' : amt >= 25 ? '#1a9a4a' : amt >= 10 ? '#d8202c' : '#f0ece4';
-    ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(x, y + 1, r, 0, 7); ctx.fill();
-    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
-    ctx.fillStyle = amt >= 100 && amt < 1000 ? '#e8c060' : '#fff'; for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + 0.4; ctx.fillRect(Math.round(x + Math.cos(a) * (r - 1.5)) - 1, Math.round(y + Math.sin(a) * (r - 1.5)) - 1, 2, 2); }
-  }
+  const IC = {   // 8 x 8 pay-table icons, drawn for the size (no shrunk sprites)
+    kernel: [['..ww.w..', '.wwwwww.', 'wwywwwww', 'wwwwwyww', '.wwywww.', '..wwww..', '...yy...', '........'], { w: '#fff6e0', y: '#f0c040' }],
+    pop: [['..y.yy..', '.yyyyyy.', '.rrrrrr.', '.rrrrrr.', '.wwwwww.', '.rrrrrr.', '.rrrrrr.', '.dddddd.'], { y: '#fff0b0', r: '#d8202c', w: '#f4ece0', d: '#8a1018' }],
+    cup: [['....s...', '...s....', '.rrrrrr.', '.wwwwww.', '.rrrrrr.', '..wwww..', '..rrrr..', '..dddd..'], { s: '#e8e8f0', r: '#d8202c', w: '#f4ece0', d: '#8a1018' }],
+    tub: [['.yywyyw.', 'yyyyyyyy', 'rwrwrwrw', 'rwrwrwrw', 'rwrwrwrw', 'rwrwrwrw', '.rwrwrw.', '.dddddd.'], { y: '#fff0b0', w: '#f4ece0', r: '#d8202c', d: '#8a1018' }],
+    vhs: [['kkkkkkkk', 'kwwwwwwk', 'kwrrrrwk', 'kkkkkkkk', 'kgkkkkgk', 'kggkkggk', 'kkkkkkkk', '........'], { k: '#1a1418', w: '#f0e0c0', r: '#d8202c', g: '#8a8a98' }],
+    tim: [['..hhhh..', '.hhhhhh.', '.hssssh.', '.sesses.', '.ssssss.', '.bbssbb.', '..bbbb..', '.cccccc.'], { h: '#5a3a20', s: '#f0c090', e: '#20140a', b: '#6a4428', c: '#2a2a34' }],
+    gregg: [['..hhhh..', '.hhhhhh.', 'hhsssshh', 'hsessesh', 'hhsssshh', 'h.ssss.h', '.jjwwjj.', 'jjjwwjjj'], { h: '#1a1418', s: '#f0c090', e: '#20140a', j: '#a8202a', w: '#f0f0f0' }],
+    boss: [['y.y.y...', 'yyyyy...', '.gggg.p.', 'ggkgggpp', 'gggggggg', '.ggggggp', '..gg.gg.', '........'], { y: '#f0c040', g: '#a0a0b0', k: '#000', p: '#f0a0b0' }],
+    seven: [['kkkkkkkk', 'krrrrrrk', 'kkkkkrrk', '....krk.', '...krk..', '...krk..', '..krk...', '..kkk...'], { k: '#ffd27a', r: '#e8302a' }],
+    wild: [['xxxxxxxx', 'xkxxxxkx', 'xkxxxxkx', 'xkxkkxkx', 'xkkxxkkx', 'xkxxxxkx', 'xxxxxxxx', '........'], { k: '#10304a' }],
+  };
+  const icon = (k, x, y, tt) => { const I = IC[SYM[k]]; pmap(I[0], I[1], x, y, 1, tt); };
+
+  // ---- cards: 18 x 26, rounded, pips, court frames, a red HEI back
   const SUIT = [['..x..', '.xxx.', 'xxxxx', '..x..', '.xxx.'], ['.x.x.', 'xxxxx', 'xxxxx', '.xxx.', '..x..'], ['..x..', '.xxx.', 'xxxxx', '.xxx.', '..x..'], ['.xxx.', 'x.x.x', 'xxxxx', '..x..', '.xxx.']];
   const suit = (s, x, y, col, sc = 1) => { ctx.fillStyle = col; SUIT[s].forEach((row, r) => { for (let c = 0; c < 5; c++) if (row[c] === 'x') ctx.fillRect(x + c * sc, y + r * sc, sc, sc); }); };
-  function card(c, x, y, flip = 1) {   // 18 x 26; flip (0-1) squeezes it for the turn-over
-    const w = Math.max(1, Math.round(18 * Math.abs(flip))), ox = x + (18 - w) / 2;
-    rect('#000', ox - 1, y - 1, w + 2, 28);
-    if (c.hide || flip < 0) { rect('#a8202a', ox, y, w, 26); if (w > 12) { rect('#e8b030', ox + 2, y + 2, w - 4, 1); rect('#e8b030', ox + 2, y + 23, w - 4, 1); text('HEI', ox + w / 2, y + 11, '#e8b030', 1, null, 'center'); } return; }
-    rect('#fff8ec', ox, y, w, 26); if (w < 14) return;
+  const CROWN = ['x.x.x', 'xxxxx', 'xxxxx'];
+  function card(c, x, y, flip = 1) {   // flip (0-1) squeezes it for the turn-over; below 0 shows the back
+    x = Math.round(x); y = Math.round(y);
+    const w = Math.max(2, Math.round(18 * Math.abs(flip))), ox = x + Math.round((18 - w) / 2);
+    rect('rgba(0,0,0,0.35)', ox + 1, y + 2, w, 26);
+    rrect(ox - 1, y - 1, w + 2, 28, 2, '#1a1014');
+    if (c.hide || flip < 0) {
+      rrect(ox, y, w, 26, 1, '#a8202a');
+      if (w > 10) { for (let j = 2; j < 24; j += 2) for (let i = 2 + (j % 4 ? 1 : 0); i < w - 2; i += 2) rect('#8a1420', ox + i, y + j, 1, 1); rect('#e8b030', ox + 2, y + 2, w - 4, 1); rect('#e8b030', ox + 2, y + 23, w - 4, 1); rect('#e8b030', ox + 2, y + 2, 1, 22); rect('#e8b030', ox + w - 3, y + 2, 1, 22); if (w > 14) { rect('#a8202a', ox + 3, y + 10, w - 6, 7); text('HEI', ox + w / 2, y + 11, '#ffd27a', 1, null, 'center'); } }
+      return;
+    }
+    rrect(ox, y, w, 26, 1, '#fbf4e6'); rect('#ffffff', ox + 1, y, w - 2, 1); rect('#d8ccb4', ox + 1, y + 25, w - 2, 1);
+    if (w < 14) return;
     const red = c.s === 1 || c.s === 2, col = red ? '#d8202c' : '#1a1418';
     text(RANK[c.r], ox + 2, y + 2, col, 1, null); suit(c.s, ox + 2, y + 8, col);
-    suit(c.s, ox + 6, y + 13, col, 2);
+    text(RANK[c.r], ox + w - 2, y + 19, col, 1, null, 'right');
+    if (c.r >= 10) { rect('#e8c060', ox + 7, y + 6, 9, 14); rect('#fbf4e6', ox + 8, y + 7, 7, 12); pmap(CROWN, { x: '#d89a28' }, ox + 9, y + 8); text(RANK[c.r], ox + 11, y + 13, col, 1, null); }
+    else suit(c.s, ox + 7, y + 9, col, 2);
   }
-  function wheel(cx, cy, r, ang, ball, tt) {   // ball: { a (absolute), rr } or null
-    ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(cx, cy + 2, r + 4, 0, 7); ctx.fill();
-    ctx.fillStyle = '#6a3a18'; ctx.beginPath(); ctx.arc(cx, cy, r + 4, 0, 7); ctx.fill();
-    ctx.fillStyle = '#c98f22'; ctx.beginPath(); ctx.arc(cx, cy, r + 1, 0, 7); ctx.fill();
-    const n = WHEEL.length, da = Math.PI * 2 / n;
-    for (let i = 0; i < n; i++) { ctx.fillStyle = numCol(WHEEL[i]); ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, r, ang + i * da - da / 2, ang + i * da + da / 2); ctx.closePath(); ctx.fill(); }
-    ctx.fillStyle = '#3a2410'; ctx.beginPath(); ctx.arc(cx, cy, r * 0.62, 0, 7); ctx.fill();
-    ctx.fillStyle = '#c98f22'; ctx.beginPath(); ctx.arc(cx, cy, r * 0.5, 0, 7); ctx.fill();
-    ctx.fillStyle = '#e8c060'; for (let k = 0; k < 4; k++) { const a = ang * 1 + k * Math.PI / 2; ctx.fillRect(Math.round(cx + Math.cos(a) * r * 0.3) - 1, Math.round(cy + Math.sin(a) * r * 0.3) - 1, 3, 3); }
-    ctx.fillStyle = '#fff6d4'; ctx.beginPath(); ctx.arc(cx, cy, 2.5, 0, 7); ctx.fill();
-    if (ball) { const bx = cx + Math.cos(ball.a) * ball.rr, by = cy + Math.sin(ball.a) * ball.rr; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(bx + 0.5, by + 1, 2.2, 0, 7); ctx.fill(); ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(bx, by, 2, 0, 7); ctx.fill(); }
+
+  // ---- the roulette wheel, rendered pixel by pixel each frame: wood bowl, ball track, pockets with gold frets, cone, turret
+  const wcache = {};
+  const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const WC = { wood: hex('#6a3a18'), woodL: hex('#9a5a28'), gold: hex('#e8b030'), goldD: hex('#9a6a18'), track: hex('#b07a40'), red: hex('#c8202c'), blk: hex('#1a1418'), grn: hex('#1a8a3a'), cone: hex('#5a3014'), cone2: hex('#7a4420') };
+  function wheelImg(R, ang) {
+    const S = R * 2 + 2; let W = wcache[R];
+    if (!W) { const c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d'); W = wcache[R] = { c, g, id: g.createImageData(S, S) }; }
+    const d = W.id.data, n = 37, da = Math.PI * 2 / n;
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const dx = x + 0.5 - S / 2, dy = y + 0.5 - S / 2, dist = Math.hypot(dx, dy), i4 = (y * S + x) * 4;
+      if (dist > R) { d[i4 + 3] = 0; continue; }
+      const a = Math.atan2(dy, dx), f = dist / R, lit = Math.cos(a + 2.36);
+      let c, k = 0;
+      if (f > 0.92) { c = WC.wood; k = 0.18 * lit + 0.08 * Math.sin(a * 23 + f * 30); if (f > 0.97) k -= 0.35; }
+      else if (f > 0.89) { c = WC.gold; k = 0.25 * lit; }
+      else if (f > 0.73) { c = WC.track; k = 0.22 * lit - (0.89 - f) * 0.8; }
+      else if (f > 0.7) c = WC.goldD;
+      else if (f > 0.5) {
+        const rel = ((a - ang + da / 2) % (Math.PI * 2) + Math.PI * 4) % (Math.PI * 2), pi = Math.floor(rel / da), fr = rel / da - pi;
+        if (fr < 0.1 || f > 0.68) { c = WC.gold; k = 0.2 * lit; } else { const nn = WHEEL[pi]; c = nn === 0 ? WC.grn : REDS.has(nn) ? WC.red : WC.blk; k = -(0.68 - f) * 1.4 + 0.12 * lit; }
+      }
+      else if (f > 0.47) { c = WC.gold; k = 0.2 * lit; }
+      else if (f > 0.15) { const seg = Math.floor((((a - ang) % (Math.PI * 2)) + Math.PI * 2) / (Math.PI / 4)) % 2; c = seg ? WC.cone : WC.cone2; k = 0.2 * lit + (0.47 - f) * 0.4; }
+      else { c = WC.gold; k = 0.35 * lit; }
+      if (f < 0.44) { for (let q = 0; q < 4; q++) { const aa = ang + q * Math.PI / 2, px = Math.cos(aa), py = Math.sin(aa), along = dx * px + dy * py, perp = Math.abs(-dx * py + dy * px); if (along > 0 && along < R * 0.42 && perp < Math.max(0.8, R * 0.03)) { c = WC.gold; k = 0.3; } } }
+      const t = k < 0 ? 0 : 255, kk = Math.min(1, Math.abs(k));
+      d[i4] = c[0] + (t - c[0]) * kk; d[i4 + 1] = c[1] + (t - c[1]) * kk; d[i4 + 2] = c[2] + (t - c[2]) * kk; d[i4 + 3] = 255;
+    }
+    W.g.putImageData(W.id, 0, 0); return W.c;
   }
-  function felt(c1, c2) { rect(c1, 0, 15, VW, VH - 15); for (let y = 15; y < VH; y += 10) for (let x = (y / 10) % 2 ? 0 : 10; x < VW; x += 20) rect(c2, x + 4, y + 3, 4, 4); }
-  function btn(x, y, w, h, label, lit, col = '#c98f22', dis = false) {
-    rect('#000', x, y, w, h); rect(dis ? '#3a2a30' : lit ? col : '#3a1420', x + 1, y + 1, w - 2, h - 2);
-    if (lit && !dis) rect('rgba(255,255,255,0.25)', x + 1, y + 1, w - 2, 1);
-    text(label, x + w / 2, y + (h - 5) / 2, dis ? '#7a6a70' : lit ? '#2a0e1a' : '#ffd27a', 1, null, 'center');
+  function wheel(cx, cy, R, ang, b, flat = 1) {   // flat < 1 squashes it for a table seen at an angle
+    const img = wheelImg(R, ang), S = R * 2 + 2;
+    ell(cx, cy + 2, R + 1, Math.round((R + 1) * flat), 'rgba(0,0,0,0.4)');
+    ctx.drawImage(img, Math.round(cx - S / 2), Math.round(cy - S * flat / 2), S, Math.round(S * flat));
+    if (b) ball(cx + Math.cos(b.a) * b.rr, cy + Math.sin(b.a) * b.rr * flat);
+  }
+
+  // ---- the set: the theater curtains behind, a gilt valance, a casino carpet underfoot, spotlights
+  function room(tt, floorY = 118, dim = 0.62) {
+    rect('#120610', 0, 15, VW, VH - 15);
+    for (let x = -174 + (-tt * 0.03 % 174); x < VW + 174; x += 174) spr('w2_curtain', x + 87, floorY + 100);
+    rect(`rgba(14,4,12,${dim})`, 0, 15, VW, floorY - 15);
+    carpet(floorY);
+    if (A) { A.trim(0, 15, VW, '#c98f22'); A.fringe(0, 18, VW, '#c98f22'); }
+  }
+  function carpet(y0) {   // a loud casino carpet: rows grow taller toward you
+    rect('#3a0812', 0, y0, VW, VH - y0); rect('#1a0408', 0, y0, VW, 1);
+    let y = y0 + 2, h = 4, row = 0;
+    while (y < VH) { const off = row % 2 ? 7 : 0; for (let x = -7 + off; x < VW; x += 14) { rect('#6a1424', x + 3, y, 8, Math.max(1, h - 2)); rect('#b07a28', x + 6, y + Math.floor(h / 2) - 1, 2, 2); if (h > 4) rect('#1a6a6a', x, y + 1, 2, 1); } y += h; h = Math.min(9, h + 1); row++; }
+  }
+  function felt(base, y0 = 15, y1 = VH) { rect(base, 0, y0, VW, y1 - y0); if (A) A.tex(0, y0, VW, y1 - y0, base, 0.06, 3); }
+  function btn(x, y, w, h, label, lit, col = '#c98f22', dis = false) {   // a raised button like the menu's: black edge, lit bevel, dark foot
+    const base = dis ? '#3a2a30' : lit ? col : '#5a2236';
+    rect('#000', x - 1, y - 1, w + 2, h + 3); rect(base, x, y, w, h);
+    rect(mix(base, 0.4), x, y, w, 1); rect(mix(base, 0.2), x, y, 1, h); rect(mix(base, -0.45), x, y + h - 1, w, 1); rect(mix(base, -0.35), x + w - 1, y, 1, h);
+    text(label, x + w / 2, y + Math.floor((h - 5) / 2), dis ? '#7a6a70' : lit ? '#2a0e1a' : '#ffd27a', 1, null, 'center');
+  }
+  function led(x, y, w, val, digits, col = '#ffb030') {   // an LED readout: dark glass, ghost 8s, lit digits
+    box(x, y, w, 11, '#140808'); const s = String(val).padStart(digits, ' ');
+    rect('rgba(255,255,255,0.08)', x + 1, y + 1, w - 2, 1); text(s.trim(), x + w - 3, y + 3, col, 1, null, 'right');
   }
   function wrapT(s, n) { const out = []; let line = ''; for (const w of s.split(' ')) { if (line && (line + ' ' + w).length > n) { out.push(line); line = w; } else line = line ? line + ' ' + w : w; } if (line) out.push(line); return out; }
-  function bubble(s, x, y, w, tail) { const L = wrapT(s, Math.floor((w - 6) / 4)), h = L.length * 7 + 5; rect('#000', x - 1, y - 1, w + 2, h + 2); rect('#fff6d4', x, y, w, h); if (tail) { rect('#000', x - 4, y + 4, 4, 3); rect('#fff6d4', x - 3, y + 5, 3, 1); } L.forEach((l, i) => text(l, x + 3, y + 3 + i * 7, '#2a0e1a', 1, null)); }
-  function betBox(x, y, lit) {   // BET with up / down arrows (clickable); the stake used by slots and blackjack
-    rect('#000', x, y, 54, 26); rect('#1a0a12', x + 1, y + 1, 52, 24);
-    text('BET', x + 27, y + 3, '#9a8a90', 1, null, 'center'); text(String(BETS[bi]), x + 27, y + 12, lit ? '#ffe680' : '#fff6d4', 2, '#000', 'center');
-    text('<', x + 5, y + 14, bi > 0 ? '#ffd27a' : '#4a3a40', 1, null); text('>', x + 46, y + 14, bi < BETS.length - 1 ? '#ffd27a' : '#4a3a40', 1, null);
+  function bubble(s, x, y, w, tail) { const L = wrapT(s, Math.floor((w - 6) / 4)), h = L.length * 7 + 5; rrect(x - 1, y - 1, w + 2, h + 2, 3, '#1a1014'); rrect(x, y, w, h, 2, '#fff6d4'); rect('#ffffff', x + 2, y, w - 4, 1); if (tail) { rect('#1a1014', x - 4, y + 4, 4, 3); rect('#fff6d4', x - 3, y + 5, 4, 1); } L.forEach((l, i) => text(l, x + 3, y + 3 + i * 7, '#2a0e1a', 1, null)); }
+  function betBox(x, y, lit) {   // BET with < > (clickable); the stake used by slots and blackjack
+    box(x, y, 54, 26, '#2a1018'); text('BET', x + 27, y + 3, '#c89850', 1, null, 'center');
+    led(x + 12, y + 12, 30, BETS[bi], 3, lit ? '#ffd040' : '#c89040');
+    btn(x + 2, y + 12, 8, 10, '<', false, '#c98f22', bi === 0); btn(x + 44, y + 12, 8, 10, '>', false, '#c98f22', bi === BETS.length - 1);
   }
   function betClick(c, x, y) { if (inR(c, x, y + 8, 18, 18)) { bump(-1); return true; } if (inR(c, x + 36, y + 8, 18, 18)) { bump(1); return true; } return false; }
   function bump(d) { const n = Math.max(0, Math.min(BETS.length - 1, bi + d)); if (n !== bi) { bi = n; SFX.tick(); } else SFX.buzz(); }
+  function arcade(cx, cy, label, lit, col, pressed) {   // a big round arcade button in a chrome ring
+    bead(cx, cy + 1, 14, '#6a6a78'); bead(cx, cy, 13, '#c8c8d4');
+    const p = pressed ? 1 : 0; bead(cx, cy + 1, 11, mix(col, -0.5)); bead(cx, cy - 1 + p, 11, lit ? col : mix(col, -0.25));
+    if (lit) glow(cx, cy, 22, col, 0.18);
+    text(label, cx, cy - 3 + p, '#2a0a08', 1, null, 'center');
+  }
 
   // ================================================================ the lobby
-  const GAMES = [{ id: 'slots', name: 'LUCKY SEVEN', sub: 'SLOTS. BET 5-100' }, { id: 'scratch', name: 'SCRATCHERS', sub: 'IN THE MONEY' }, { id: 'roul', name: 'ROULETTE', sub: 'ONE ZERO' }, { id: 'bj', name: 'BLACKJACK', sub: 'PAYS 3 TO 2' }];
-  const CAB = i => ({ x: 12 + i * 75, y: 56, w: 70, h: 84 });
+  const GAMES = [{ id: 'slots', name: 'LUCKY SEVEN', sub: 'SLOTS' }, { id: 'scratch', name: 'SCRATCHERS', sub: '10 OR 25' }, { id: 'roul', name: 'ROULETTE', sub: 'ONE ZERO' }, { id: 'bj', name: 'BLACKJACK', sub: '3 TO 2' }];
+  const GX = i => 46 + i * 76, FLOOR = 126;
+  const CAB = i => ({ x: GX(i) - 34, y: 54, w: 68, h: 88 });
   function enter(id) {
     scr = id; t = 0; SFX.switch(); banner = null;
     if (id === 'slots') { S.state = 'idle'; }
@@ -225,37 +360,70 @@
     else if (IN.ok) enter(GAMES[lc].id);
     if (IN.back) return 'back';
   }
-  function marquee(x, y, w, h, tt, sp = 4) {   // a row of chasing bulbs round a box
-    const per = 2 * (w + h), n = Math.floor(per / 6);
-    for (let i = 0; i < n; i++) {
-      let d = i * 6, bx, by; if (d < w) { bx = x + d; by = y; } else if ((d -= w) < h) { bx = x + w; by = y + d; } else if ((d -= h) < w) { bx = x + w - d; by = y + h; } else { d -= w; bx = x; by = y + h - d; }
-      const on = (i + Math.floor(tt / sp)) % 3 === 0; rect(on ? '#fff6c0' : '#8a5a1c', bx - 1, by - 1, 2, 2);
-    }
+  function slotCab(cx, tt, on) {   // a slot machine: topper, screen with three little reels, chrome, lever, tray
+    box(cx - 21, FLOOR - 8, 42, 8, '#2a1a20');
+    box(cx - 18, 76, 36, 42, '#a01822'); rect('#c8c8d4', cx - 18, 76, 2, 42); rect('#c8c8d4', cx + 16, 76, 2, 42);
+    rbox(cx - 16, 58, 32, 18, 6, '#c98f22'); rrect(cx - 14, 60, 28, 14, 5, '#3a0610');
+    logo('777', cx, 62, 1, NEON, null, '#1a0204');
+    if (A) A.bulbs(cx - 12, 57, 26, 6, tt + (on ? 0 : 999), '#fffbd0', '#7a4a18');
+    box(cx - 14, 80, 28, 18, '#0a0408');
+    ctx.save(); ctx.beginPath(); ctx.rect(cx - 13, 81, 26, 16); ctx.clip();
+    for (let r = 0; r < 3; r++) { const x = cx - 13 + r * 9; rect('#fff6e8', x, 81, 8, 16); rect('rgba(0,0,0,0.18)', x, 81, 8, 3); rect('rgba(0,0,0,0.18)', x, 94, 8, 3); const p = on ? tt * (0.12 + r * 0.035) : r * 3 + 2; for (let k = -1; k <= 1; k++) { const idx = Math.floor(p) + k; icon(STRIPS[r][mod(idx, STRIPS[r].length)], x, Math.round(85 - (k - (p - Math.floor(p))) * 9), tt); } }
+    ctx.restore(); rect('rgba(232,48,42,0.8)', cx - 14, 88, 28, 1);
+    if (on) glow(cx, 89, 20, '#ffe6b0', 0.2);
+    if (A) A.trim(cx - 18, 100, 36, '#c8c8d4');
+    [['#e8302a', -10], ['#ffd040', -3], ['#30c060', 4]].forEach(([c2, dx]) => { rect('#000', cx + dx - 1, 104, 7, 4); rect(c2, cx + dx, 104, 5, 3); rect(mix(c2, 0.5), cx + dx, 104, 5, 1); });
+    box(cx - 10, 110, 20, 5, '#9a9aa8'); rect('#2a2028', cx - 8, 111, 16, 3);
+    const ly = on ? 80 + Math.round(Math.abs(Math.sin(tt / 18)) * 3) : 80; rect('#000', cx + 19, ly, 3, 98 - ly); rect('#d0d0dc', cx + 20, ly, 1, 98 - ly); box(cx + 18, 96, 4, 6, '#9a9aa8'); bead(cx + 20, ly, 3, '#e8302a');
+  }
+  function kiosk(cx, tt, on) {   // the scratch-ticket counter: a hanging IN THE MONEY sign, a dispenser of tickets, a glass case
+    box(cx - 26, 65, 52, 11, '#1e7a3a'); if (A) A.trim(cx - 26, 65, 52, '#e8c060');
+    text('IN THE MONEY', cx, 69, on && Math.floor(tt / 20) % 2 ? '#fff6c0' : '#ffe27a', 1, '#0a3a1a', 'center');
+    box(cx - 14, 77, 28, 21, '#2a1a2a');
+    [['#1e7a3a', -11], ['#3a2a8a', -3], ['#1e7a3a', 5]].forEach(([c2, dx], i) => { const sw = on ? Math.round(Math.sin(tt / 14 + i)) : 0; rect('#000', cx + dx - 1 + sw, 79, 8, 18); rect(c2, cx + dx + sw, 79, 6, 17); rect('#b8b8c4', cx + dx + 1 + sw, 83, 4, 3); rect('#b8b8c4', cx + dx + 1 + sw, 88, 4, 3); rect('#e8c060', cx + dx + sw, 80, 6, 1); });
+    box(cx - 22, 100, 44, FLOOR - 100, '#6a3a18'); if (A) { A.planks(cx - 21, 101, 42, FLOOR - 102, '#6a3a18', 7, true); A.trim(cx - 24, 98, 48, '#c98f22'); }
+    box(cx - 17, 105, 34, 10, '#1a2a30'); for (let k = 0; k < 5; k++) rect(k % 2 ? '#3a2a8a' : '#1e7a3a', cx - 15 + k * 7, 107, 5, 7); rect('rgba(255,255,255,0.25)', cx - 16, 105, 8, 1);
+    if (on) glow(cx, 68, 22, '#9aff9a', 0.14);
+  }
+  function rouTable(cx, tt, on) {   // a roulette table seen from the side: legs, a wood rim, felt, the wheel
+    box(cx - 22, 106, 4, FLOOR - 106, '#4a2810'); box(cx + 18, 106, 4, FLOOR - 106, '#4a2810'); box(cx - 3, 110, 6, FLOOR - 110, '#c98f22');
+    ell(cx, 102, 32, 11, '#2a1408'); ell(cx, 101, 31, 10, '#6a3a18'); ell(cx, 100, 28, 8, '#1a7a3a');
+    rect('#9a5a28', cx - 31, 101, 62, 1);
+    wheel(cx, 96, 16, on ? tt * 0.05 : 0.4, { a: on ? -tt * 0.09 : 2.2, rr: 12 }, 0.55);
+    if (on) glow(cx, 96, 26, '#fff2c0', 0.16);
+    for (let k = 0; k < 3; k++) chip(cx + 22, 100, [5, 25, 100][k], 3, 3 - k);
+  }
+  function bjTable(cx, tt, on) {   // Gregg behind a half-moon table with two cards dealt
+    spr('portrait_gregg', cx, 99 + (on ? Math.round(Math.sin(tt / 20)) : 0));
+    box(cx - 3, 112, 6, FLOOR - 112, '#4a2810');
+    rect('#3a1a10', cx - 31, 98, 62, 3); ell(cx, 100, 30, 12, '#2a1008', 1); ell(cx, 100, 27, 9, '#7a1420', 1); rect('#9a5a28', cx - 31, 98, 62, 1);
+    const mini = (x, y, r2, red) => { rect('#1a1014', x - 1, y - 1, 9, 12); rect('#fbf4e6', x, y, 7, 10); text(r2, x + 1, y + 1, red ? '#d8202c' : '#1a1418', 1, null); };
+    mini(cx - 9, 101, 'A', false); mini(cx + 1, 102, 'K', true);
+    if (on) { text('21', cx + 16, 92, rainbow(0, tt), 1, '#000', 'center'); glow(cx, 100, 24, '#fff2c0', 0.14); }
   }
   function lobbyDraw(tt) {
-    felt('#4a0a14', '#560e1a');
-    rect('#000', 98, 17, 124, 35); rect('#1a0408', 99, 18, 122, 33); marquee(100, 19, 120, 31, tt);
-    text('CASINO', VW / 2, 23, Math.floor(tt / 30) % 4 ? '#ff4a3a' : '#ffe680', 3, '#4a0408', 'center');
-    text('LUCKY SEASON 7', VW / 2, 42, Math.floor(tt / 20) % 2 ? '#ffe680' : '#fff6d4', 1, null, 'center');
-    for (let k = 0; k < 5; k++) { chip(70, 46 - k * 2, [5, 10, 25, 50, 100][k], 6); chip(250, 46 - k * 2, [100, 50, 25, 10, 5][k], 6); }
+    room(tt, 110);
+    // the sign
+    glow(VW / 2, 36, 70, '#ff6a3a', 0.12);
+    box(102, 22, 116, 30, '#5a0a14'); rect('#1a0306', 106, 26, 108, 22);
+    if (A) { A.bulbs(105, 24, 110, 6, tt); A.bulbs(105, 49, 110, 6, tt + 3); A.bulbs(104, 28, 20, 6, tt + 1, undefined, undefined, true); A.bulbs(216, 28, 20, 6, tt + 5, undefined, undefined, true); }
+    logo('CASINO', VW / 2, 30, 3, GOLD, (tt * 1.4) % 220 + 60);
+    box(124, 54, 72, 9, '#8a1420'); text('LUCKY SEASON 7', VW / 2, 56, Math.floor(tt / 24) % 2 ? '#fff6c0' : '#ffb0a0', 1, '#3a0408', 'center');
+    // the games, each under a light
     GAMES.forEach((g, i) => {
-      const R0 = CAB(i), on = i === lc, lift = on ? Math.round(Math.abs(Math.sin(tt / 12)) * 2) : 0, x = R0.x, y = R0.y - lift;
-      rect('#000', x - 1, y - 1, R0.w + 2, R0.h + 2); rect(on ? '#c98f22' : '#5a3a2a', x, y, R0.w, R0.h); rect('#1a0a12', x + 2, y + 2, R0.w - 4, R0.h - 4);
-      if (on) marquee(x + 1, y + 1, R0.w - 2, R0.h - 2, tt, 3);
-      text(g.name, x + R0.w / 2, y + 6, on ? '#ffe680' : '#e8d0b0', 1, null, 'center');
-      const sx = x + 7, sy = y + 15, sw = R0.w - 14, sh = 46;
-      rect('#000', sx - 1, sy - 1, sw + 2, sh + 2); rect('#0a0408', sx, sy, sw, sh);
-      ctx.save(); ctx.beginPath(); ctx.rect(sx, sy, sw, sh); ctx.clip();
-      if (g.id === 'slots') { for (let r = 0; r < 3; r++) { rect('#fff6e8', sx + 2 + r * 19, sy + 3, 17, 40); const p = on ? tt * (0.15 + r * 0.04) : r * 3 + 2; for (let k = -1; k <= 1; k++) { const idx = Math.floor(p) + k, yy = sy + 23 - (k - (p - Math.floor(p))) * 14; sym(STRIPS[r][mod(idx, STRIPS[r].length)], sx + 10 + r * 19, yy, 0.5, 1, idx, tt); } } rect('rgba(232,48,42,0.7)', sx, sy + 22, sw, 1); }
-      else if (g.id === 'scratch') { rect('#1e7a3a', sx + 4, sy + 4, sw - 8, sh - 8); text('IN THE', sx + sw / 2, sy + 7, '#ffe680', 1, null, 'center'); text('MONEY', sx + sw / 2, sy + 14, '#ffe680', 1, null, 'center'); for (let k = 0; k < 3; k++) { rect('#b8b8c4', sx + 8 + k * 14, sy + 24, 12, 12); } const cx2 = sx + 8 + ((tt * 0.8) % 42); if (on) { rect('#d8d8e0', sx + 8, sy + 24, Math.min(40, (tt * 0.8) % 42), 12); text('1000', sx + 28, sy + 27, '#1e7a3a', 1, null, 'center'); ctx.fillStyle = '#e8b030'; ctx.beginPath(); ctx.arc(cx2, sy + 30 + Math.sin(tt / 3) * 3, 4, 0, 7); ctx.fill(); } }
-      else if (g.id === 'roul') wheel(sx + sw / 2, sy + sh / 2, 18, on ? tt * 0.06 : 0.3, { a: on ? -tt * 0.11 : 2, rr: 15 }, tt);
-      else { card({ r: 0, s: 0 }, sx + 9, sy + 10); card({ r: 12, s: 1 }, sx + 25, sy + 13); if (on) text('21', sx + sw - 5, sy + 4, rainbow(0, tt), 1, null, 'right'); }
+      const cx = GX(i), on = i === lc;
+      ell(cx, FLOOR, 26, 3, 'rgba(0,0,0,0.45)');
+      if (on && A) A.cone(cx, 15, FLOOR - 15, 34, '#fff2c0', 0.12);
+      ctx.save(); if (!on) ctx.globalAlpha = 0.82;
+      if (g.id === 'slots') slotCab(cx, tt, on); else if (g.id === 'scratch') kiosk(cx, tt, on); else if (g.id === 'roul') rouTable(cx, tt, on); else bjTable(cx, tt, on);
       ctx.restore();
-      text(g.sub, x + R0.w / 2, y + 64, '#9a8a90', 1, null, 'center');
-      if (on) text(DD.padUsed ? 'CROSS: PLAY' : 'JUMP: PLAY', x + R0.w / 2, y + 74, Math.floor(tt / 16) % 2 ? '#ffd27a' : '#fff6d4', 1, null, 'center');
+      if (!on) rect('rgba(14,4,12,0.25)', cx - 32, 56, 64, FLOOR - 56);
+      const px = cx - 33, py = 131;
+      box(px, py, 66, 11, on ? '#c98f22' : '#3a1420');
+      text(g.name, cx, py + 3, on ? '#2a0e1a' : '#e8d0b0', 1, null, 'center');
+      if (on && A) A.bulbs(px + 2, py - 3, 62, 6, tt);
     });
-    const net = C.net, nt = unl() ? 'UNLIMITED: JUST FOR FUN' : 'BIGGEST WIN ' + C.big + '   BEST STREAK ' + C.best + '   YOU VS THE HOUSE ' + (net > 0 ? '+' : '') + net;
-    text(nt, VW / 2, 143, net < 0 && !unl() ? '#c8a0a8' : '#9ac8a0', 1, null, 'center');
+    if (A) A.vignette(0.4);
   }
 
   // ================================================================ LUCKY SEVEN
@@ -293,14 +461,14 @@
       }
       if (S.tease && S.st[2] === 'spin' && t % 4 === 0) { const k = 1 - (S.at[2] - t) / 64; tone(300 + k * 700, 300 + k * 720, 0.05, 'triangle', 0.035); }
       if (tick && t - S.tickAt > 1) { S.tickAt = t; tone(1500, 1500, 0.015, 'square', 0.012); }
-      if (IN.ok || (c && (inR(c, 254, 112, 60, 22) || inR(c, 248, 30, 16, 70) || inR(c, 100, 50, 106, 90)))) for (let r = 0; r < 3; r++) if (S.st[r] === 'spin') S.at[r] = Math.min(S.at[r], t + 1 + r * 3);   // slam the stops
+      if (IN.ok || (c && (inR(c, 266, 102, 36, 34) || inR(c, 232, 38, 16, 62) || inR(c, 100, 50, 106, 90)))) for (let r = 0; r < 3; r++) if (S.st[r] === 'spin') S.at[r] = Math.min(S.at[r], t + 1 + r * 3);   // slam the stops
       if (S.st.every(s => s === 'done')) slotsResult();
       if (IN.back) { /* finish first */ }
       return;
     }
     if (S.state === 'show') { S.show++; S.shown += (S.res.back - S.shown) * 0.12; if (Math.abs(S.res.back - S.shown) < 1) S.shown = S.res.back; if (S.show > 60 && S.show < 62) S.state = 'idle'; }
     if (IN.ny) bump(-IN.ny); if (IN.nx) bump(IN.nx);
-    if (c) { if (betClick(c, 258, 40)) return; if (inR(c, 254, 112, 60, 22) || inR(c, 248, 30, 16, 70) || inR(c, 100, 50, 106, 90)) { spin(); return; } }
+    if (c) { if (betClick(c, 258, 40)) return; if (inR(c, 266, 102, 36, 34) || inR(c, 232, 38, 16, 62) || inR(c, 100, 50, 106, 90)) { spin(); return; } }
     else if (IN.ok) { spin(); return; }
     if (IN.back) { scr = 'lobby'; SFX.switch(); }
   }
@@ -318,51 +486,58 @@
     settle(S.bet, back, S.bet >= 50);
   }
   function slotsDraw(tt) {
-    felt('#3a0810', '#44101a');
-    // the pay table
-    rect('#000', 3, 18, 66, 128); rect('#1a0a12', 4, 19, 64, 126); text('PAYS', 36, 22, '#ffd27a', 1, null, 'center'); text('PER LINE BET', 36, 29, '#9a8a90', 1, null, 'center');
+    room(tt, 122, 0.7);
+    const show = S.res && S.state !== 'spin', jk = show && S.res.wins.some(w => w.sym === SEV && w.n === 3);
+    // the pay table, a lit glass card on the wall
+    box(3, 18, 66, 128, '#1a0a12'); rect('#2a1420', 5, 20, 62, 124); if (A) A.trim(5, 20, 62, '#c98f22');
+    logo('PAYS', 36, 24, 1); text('PER LINE BET', 36, 31, '#9a8a90', 1, null, 'center');
     const ROWS = [[WILD], [SEV], [BOSS], [6], [5], [6, 5, 6, PAYHOST], [4], [3], [2], [1], [0], [0, 1, 0, PAYPOP], [SEV, SEV, -1, PAY77]];
     ROWS.forEach((row, i) => {
-      const y = 36 + i * 8, ks = row.length === 1 ? [row[0], row[0], row[0]] : row.slice(0, 3), pay = row.length === 1 ? PAY3[row[0]] : row[3];
-      ks.forEach((k, j) => { if (k >= 0) sym(k, 10 + j * 9, y + 3, 0.28, 1, Math.floor(tt / 40) + j, tt); else text('ANY', 24, y, '#9a8a90', 1, null); });
-      text(String(pay), 64, y, row[0] === SEV ? '#ff6a4a' : row[0] === WILD ? rainbow(i, tt) : '#fff6d4', 1, null, 'right');
+      const y = 39 + Math.round(i * 8.1), ks = row.length === 1 ? [row[0], row[0], row[0]] : row.slice(0, 3), pay = row.length === 1 ? PAY3[row[0]] : row[3];
+      const lit = show && S.res.wins.some(w => (row.length === 1 ? w.sym === row[0] && w.n === 3 && w.mult === PAY3[row[0]] : w.mult === row[3]));
+      if (lit) rect(Math.floor(tt / 6) % 2 ? '#5a2a10' : '#3a1a10', 6, y - 1, 60, 9);
+      ks.forEach((k, j) => { if (k >= 0) icon(k, 8 + j * 9, y, tt); else text('ANY', 26, y + 1, '#9a8a90', 1, null); });
+      text(String(pay), 64, y + 1, row[0] === SEV ? '#ff7a5a' : row[0] === WILD ? rainbow(i, tt) : lit ? '#ffe680' : '#fff6d4', 1, null, 'right');
     });
-    // the machine
-    rect('#000', 89, 17, 142, 131); rect('#8a1420', 90, 18, 140, 129); rect('#c98f22', 92, 20, 136, 125); rect('#5a0a14', 94, 22, 132, 121);
-    rect('#1a0408', 98, 24, 124, 18); marquee(99, 25, 122, 16, tt, 3);
-    const jk = S.res && S.state === 'show' && S.res.wins.some(w => w.sym === SEV && w.n === 3);
-    text('LUCKY SEVEN', 160, 29, jk ? rainbow(0, tt) : '#ffe680', 1, '#7a2a10', 'center');
-    text('7', 106, 28, '#e8302a', 2, '#ffd27a'); text('7', 208, 28, '#e8302a', 2, '#ffd27a');
-    rect('#000', 104, 46, 112, 88);
-    ctx.save(); ctx.beginPath(); ctx.rect(105, 47, 110, 86); ctx.clip();
+    // the cabinet
+    box(86, 42, 148, 106, '#a01822'); rect('#7a1018', 88, 140, 144, 6);
+    box(86, 42, 7, 106, '#b8b8c8'); box(227, 42, 7, 106, '#b8b8c8');
+    for (let y = 46; y < 146; y += 8) { rect('#e8e8f0', 88, y, 2, 1); rect('#e8e8f0', 229, y, 2, 1); }
+    rbox(98, 17, 124, 27, 9, '#c98f22'); rrect(101, 20, 118, 21, 7, '#3a0610');
+    if (A) A.bulbs(108, 18, 106, 6, tt);
+    glow(160, 30, 50, jk ? '#ffe680' : '#ff5a3a', jk ? 0.3 : 0.14);
+    logo('LUCKY SEVEN', 160, 26, 2, jk ? GOLD : NEON, (tt * 1.6) % 260 + 30, '#1a0204', '#5a0a10');
+    box(100, 45, 120, 92, '#b8b8c8'); rect('#000', 103, 47, 114, 88);
+    ctx.save(); ctx.beginPath(); ctx.rect(104, 48, 112, 86); ctx.clip();
     for (let r = 0; r < 3; r++) {
-      const x = RX(r); rect('#fff6e8', x - 15, 47, 30, 86);
+      const x = RX(r); rect('#fff6e8', x - 15, 48, 30, 86);
       const p = S.pos[r], f = p - Math.floor(p), blur = S.st[r] === 'spin' && S.spd[r] > 0.5;
-      for (let k = -2; k <= 2; k++) { const idx = Math.floor(p) + k, y = RY - (k - f) * CELL; sym(STRIPS[r][mod(idx, STRIPS[r].length)], x, y, 1, blur ? 0.45 : 1, S.face, tt); if (blur) sym(STRIPS[r][mod(idx, STRIPS[r].length)], x, y - 7, 1, 0.25, S.face, tt); }
-      rect('rgba(0,0,0,0.22)', x - 15, 47, 30, 9); rect('rgba(0,0,0,0.12)', x - 15, 56, 30, 6); rect('rgba(0,0,0,0.22)', x - 15, 124, 30, 9); rect('rgba(0,0,0,0.12)', x - 15, 118, 30, 6);
-      if (r < 2) rect('#5a0a14', x + 15, 47, 4, 86);
+      for (let k = -2; k <= 2; k++) { const idx = Math.floor(p) + k, y = RY - (k - f) * CELL, s0 = STRIPS[r][mod(idx, STRIPS[r].length)]; sym(s0, x, y, blur ? 0.5 : 1, S.face, tt, jk && s0 === SEV && k === 0); if (blur) sym(s0, x, y - 8, 0.22, S.face, tt); }
+      for (let b = 0; b < 4; b++) { const a = (0.26 - b * 0.06).toFixed(2); rect(`rgba(40,10,10,${a})`, x - 15, 48 + b * 4, 30, 4); rect(`rgba(40,10,10,${a})`, x - 15, 130 - b * 4, 30, 4); }   // the drum curves away
+      rect('rgba(255,255,255,0.35)', x - 15, 48, 1, 86); rect('rgba(0,0,0,0.25)', x + 14, 48, 1, 86);
+      if (r < 2) { rect('#1a0306', x + 15, 48, 4, 86); rect('#5a0a14', x + 16, 48, 2, 86); }
     }
-    // winning lines
-    if (S.res && S.state !== 'spin' && S.res.wins.length) {
-      const w = S.res.wins[Math.floor(tt / 30) % S.res.wins.length], L = LINES[w.line], blink = Math.floor(tt / 6) % 2 || S.show < 30;
-      if (blink) { ctx.strokeStyle = LINE_COL[w.line]; ctx.lineWidth = 2; ctx.beginPath(); for (let r = 0; r < 3; r++) { const x = RX(r), y = RY + (L[r] - 1) * CELL; if (r) ctx.lineTo(x, y); else ctx.moveTo(x - 18, y); } ctx.lineTo(RX(2) + 18, RY + (L[2] - 1) * CELL); ctx.stroke(); }
-      for (let r = 0; r < w.n; r++) { const x = RX(r), y = RY + (L[r] - 1) * CELL; ctx.strokeStyle = blink ? LINE_COL[w.line] : '#fff'; ctx.lineWidth = 1; ctx.strokeRect(x - 13.5, y - 12.5, 27, 25); }
+    if (show && S.res.wins.length) {   // the winning line, blinking, each counted symbol boxed
+      const w = S.res.wins[Math.floor(tt / 30) % S.res.wins.length], L = LINES[w.line], blink = Math.floor(tt / 6) % 2 || S.show < 30, col = LINE_COL[w.line];
+      if (blink) for (let r = 0; r < 3; r++) { const x0 = r ? RX(r - 1) : RX(0) - 18, y0 = r ? RY + (L[r - 1] - 1) * CELL : RY + (L[0] - 1) * CELL, x1 = RX(r), y1 = RY + (L[r] - 1) * CELL, n = Math.max(Math.abs(x1 - x0), 1); for (let i = 0; i <= n; i += 1) { const yy = Math.round(y0 + (y1 - y0) * i / n); rect('#000', x0 + i, yy - 1, 1, 4); rect(col, x0 + i, yy, 1, 2); } }
+      for (let r = 0; r < w.n; r++) { const x = RX(r), y = RY + (L[r] - 1) * CELL, c2 = blink ? col : '#fff'; rect(c2, x - 14, y - 13, 28, 1); rect(c2, x - 14, y + 12, 28, 1); rect(c2, x - 14, y - 13, 1, 26); rect(c2, x + 13, y - 13, 1, 26); }
     }
+    ctx.globalAlpha = 0.07; for (let k = 0; k < 18; k++) rect('#ffffff', 112 + k, 48 + k * 5, 18, 5); ctx.globalAlpha = 1;   // a glare across the glass
     ctx.restore();
-    if (S.tease && S.st[2] === 'spin') { const g = Math.floor(tt / 3) % 2; rect(g ? '#ffe680' : '#e8302a', RX(2) - 16, 46, 32, 2); rect(g ? '#ffe680' : '#e8302a', RX(2) - 16, 132, 32, 2); }
-    for (let i = 0; i < 5; i++) { const L = LINES[i], lit = S.res && S.state !== 'spin' && S.res.wins.some(w => w.line === i), yl = RY + (L[0] - 1) * CELL + (i > 2 ? (i === 3 ? -6 : 6) : 0), yr = RY + (L[2] - 1) * CELL + (i > 2 ? (i === 3 ? 6 : -6) : 0); rect(lit ? LINE_COL[i] : '#3a1018', 98, yl - 2, 5, 5); rect(lit ? LINE_COL[i] : '#3a1018', 217, yr - 2, 5, 5); }
-    // win meter
-    rect('#000', 120, 136, 80, 10); const wv = S.state === 'show' ? Math.round(S.shown) : S.res ? S.res.back : 0;
-    text('WIN ' + String(wv).padStart(4, '0'), 160, 138, wv ? (S.show < 60 ? rainbow(0, tt) : '#ffe680') : '#5a3a3a', 1, null, 'center');
+    if (S.tease && S.st[2] === 'spin') { const g = Math.floor(tt / 3) % 2 ? '#ffe680' : '#e8302a'; rect(g, RX(2) - 16, 46, 32, 2); rect(g, RX(2) - 16, 134, 32, 2); glow(RX(2), 90, 30, '#ffe680', 0.2); }
+    for (let i = 0; i < 5; i++) { const L = LINES[i], lit = show && S.res.wins.some(w => w.line === i), yl = RY + (L[0] - 1) * CELL + (i > 2 ? (i === 3 ? -6 : 6) : 0), yr = RY + (L[2] - 1) * CELL + (i > 2 ? (i === 3 ? 6 : -6) : 0); bead(97, yl, 2, lit ? LINE_COL[i] : '#5a2a30'); bead(223, yr, 2, lit ? LINE_COL[i] : '#5a2a30'); }
+    const wv = S.state === 'show' ? Math.round(S.shown) : S.res ? S.res.back : 0;
+    text('WIN', 128, 140, '#ffd27a', 1, null); led(142, 137, 50, wv, 5, wv ? (S.show < 60 && Math.floor(tt / 4) % 2 ? '#fff6c0' : '#ffb030') : '#ffb030');
     // the lever
-    const k = S.lever < 24 ? Math.sin(S.lever / 24 * Math.PI) : 0, ky = 42 + k * 44;
-    rect('#000', 231, 76, 10, 14); rect('#9a9aa8', 232, 77, 8, 12);
-    rect('#000', 238, Math.min(ky, 82) - 1, 4, Math.abs(82 - ky) + 2); rect('#d0d0dc', 239, Math.min(ky, 82), 2, Math.abs(82 - ky));
-    ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(240, ky, 5, 0, 7); ctx.fill(); ctx.fillStyle = '#e8302a'; ctx.beginPath(); ctx.arc(240, ky, 4, 0, 7); ctx.fill(); rect('#ff9a8a', 238, ky - 2, 2, 2);
-    // right panel
-    betBox(258, 40, S.state !== 'spin'); text('5 LINES', 285, 70, '#9a8a90', 1, null, 'center'); text('LINE BET ' + BETS[bi] / 5, 285, 78, '#9a8a90', 1, null, 'center');
-    const sp = S.state === 'spin', hb = !sp ? Math.round(Math.abs(Math.sin(tt / 10))) : 0;
-    btn(254, 112 - hb, 60, 22, sp ? 'STOP' : 'SPIN', true, sp ? '#e8302a' : '#ffd27a');
+    const k = S.lever < 24 ? Math.sin(S.lever / 24 * Math.PI) : 0, ky = Math.round(46 + k * 42);
+    box(234, 80, 8, 14, '#9a9aa8');
+    rect('#000', 238, Math.min(ky, 84) - 1, 3, Math.abs(84 - ky) + 2); rect('#e0e0ec', 239, Math.min(ky, 84), 1, Math.abs(84 - ky));
+    bead(239, ky, 5, '#e8302a');
+    // the right panel
+    betBox(258, 40, S.state !== 'spin'); text('5 LINES', 285, 70, '#c89850', 1, '#000', 'center'); text('LINE BET ' + BETS[bi] / 5, 285, 78, '#c89850', 1, '#000', 'center');
+    const sp = S.state === 'spin';
+    arcade(284, 118, sp ? 'STOP' : 'SPIN', sp || Math.floor(tt / 20) % 2 === 0, sp ? '#ff5a40' : '#ffd040', S.lever < 8);
+    if (A) A.vignette(0.3);
   }
 
   // ================================================================ scratchers
@@ -459,56 +634,76 @@
     }
   }
   function ticketArt(kind, x, y, w, h, tk, tt, small) {   // the printed ticket (under the foil)
-    const T = TIX[kind];
-    if (kind === 0) {
-      rect('#000', x - 1, y - 1, w + 2, h + 2); rect('#e8c060', x, y, w, h); rect('#1e7a3a', x + 2, y + 2, w - 4, h - 4);
-      for (let i = 0; i < w - 8; i += 8) { rect('#2a9a4a', x + 4 + i, y + 4, 4, 2); rect('#2a9a4a', x + 4 + i, y + h - 6, 4, 2); }
-      text('IN THE MONEY', x + w / 2, y + 8, '#ffe680', small ? 1 : 2, '#0a3a1a', 'center');
-      text('TOP PRIZE ' + T.top, x + w / 2, y + (small ? 16 : 22), '#fff6d4', 1, null, 'center');
-      if (!small && tk) {
-        regionsOf(tk).forEach((r, i) => { const v = tk.cells[i], win = K.state === 'done' && v === tk.prize, pulse = win && Math.floor(tt / 8) % 2; rect(pulse ? '#ffe680' : '#f4ece0', x + r.x, y + r.y, r.w, r.h); text(String(v), x + r.x + r.w / 2, y + r.y + 5 - (r.h < 20 ? 0.5 : 0), v === 1000 ? '#c8202c' : '#1e5a2a', 2, null, 'center'); });
-        text('MATCH 3 AMOUNTS: WIN THAT AMOUNT', x + w / 2, y + h - 10, '#cfe8d0', 1, null, 'center');
-      } else if (small) { for (let i = 0; i < 9; i++) rect('#b8b8c4', x + 22 + (i % 3) * 26, y + 30 + Math.floor(i / 3) * 16, 22, 12); text('MATCH 3 AMOUNTS', x + w / 2, y + h - 12, '#cfe8d0', 1, null, 'center'); }
+    const T = TIX[kind], money = kind === 0, base = money ? '#1e7a3a' : '#3a2a8a', lite = money ? '#2a9a4a' : '#5a4ab0', ink = money ? '#0a3a1a' : '#1a1050';
+    rect('rgba(0,0,0,0.4)', x + 3, y + 3, w, h);
+    rect('#e8c060', x, y, w, h); rect('#fff0a0', x, y, w, 1); rect('#a87a20', x, y + h - 1, w, 1);
+    rect(base, x + 2, y + 2, w - 4, h - 4);
+    for (let yy = y + 4; yy < y + h - 4; yy += 4) for (let xx = x + 3; xx < x + w - 3; xx++) { const o = Math.round(Math.sin((xx + yy * 0.7) / 5) * 1.5); if ((xx + o) % 6 === 0) rect(lite, xx, yy + o, 1, 1); }   // guilloche, like money
+    for (let xx = x + 2; xx < x + w - 2; xx += 3) { rect('#1a1014', xx, y - 1, 1, 1); rect('#1a1014', xx, y + h, 1, 1); }   // perforations
+    if (A) { A.trim(x + 4, y + 4, w - 8, '#e8c060'); A.trim(x + 4, y + h - 7, w - 8, '#e8c060'); }
+    if (small) {
+      logo(money ? 'IN THE MONEY' : 'LUCKY DIP', x + w / 2, y + 10, 1);
+      rect('#c8202c', x + 18, y + 18, w - 36, 9); text('TOP PRIZE ' + T.top, x + w / 2, y + 20, '#fff6d4', 1, null, 'center');
+      if (money) for (let i = 0; i < 9; i++) foilBit(x + 20 + (i % 3) * 28, y + 31 + Math.floor(i / 3) * 14, 24, 11);
+      else { foilBit(x + w - 36, y + 30, 26, 13); for (let i = 0; i < 6; i++) foilBit(x + 10 + (i % 3) * 34, y + 47 + Math.floor(i / 3) * 13, 30, 10); }
+      text(money ? 'MATCH 3 AMOUNTS' : 'MATCH YOUR DIP', x + w / 2, y + h - 16, money ? '#cfe8d0' : '#d0c8f0', 1, null, 'center');
+      return;
+    }
+    if (money) {
+      logo('IN THE MONEY', x + w / 2, y + 9, 2, GOLD, null, ink, '#06200e');
+      rect('#c8202c', x + 40, y + 21, w - 80, 8); rect('#e84a3a', x + 40, y + 21, w - 80, 1); text('TOP PRIZE ' + T.top, x + w / 2, y + 22, '#fff6d4', 1, null, 'center');
+      if (tk) regionsOf(tk).forEach((r, i) => { const v = tk.cells[i], win = K.state === 'done' && v === tk.prize, pulse = win && Math.floor(tt / 8) % 2; box(x + r.x, y + r.y, r.w, r.h, pulse ? '#ffe680' : '#f4ece0', { outline: '#0a3a1a' }); text(String(v), x + r.x + r.w / 2, y + r.y + 5, v === 1000 ? '#c8202c' : '#1e5a2a', 2, null, 'center'); if (win) glow(x + r.x + r.w / 2, y + r.y + r.h / 2, 18, '#ffe680', 0.2); });
+      text('MATCH 3 AMOUNTS: WIN THAT AMOUNT', x + w / 2, y + h - 12, '#cfe8d0', 1, ink, 'center');
     } else {
-      rect('#000', x - 1, y - 1, w + 2, h + 2); rect('#e8c060', x, y, w, h); rect('#3a2a8a', x + 2, y + 2, w - 4, h - 4);
-      for (let i = 0; i < 9; i++) { const sx = x + 6 + ((i * 37) % (w - 12)), sy = y + 6 + ((i * 23) % (h - 12)); rect('#5a4ab0', sx, sy, 2, 2); }
-      text('LUCKY DIP', x + (small ? w / 2 : 52), y + 8, '#ffe680', small ? 1 : 2, '#1a1050', 'center');
-      text('TOP PRIZE ' + T.top, x + (small ? w / 2 : 52), y + (small ? 16 : 22), '#fff6d4', 1, null, 'center');
-      if (!small && tk) {
-        regionsOf(tk).forEach((r, i) => {
-          if (r.dip) { rect('#f4ece0', x + r.x, y + r.y, r.w, r.h); drawSpr(tk.dip, x + r.x + r.w / 2, y + r.y + r.h - 2, 0.85); return; }
-          const s = tk.spots[i - 1], win = K.state === 'done' && s.sym === tk.dip, pulse = win && Math.floor(tt / 8) % 2;
-          rect(pulse ? '#ffe680' : '#f4ece0', x + r.x, y + r.y, r.w, r.h); drawSpr(s.sym, x + r.x + 12, y + r.y + r.h - 3, 0.75); text(String(s.prize), x + r.x + r.w - 2, y + r.y + 9, '#3a2a8a', 1, null, 'right');
-        });
-        text('YOUR DIP', x + 118, y + 11, '#fff6d4', 1, null, 'center');
-        text('MATCH YOUR DIP: WIN THE PRIZE', x + w / 2, y + h - 8, '#d0c8f0', 1, null, 'center');
-      } else if (small) { rect('#b8b8c4', x + w - 34, y + 24, 26, 20); for (let i = 0; i < 6; i++) rect('#b8b8c4', x + 10 + (i % 3) * 34, y + 50 + Math.floor(i / 3) * 16, 30, 12); text('MATCH YOUR DIP', x + w / 2, y + h - 12, '#d0c8f0', 1, null, 'center'); }
+      logo('LUCKY DIP', x + 50, y + 9, 2, GOLD, null, ink, '#0a0830');
+      rect('#c8202c', x + 14, y + 22, 72, 8); rect('#e84a3a', x + 14, y + 22, 72, 1); text('TOP PRIZE ' + T.top, x + 50, y + 23, '#fff6d4', 1, null, 'center');
+      if (tk) regionsOf(tk).forEach((r, i) => {
+        if (r.dip) { box(x + r.x, y + r.y, r.w, r.h, '#f4ece0', { outline: ink }); drawSpr(tk.dip, x + r.x + r.w / 2, y + r.y + r.h - 2); return; }
+        const s = tk.spots[i - 1], win = K.state === 'done' && s.sym === tk.dip, pulse = win && Math.floor(tt / 8) % 2;
+        box(x + r.x, y + r.y, r.w, r.h, pulse ? '#ffe680' : '#f4ece0', { outline: ink }); drawSpr(s.sym, x + r.x + 12, y + r.y + r.h - 2, true); text(String(s.prize), x + r.x + r.w - 2, y + r.y + 8, '#3a2a8a', 1, null, 'right');
+        if (win) glow(x + r.x + r.w / 2, y + r.y + r.h / 2, 18, '#ffe680', 0.2);
+      });
+      text('YOUR DIP', x + 118, y + 11, '#fff6d4', 1, ink, 'center');
+      text('MATCH YOUR DIP: WIN THE PRIZE', x + w / 2, y + h - 12, '#d0c8f0', 1, ink, 'center');
     }
   }
-  function drawSpr(n, cx, by, s = 1) { const e = SPR[n]; if (!e) return; const sc = Math.min(e[0] === 'card' ? 0.7 : 1, e[1]) * s; spr(e[0], cx, by, false, sc, e[0] === 'card' ? sc * 1.5 : sc); }
+  function foilBit(x, y, w, h) { rect('#6a6a78', x - 1, y - 1, w + 2, h + 2); rect('#a8a8b8', x, y, w, h); rect('#d8d8e4', x, y, w, 1); for (let d = 0; d < w + h; d += 6) for (let k = 0; k < h; k++) { const xx = d - k; if (xx >= 0 && xx < w) rect('#c4c4d0', x + xx, y + k, 1, 1); } }
+  function drawSpr(n, cx, by, mini) {   // ticket art: sprites at whole sizes only (the blue card gets its own little drawing)
+    if (n === 'card') { const x = Math.round(cx - 9), y = Math.round(by - 10); rrect(x - 1, y - 1, 20, 12, 2, '#2a6a8a'); rrect(x, y, 18, 10, 1, '#7ad8e8'); rect('#c8f4fa', x + 2, y + 1, 14, 1); rect('#2a6a8a', x + 3, y + 4, 12, 1); rect('#2a6a8a', x + 3, y + 6, 8, 1); return; }
+    if (mini) { const k = SYM.indexOf(n); if (k >= 0) { pmap(IC[n][0], IC[n][1], Math.round(cx - 8), Math.round(by - 16), 2); return; } }
+    const e = SPR[n]; if (e) spr(e[0], cx, by, false, e[0] === 'kernel' || e[0] === 'pop' ? 1 : 1, 1);
+  }
   function scratchDraw(tt) {
-    felt('#2a0a24', '#340e2c');
+    // the shop: wood panelling, a counter, the ticket under a lamp
+    rect('#2a160c', 0, 15, VW, 85); if (A) { A.planks(0, 15, VW, 85, '#3a2214', 12, true); A.trim(0, 15, VW, '#c98f22'); }
+    if (K.state !== 'pick') {
+    box(6, 22, 70, 46, '#1a2a30'); rect('rgba(255,255,255,0.12)', 8, 24, 30, 1);   // a case of tickets on the wall
+    for (let r = 0; r < 3; r++) for (let k = 0; k < 6; k++) { const c2 = (r + k) % 3 === 1 ? '#3a2a8a' : '#1e7a3a'; rect('#000', 10 + k * 11, 26 + r * 14, 9, 12); rect(c2, 11 + k * 11, 27 + r * 14, 7, 10); rect('#b8b8c4', 12 + k * 11, 30 + r * 14, 5, 3); }
+    box(244, 22, 70, 30, '#1e7a3a'); if (A) A.trim(244, 22, 70, '#e8c060'); text('IN THE', 279, 28, '#ffe27a', 1, '#0a3a1a', 'center'); text('MONEY', 279, 37, '#ffe27a', 1, '#0a3a1a', 'center'); text('SOLD HERE', 279, 45, '#cfe8d0', 1, null, 'center');
+    }
+    rect('#5a3014', 0, 100, VW, 49); if (A) { A.planks(0, 100, VW, 49, '#6a3a18', 7); A.trim(0, 98, VW, '#c98f22'); }
+    glow(160, 76, 110, '#fff2c0', 0.14);
     if (K.state === 'pick') {
-      text('PICK A TICKET', VW / 2, 20, '#ffe680', 2, '#7a2a10', 'center');
+      logo('PICK A TICKET', VW / 2, 18, 2);
       for (let i = 0; i < 2; i++) {
-        const on = K.pick === i, lift = on ? Math.round(Math.abs(Math.sin(tt / 12)) * 3) : 0, x = 30 + i * 140, y = 34 - lift;
-        ticketArt(i, x, y, 120, 92, null, tt, true);
-        if (on) { ctx.strokeStyle = Math.floor(tt / 8) % 2 ? '#ffe680' : '#fff'; ctx.lineWidth = 1; ctx.strokeRect(x - 2.5, y - 2.5, 125, 97); }
+        const on = K.pick === i, lift = on ? Math.round(Math.abs(Math.sin(tt / 12)) * 3) : 0, x = 30 + i * 140, y = 36 - lift;
+        if (on) glow(x + 60, y + 46, 70, '#fff2c0', 0.18);
+        ticketArt(i, x, y, 120, 90, null, tt, true);
+        if (!on) rect('rgba(20,8,4,0.35)', x, y, 120, 90);
         const free = i === 0 && freeTix(), price = unl() ? 'FREE' : free ? 'FREE TICKET!' : TIX[i].price + ' HEI POINTS';
-        text(price, x + 60, 132, free ? rainbow(0, tt) : on ? '#ffe680' : '#c8b8c0', 1, null, 'center');
+        box(x + 24, 132, 72, 11, on ? '#c98f22' : '#3a1420'); text(price, x + 60, 135, free ? rainbow(0, tt) : on ? '#2a0e1a' : '#c8b8c0', 1, null, 'center');
       }
       return;
     }
     const tk = K.tk;
     ticketArt(tk.kind, TX, TY, TW, TH, tk, tt, false);
     ctx.drawImage(K.foil, TX, TY);
-    K.regions.forEach(r => { if (r.open && t - r.pop < 10) { const k = (t - r.pop) / 10; ctx.strokeStyle = `rgba(255,246,212,${(1 - k).toFixed(2)})`; ctx.strokeRect(TX + r.x - k * 4 + 0.5, TY + r.y - k * 4 + 0.5, r.w + k * 8 - 1, r.h + k * 8 - 1); } });
-    if (K.state === 'scratch' && !K.mouse) { const cx = K.coin.x, cy = K.coin.y; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(cx + 1, cy + 1, 5, 0, 7); ctx.fill(); ctx.fillStyle = '#e8b030'; ctx.beginPath(); ctx.arc(cx, cy, 5, 0, 7); ctx.fill(); ctx.fillStyle = '#b07a18'; ctx.beginPath(); ctx.arc(cx, cy, 3, 0, 7); ctx.fill(); }
-    // side panels
-    text(K.free ? 'FREE TICKET' : unl() ? 'FREE PLAY' : 'PAID ' + TIX[tk.kind].price, 44, 24, K.free ? rainbow(0, tt) : '#9a8a90', 1, null, 'center');
+    K.regions.forEach(r => { if (r.open && t - r.pop < 10) { const k = (t - r.pop) / 10, c2 = `rgba(255,246,212,${(1 - k).toFixed(2)})`, x0 = Math.round(TX + r.x - k * 4), y0 = Math.round(TY + r.y - k * 4), w0 = Math.round(r.w + k * 8), h0 = Math.round(r.h + k * 8); rect(c2, x0, y0, w0, 1); rect(c2, x0, y0 + h0, w0, 1); rect(c2, x0, y0, 1, h0); rect(c2, x0 + w0, y0, 1, h0); } });
+    if (K.state === 'scratch' && !K.mouse) coin(K.coin.x, K.coin.y);
+    // side cards
+    box(6, 74, 70, 22, '#f4ece0'); text(K.free ? 'FREE TICKET' : unl() ? 'FREE PLAY' : 'PAID ' + TIX[tk.kind].price, 41, 78, K.free ? '#c8202c' : '#3a2a1a', 1, null, 'center'); text(tk.kind ? 'TOP PRIZE 500' : 'TOP PRIZE 1000', 41, 87, '#7a5a3a', 1, null, 'center');
     if (K.state === 'scratch') {
-      ['DRAG TO', 'SCRATCH,', 'OR ARROWS', 'MOVE THE', 'COIN'].forEach((l, i) => text(l, 44, 44 + i * 8, '#c8b8c0', 1, null, 'center'));
-      text(DD.padUsed ? 'CROSS:' : 'JUMP:', 278, 52, '#ffd27a', 1, null, 'center'); text('SCRATCH', 278, 60, '#ffd27a', 1, null, 'center'); text('IT ALL', 278, 68, '#ffd27a', 1, null, 'center');
+      box(244, 58, 70, 38, '#f4ece0'); ['DRAG TO SCRATCH', 'OR STEER THE', 'COIN. ' + (DD.padUsed ? 'CROSS' : 'JUMP') + ':', 'SCRATCH IT ALL'].forEach((l, i) => text(l, 279, 62 + i * 8, '#3a2a1a', 1, null, 'center'));
     } else {
       btn(6, 120, 66, 14, 'TICKETS', false); const again = unl() ? 'AGAIN: FREE' : (tk.kind === 0 && freeTix() ? 'AGAIN: FREE' : 'AGAIN: ' + TIX[tk.kind].price); btn(248, 120, 66, 14, again, true, '#ffd27a');
     }
@@ -565,8 +760,8 @@
     R.wa += R.ws; R.ws *= R.state === 'spin' ? 0.995 : 0.97; if (R.ws < 0.002) R.ws = R.state === 'bet' ? 0.004 : R.ws;
     if (R.state === 'spin') {
       R.T++; const k = Math.min(1, R.T / DUR), e = 1 - Math.pow(1 - k, 3);
-      let rel = R.target - R.laps * (1 - e), rr = 41;   // the ball's angle on the wheel, counter to the spin, landing on its number
-      if (k > 0.62) { const f = Math.min(1, (k - 0.62) / 0.1); rr = 41 - f * 8; }
+      let rel = R.target - R.laps * (1 - e), rr = 38;   // the ball's angle on the wheel, counter to the spin, landing on its number
+      if (k > 0.62) { const f = Math.min(1, (k - 0.62) / 0.1); rr = 38 - f * 11; }
       if (k > 0.72 && k < 0.95) { const q = (k - 0.72) / 0.23; rr += Math.abs(Math.sin(q * 22)) * 4 * (1 - q); rel += Math.sin(q * 9) * 0.17 * (1 - q); }
       R.ball = { a: R.wa + rel, rr };
       const pk = Math.floor(mod(rel, Math.PI * 2) / (Math.PI * 2 / 37)); if (pk !== R.tk) { R.tk = pk; if (k > 0.6) tone(2400 + rnd(600), 2200, 0.012, 'square', 0.03); else if (R.T % 3 === 0) tone(1600, 1500, 0.01, 'square', 0.01); }
@@ -574,7 +769,7 @@
       if (IN.ok && R.T < DUR - 40) R.T = Math.max(R.T, DUR - 40);   // hurry it along
       return;
     }
-    if (R.state === 'show') { R.ball = { a: R.wa + R.target, rr: 33 }; R.k++; if (R.k > 90 || (R.k > 20 && (IN.ok || c))) { R.state = 'bet'; R.bets = {}; } if (R.state === 'show') { if (IN.back) { R.state = 'bet'; R.bets = {}; } return; } }
+    if (R.state === 'show') { R.ball = { a: R.wa + R.target, rr: 27 }; R.k++; if (R.k > 90 || (R.k > 20 && (IN.ok || c))) { R.state = 'bet'; R.bets = {}; } if (R.state === 'show') { if (IN.back) { R.state = 'bet'; R.bets = {}; } return; } }
     if (R.state === 'bet' && R.ball && R.ball.rr) R.ball.a = R.wa + R.target;
     if (IN.nx) navSpot(IN.nx, 0); if (IN.ny) navSpot(0, IN.ny);
     if (c) { const i = SPOTS.findIndex(s => inR(c, s.x, s.y, s.w, s.h)); if (i >= 0) { if (R.cur !== i) R.vfa = 0; R.cur = i; rouletteAct(SPOTS[i]); return; } }
@@ -590,29 +785,40 @@
     settle(R.stake, back, R.stake >= 100);
   }
   function rouletteDraw(tt) {
-    felt('#0e4a24', '#12542a');
-    rect('#000', 6, 26, 112, 120); rect('#3a2410', 7, 27, 110, 118);
-    wheel(62, 82, 44, R.wa, R.ball, tt);
-    if (R.state === 'show' || (R.state === 'bet' && R.hist.length)) { const n = R.hist[0], pulse = R.state === 'show' && Math.floor(tt / 6) % 2; rect('#000', 46, 131, 32, 13); rect(numCol(n), 47, 132, 30, 11); text(String(n), 62, 133, pulse ? '#ffe680' : '#fff6d4', 1, null, 'center'); }
-    text('LAST', 8, 20, '#9ac8a0', 1, null); R.hist.forEach((n, i) => { if (i > 7) return; rect(numCol(n), 26 + i * 11, 18, 10, 8); text(String(n), 31 + i * 11, 19, '#fff', 1, null, 'center'); });
+    felt('#0e4a24', 15, 149);
+    rect('#3a1c0c', 0, 15, VW, 3); if (A) A.trim(0, 18, VW, '#c98f22');
+    glow(62, 84, 80, '#fff2c0', 0.1); glow(220, 60, 110, '#fff2c0', 0.08);
+    // the wheel in its wooden housing
+    rbox(8, 33, 108, 102, 14, '#4a2410'); if (A) A.tex(10, 35, 104, 98, '#4a2410', 0.08, 5);
+    wheel(62, 84, 46, R.wa, R.ball);
+    text('LAST', 8, 21, '#9ac8a0', 1, null); R.hist.forEach((n, i) => { if (i > 7) return; box(26 + i * 11, 20, 10, 8, numCol(n)); text(String(n), 31 + i * 11, 22, '#fff', 1, null, 'center'); });
+    if (R.state === 'show' || (R.state === 'bet' && R.hist.length)) { const n = R.hist[0], pulse = R.state === 'show' && Math.floor(tt / 6) % 2; box(44, 133, 36, 13, numCol(n)); logo(String(n), 62, 136, 1, pulse ? GOLD : ['#ffffff', '#ffffff', '#f0f0f0', '#d8d8d8', '#c0c0c0'], '#000'); }
     // the board
     SPOTS.forEach((s, i) => {
       const cur = i === R.cur && R.state === 'bet', hit = R.state === 'show' && (s.id === 'n' + R.n || (rouletteWins(s.id, R.n) > 0 && !s.ctl && s.n === undefined && s.id !== 'n0'));
-      if (s.ctl) { const lit = cur || (s.id === 'vfa' && R.vfa) || (s.id === 'spin' && R.state === 'bet' && (tableTotal() > 0 || R.last)); const lab = s.id === 'spin' && !tableTotal() && R.last ? 'REBET' : s.label; btn(s.x, s.y, s.w, s.h, lab, lit, s.id === 'vfa' ? (R.vfa && Math.floor(tt / 5) % 2 ? '#ff6a4a' : '#e8302a') : s.id === 'spin' ? '#ffd27a' : '#c98f22', R.state !== 'bet'); return; }
+      if (s.ctl) {
+        const lit = cur || (s.id === 'vfa' && R.vfa) || (s.id === 'spin' && R.state === 'bet' && (tableTotal() > 0 || R.last));
+        const lab = s.id === 'spin' && !tableTotal() && R.last ? 'REBET' : s.label;
+        btn(s.x, s.y, s.w, s.h, lab, lit, s.id === 'vfa' ? (R.vfa && Math.floor(tt / 5) % 2 ? '#ff6a4a' : '#e8302a') : s.id === 'spin' ? '#ffd27a' : '#c98f22', R.state !== 'bet');
+        if (cur) { rect('#fff6c0', s.x - 2, s.y - 2, s.w + 4, 1); rect('#fff6c0', s.x - 2, s.y + s.h + 2, s.w + 4, 1); }
+        return;
+      }
       const bg = s.n !== undefined ? numCol(s.n) : s.id === 'n0' ? numCol(0) : s.id === 'red' ? '#c8202c' : s.id === 'black' ? '#1a1418' : '#0e4a24';
-      rect('#e8d8b0', s.x, s.y, s.w + 1, s.h + 1); rect(hit ? (Math.floor(tt / 6) % 2 ? '#ffe680' : bg) : bg, s.x + 1, s.y + 1, s.w - 1, s.h - 1);
-      if (s.n === 7) rect('rgba(255,214,90,' + (0.25 + 0.2 * Math.sin(tt / 8)).toFixed(2) + ')', s.x + 1, s.y + 1, s.w - 1, s.h - 1);   // the lucky 7
-      text(s.label, s.x + s.w / 2 + 1, s.y + (s.h - 5) / 2 + 1, '#fff6d4', 1, null, 'center');
-      if (cur) { const g = Math.floor(tt / 6) % 2 ? '#ffe680' : '#fff'; ctx.strokeStyle = g; ctx.lineWidth = 1; ctx.strokeRect(s.x + 0.5, s.y + 0.5, s.w, s.h); ctx.strokeRect(s.x - 0.5, s.y - 0.5, s.w + 2, s.h + 2); }
-      if (R.bets[s.id]) chip(s.x + s.w / 2 + 1, s.y + s.h / 2 + 1, R.bets[s.id], s.w < 15 ? 4 : 5);
+      rect('#e8d8b0', s.x, s.y, s.w + 1, s.h + 1);
+      const fill = hit ? (Math.floor(tt / 6) % 2 ? '#ffe680' : bg) : bg;
+      rect(fill, s.x + 1, s.y + 1, s.w - 1, s.h - 1); rect(mix(fill, 0.25), s.x + 1, s.y + 1, s.w - 1, 1); rect(mix(fill, -0.3), s.x + 1, s.y + s.h - 1, s.w - 1, 1);
+      if (s.n === 7) { rect('rgba(255,214,90,' + (0.2 + 0.15 * Math.sin(tt / 8)).toFixed(2) + ')', s.x + 1, s.y + 1, s.w - 1, s.h - 1); }
+      text(s.label, s.x + s.w / 2 + 1, s.y + Math.floor((s.h - 5) / 2) + 1, '#fff6d4', 1, s.n !== undefined || s.id === 'n0' ? '#000' : null, 'center');
+      if (cur) { const g = Math.floor(tt / 6) % 2 ? '#ffe680' : '#fff'; rect(g, s.x - 1, s.y - 1, s.w + 3, 1); rect(g, s.x - 1, s.y + s.h + 1, s.w + 3, 1); rect(g, s.x - 1, s.y - 1, 1, s.h + 3); rect(g, s.x + s.w + 1, s.y - 1, 1, s.h + 3); }
+      if (R.bets[s.id]) chip(s.x + Math.floor(s.w / 2) + 1, s.y + Math.floor(s.h / 2), R.bets[s.id], s.w < 15 ? 4 : 5, Math.min(3, 1 + Math.floor(R.bets[s.id] / 50)));
     });
-    text('LUCKY', BX + 2 * CW + 7, BY - 6, '#ffd27a', 1, null, 'center');
-    text(String(BETS[bi]), 190, 109, '#ffe680', 1, null, 'center'); text('CHIP', 190, 98, '#9ac8a0', 1, null, 'center');
+    led(178, 106, 24, BETS[bi], 3, '#ffd040'); text('CHIP', 190, 98, '#9ac8a0', 1, null, 'center');
     const s = SPOTS[R.cur], on = R.bets[s.id] || 0, tot = tableTotal();
-    text('ON THE TABLE: ' + tot, 120, 126, '#fff6d4', 1, null);
-    if (!s.ctl) text(s.label + ' PAYS ' + (s.id[0] === 'n' ? '35' : s.id[0] === 'd' || s.id[0] === 'c' ? '2' : '1') + ' TO 1' + (on ? '. YOU HAVE ' + on : ''), 120, 135, '#9ac8a0', 1, null);
-    else if (s.id === 'vfa') text('ALL IN ON ' + SPOTS.find(q => q.id === (R.lastSpot || 'red')).label + '. GREGG BET THE VFA', 120, 135, '#ff8a6a', 1, null);
-    if (R.state === 'show' && R.won) text('WON ' + R.won, 316, 126, rainbow(0, tt), 1, null, 'right');
+    text('ON THE TABLE', 120, 126, '#9ac8a0', 1, null); led(172, 124, 30, tot, 4, '#ffd040');
+    if (!s.ctl) text(s.label + ' PAYS ' + (s.id[0] === 'n' ? '35' : s.id[0] === 'd' || s.id[0] === 'c' ? '2' : '1') + ' TO 1' + (on ? '. YOU HAVE ' + on : ''), 120, 138, '#cfe8d0', 1, null);
+    else if (s.id === 'vfa') text('ALL IN ON ' + SPOTS.find(q => q.id === (R.lastSpot || 'red')).label + '. GREGG BET THE VFA', 120, 138, '#ff8a6a', 1, null);
+    if (R.state === 'show' && R.won) logo('WON ' + R.won, 270, 126, 1, GOLD, null);
+    if (A) A.vignette(0.3);
   }
 
   // ================================================================ blackjack
@@ -689,30 +895,41 @@
     }
   }
   function bjDraw(tt) {
-    felt('#4a0a14', '#520e18');
-    // the dealer behind the table
+    // the wall behind the dealer, two lamps over the table
+    rect('#120610', 0, 15, VW, 45);
+    for (let x = -174 + (-tt * 0.03 % 174); x < VW + 174; x += 174) spr('w2_curtain', x + 87, 160);
+    rect('rgba(14,4,12,0.6)', 0, 15, VW, 45); if (A) { A.trim(0, 15, VW, '#c98f22'); A.fringe(0, 18, VW, '#c98f22'); }
     const d = DLR[B.dealer], bob = Math.round(Math.sin(tt / 20));
-    spr(d.spr, 160 + B.dx, 68 + bob, B.walk > 150 && B.walk < 200);
-    rect('#000', 0, 52, VW, 3); rect('#6a3a18', 0, 53, VW, 6); rect('#c98f22', 0, 58, VW, 1);
-    rect('#7a1420', 0, 59, VW, VH - 59); for (let y = 63; y < VH; y += 10) for (let x = (y / 10) % 2 ? 0 : 10; x < VW; x += 20) rect('#84182a', x + 4, y, 4, 4);
-    text('BLACKJACK PAYS 3 TO 2', 160, 136, '#e8c060', 1, null, 'center'); text('DEALER STANDS ON 17', 160, 143, '#c89850', 1, null, 'center');
+    spr(d.spr, 160 + B.dx, 70 + bob, B.walk > 150 && B.walk < 200);
+    // the table: dealer's rail with the chip tray, red felt, our padded rail
+    box(0, 54, VW, 7, '#5a3014'); if (A) A.planks(1, 55, VW - 2, 5, '#5a3014', 20, true);
+    box(122, 55, 76, 5, '#2a1408'); for (let k = 0; k < 12; k++) { const c2 = CHIPC([5, 10, 25, 50, 100, 5][k % 6]); rect(c2, 124 + k * 6, 56, 5, 3); rect(mix(c2, 0.4), 124 + k * 6, 56, 5, 1); }
+    felt('#7a1420', 61, 149);
+    for (const lx of [70, 250]) { rect('#5a4a30', lx, 15, 1, 6); box(lx - 9, 21, 19, 6, '#1e5a3a'); rect('#e8c060', lx - 9, 26, 19, 1); if (A) A.cone(lx, 27, 120, 46, '#fff2c0', 0.08); glow(lx, 30, 16, '#fff2c0', 0.3); }
+    ell(160, 214, 252, 82, '#1a0806'); ell(160, 215, 250, 80, '#7a3020'); ell(160, 217, 248, 78, '#5a2216'); ell(160, 224, 246, 76, '#3a140e');   // our rail, padded leather
+    for (let x = 0; x < VW; x += 4) { const q = (x - 160) / 248; if (Math.abs(q) < 1) rect('#a8604a', x, Math.round(218 - 78 * Math.sqrt(1 - q * q)), 2, 1); }   // its stitching
+    const arc = 'BLACKJACK PAYS 3 TO 2'; for (let i = 0; i < arc.length; i++) { const x = 160 - arc.length * 2 + i * 4, y = 90 + Math.round(((x - 160) / 46) ** 2); text(arc[i], x, y, '#e8c060', 1, null); }
+    // the dealer's line, the shoe
     if (B.sayT > 0 && B.say) bubble(B.say, 188, 18, 92, B.dx === 0);
-    // the shoe
-    rect('#000', 286, 22, 28, 22); rect('#2a1a10', 287, 23, 26, 20); card({ hide: true }, 291, 20);
+    box(284, 30, 30, 22, '#2a1a10'); rect('#4a2a18', 286, 32, 26, 3); for (let k = 0; k < 6; k++) rect(k % 2 ? '#e8e0d0' : '#c8c0b0', 288 + k, 36, 1, 12); card({ hide: true }, 294, 31);
     // hands
-    const fly = (c, x, y) => { const k = Math.min(1, (t - (c.t0 || 0)) / 9), e = 1 - Math.pow(1 - k, 2); return [300 + (x - 300) * e, 24 + (y - 24) * e]; };
+    const fly = (c, x, y) => { const k = Math.min(1, (t - (c.t0 || 0)) / 9), e = 1 - Math.pow(1 - k, 2); return [300 + (x - 300) * e, 34 + (y - 34) * e]; };
     B.D.forEach((c, i) => { const [x, y] = fly(c, handX(B.D, i, 160), 62); const f = !c.hide && i === 1 && B.flipT < 12 ? (B.flipT < 6 ? -(1 - B.flipT / 6) : (B.flipT - 6) / 6) : 1; card(f < 0 ? Object.assign({}, c, { hide: true }) : c, x, y, f || 0.1); });
-    B.P.forEach((c, i) => { const [x, y] = fly(c, handX(B.P, i, 160), 100); card(c, x, y, B.doubled && i === 2 ? 1 : 1); });
-    const badge = (h, x, y) => { if (!h.length) return; const hv = handV(h), s = (hv.soft && hv.v < 21 ? hv.v - 10 + '/' : '') + hv.v; rect('#000', x - 12, y, 24, 9); text(s, x, y + 2, hv.v > 21 ? '#ff6a6a' : hv.v === 21 ? '#ffe680' : '#fff6d4', 1, null, 'center'); };
+    B.P.forEach((c, i) => { const [x, y] = fly(c, handX(B.P, i, 160), 100); card(c, x, y); });
+    const badge = (h, x, y) => { if (!h.length) return; const hv = handV(h), s = (hv.soft && hv.v < 21 ? hv.v - 10 + '/' : '') + hv.v; rbox(x - 12, y, 24, 9, 2, hv.v > 21 ? '#7a1018' : hv.v === 21 ? '#c98f22' : '#2a1018'); text(s, x, y + 2, hv.v > 21 ? '#ffb0a0' : hv.v === 21 ? '#2a0e1a' : '#fff6d4', 1, null, 'center'); };
     badge(B.D, 160 - B.D.length * 7 - 20, 70); badge(B.P, 160 - B.P.length * 7 - 20, 108);
     // the bet circle
-    ctx.strokeStyle = '#e8c060'; ctx.beginPath(); ctx.arc(80, 112, 12, 0, 7); ctx.stroke();
-    const st = B.state === 'bet' || (B.state === 'done' && !B.P.length) ? BETS[bi] : B.stake; for (let k = 0; k < Math.min(6, Math.ceil(st / 10)); k++) chip(80, 114 - k * 2, B.doubled ? 50 : st);
-    text(String(st), 80, 127, '#fff6d4', 1, null, 'center'); if (B.doubled) text('DOUBLED', 80, 96, '#ff8a6a', 1, null, 'center');
-    text('STREAK ' + B.wins, 8, 64, B.wins >= 2 && B.dealer === 'gregg' ? '#ff8a6a' : '#c89850', 1, null);
+    for (let a = 0; a < 64; a++) { const an = a / 64 * Math.PI * 2; rect('#e8c060', Math.round(80 + Math.cos(an) * 13), Math.round(112 + Math.sin(an) * 9), 1, 1); }
+    const st = B.state === 'bet' || (B.state === 'done' && !B.P.length) ? BETS[bi] : B.stake;
+    chip(80, 112, st, 5, Math.min(6, Math.ceil(st / 20))); if (B.doubled) chip(92, 114, B.bet, 5, Math.min(6, Math.ceil(B.bet / 20)));
+    text(String(st), 80, 124, '#fff6d4', 1, '#000', 'center'); if (B.doubled) text('DOUBLED', 80, 94, '#ff8a6a', 1, '#000', 'center');
+    // the rules plaque
+    box(6, 66, 54, 22, '#c98f22'); rect('#e8c060', 8, 68, 50, 18); text('DEALER', 33, 70, '#3a1a08', 1, null, 'center'); text('STANDS ON', 33, 76, '#3a1a08', 1, null, 'center'); text('ALL 17S', 33, 82, '#3a1a08', 1, null, 'center');
+    text('STREAK ' + B.wins, 33, 94, B.wins >= 2 && B.dealer === 'gregg' ? '#ff8a6a' : '#e8c060', 1, '#000', 'center');
     // the right panel
     if (B.state === 'play') { const canD = B.P.length === 2; ['HIT', 'STAND', 'DOUBLE'].forEach((l, i) => btn(258, 70 + i * 20, 58, 16, l, B.sel === i, i === 2 ? '#ff8a6a' : '#ffd27a', i === 2 && !canD)); }
     else if (B.state === 'bet' || B.state === 'done') { betBox(260, 70, true); const hb = Math.round(Math.abs(Math.sin(tt / 10))); btn(258, 104 - hb, 60, 18, B.state === 'done' ? 'DEAL AGAIN' : 'DEAL', true, '#ffd27a'); }
+    if (A) A.vignette(0.3);
   }
 
   // ================================================================ the screen
@@ -738,9 +955,9 @@
     if (scr === 'lobby') lobbyDraw(tt); else if (scr === 'slots') slotsDraw(tt); else if (scr === 'scratch') scratchDraw(tt); else if (scr === 'roul') rouletteDraw(tt); else bjDraw(tt);
     ctx.restore();
     // footer
-    rect('#0a0408', 0, 149, VW, 31);
-    if (msgT > 0) text(msg, VW / 2, 152, msg.startsWith('NEED') || msg.startsWith('OUT') ? '#ff8080' : '#ffe680', 1, null, 'center');
-    else text(unl() ? 'UNLIMITED HEI POINTS: EVERYTHING PLAYS FREE, NOTHING PAYS' : scr === 'lobby' ? 'LUCKY SEVEN MEANS CASINO WITH YOU.' : 'BALANCE ' + pts() + '   YOU VS THE HOUSE ' + (C.net > 0 ? '+' : '') + C.net, VW / 2, 152, '#9a8a90', 1, null, 'center');
+    rect('#0a0408', 0, 149, VW, 31); if (A) A.trim(0, 148, VW, '#c98f22');
+    if (msgT > 0) text(msg, VW / 2, 153, msg.startsWith('NEED') || msg.startsWith('OUT') ? '#ff8080' : '#ffe680', 1, null, 'center');
+    else text(unl() ? 'UNLIMITED HEI POINTS: EVERYTHING PLAYS FREE, NOTHING PAYS' : scr === 'lobby' ? 'BIGGEST WIN ' + C.big + '   BEST STREAK ' + C.best + '   YOU VS THE HOUSE ' + (C.net > 0 ? '+' : '') + C.net : 'BALANCE ' + pts() + '   YOU VS THE HOUSE ' + (C.net > 0 ? '+' : '') + C.net, VW / 2, 153, '#9a8a90', 1, null, 'center');
     const J = DD.padUsed ? 'CROSS' : 'JUMP', X = DD.padUsed ? 'CIRCLE' : 'X', SW = DD.padUsed ? 'R1' : 'C';
     const help = scr === 'lobby' ? 'LEFT/RIGHT: PICK   ' + J + ': PLAY   ' + SW + ': STORE   ' + X + ': ' + (ST() ? ST().backLabel : 'BACK')
       : scr === 'slots' ? (S.state === 'spin' ? J + ': STOP THE REELS' : J + ': SPIN   ARROWS: BET   ' + X + ': CASINO')
@@ -751,14 +968,27 @@
   }
   function drawTop() {   // over the store's header: coins into the balance, sparks and the banner
     for (const p of spark) { const a = 1 - p.t / p.life; ctx.globalAlpha = a; rect('#000', p.x, p.y + 1, 2, 2); rect(p.c, p.x, p.y, 2, 2); ctx.globalAlpha = 1; }
-    for (const f of coins) { if (f.t < 0) continue; const k = f.t / f.d, e = k * k * (3 - 2 * k), arc = Math.sin(k * Math.PI) * 24, x = f.x0 + (BAL.x - f.x0) * e, y = f.y0 + (BAL.y - f.y0) * e - arc; rect('#000', x - 1, y - 1, 5, 5); rect('#ffd27a', x, y, 3, 3); rect('#fff6d4', x, y, 1, 1); }
+    for (const f of coins) { if (f.t < 0) continue; const k = f.t / f.d, e = k * k * (3 - 2 * k), arc = Math.sin(k * Math.PI) * 24, x = f.x0 + (BAL.x - f.x0) * e, y = f.y0 + (BAL.y - f.y0) * e - arc; rect('#6a3a08', x - 1, y - 1, 5, 5); rect('#e8b030', x, y, 3, 3); rect('#fff0a0', x, y, 1, 1); }
     if (banner) {
-      const b = banner, s = b.size, w = b.s.length * 4 * s, pop = b.t < 8 ? Math.round((8 - b.t) * 1.5) : 0, y = ({ slots: 26, scratch: 135, bj: 88, roul: 128 }[scr] || 66) - pop + (b.t > b.n - 10 ? (b.t - (b.n - 10)) * 3 : 0);
-      rect('rgba(10,4,8,0.78)', VW / 2 - w / 2 - 8, y - 4, w + 16, 5 * s + 8); rect(b.col === 'rain' ? rainbow(0, t) : '#c98f22', VW / 2 - w / 2 - 8, y - 4, w + 16, 1); rect(b.col === 'rain' ? rainbow(4, t) : '#c98f22', VW / 2 - w / 2 - 8, y + 5 * s + 3, w + 16, 1);
-      if (b.col === 'rain') { for (let i = 0; i < b.s.length; i++) text(b.s[i], VW / 2 - w / 2 + i * 4 * s, y + Math.round(Math.sin(t / 4 + i * 0.7) * 1.5), rainbow(i, t), s, '#2a0e1a'); }
+      const b = banner, s = b.size, w = b.s.length * 4 * s, pop = b.t < 8 ? Math.round((8 - b.t) * 1.5) : 0, y = ({ slots: 26, scratch: 135, bj: 86, roul: 128 }[scr] || 66) - pop + (b.t > b.n - 10 ? (b.t - (b.n - 10)) * 3 : 0);
+      const big = b.col === 'rain', px = Math.round(VW / 2 - w / 2 - 10), pw = w + 20, ph = 5 * s + 10;
+      if (big) glow(VW / 2, y + ph / 2 - 4, w, '#ffe680', 0.25);
+      box(px, y - 5, pw, ph, big ? '#5a0a14' : '#2a0e1a');
+      if (big && A) { A.bulbs(px + 3, y - 4, pw - 6, 6, t); A.bulbs(px + 3, y + ph - 7, pw - 6, 6, t + 3); }
+      if (big) logo(b.s, VW / 2, y, s, GOLD, (t * 3) % (w + 60) + px - 20);
+      else if (s > 1) logo(b.s, VW / 2, y, s, b.col === '#ffe680' ? GOLD : [b.col, b.col, mix(b.col, -0.1), mix(b.col, -0.2), mix(b.col, -0.3)]);
       else text(b.s, VW / 2, y, b.col, s, '#2a0e1a', 'center');
     }
   }
+
+  // ?casino=lobby|slots|scratch|roul|bj (testing and screenshots): straight into that casino screen; &demo shows it mid-play
+  const Qs = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
+  if (Qs && Qs.has('casino') && ST()) { const iv = setInterval(() => { if (!window.__menu || window.__menu.st === 'load') return; clearInterval(iv);
+    const st = ST(), w = Qs.get('casino'); if (st.pts < 500 && !st.unlimited) st.bank(500 - st.pts);
+    st.tab = 1; st.open({ label: 'BACK' }); if (w && w !== 'lobby') enter(w); if (Qs.has('lc')) lc = +Qs.get('lc');
+    if (Qs.has('demo')) { if (w === 'slots') { spin(); S.stops = STRIPS.map(a => a.indexOf(SEV)); } if (w === 'scratch') { buyTicket(+Qs.get('demo') || 0); } if (w === 'roul') { placeBet('red', 25); placeBet('n7', 10); placeBet('d2', 5); } if (w === 'bj') deal(); }
+    DD.setScene({ step: IN => { if (st.step(IN, IN.click) === 'back') st.open({ label: 'BACK' }); }, draw: () => st.draw() });
+  }, 100); }
 
   window.DDCasino = { open, step, draw, drawTop, M, BETS, get scr() { return scr; }, get busy() { return busy(); }, get stats() { return C; }, reload: cload,
     test: { S, K, R, B, get t() { return t; }, set bi(n) { bi = n; }, enter, spin, deal, buyTicket, spinWheel, placeBet, settle, freeTix } };
