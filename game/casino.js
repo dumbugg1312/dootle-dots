@@ -97,6 +97,14 @@
   function newShoe() { const s = []; for (let d = 0; d < 6; d++) for (let su = 0; su < 4; su++) for (let r = 0; r < 13; r++) s.push({ r, s: su }); return shuffle(s); }
   M.handV = handV; M.isBJ = isBJ; M.newShoe = newShoe;
 
+  // ---- bingo: 75 balls, a 5 x 5 card (B 1-15 ... O 61-75, free middle); any row, column, diagonal or the four corners
+  const BLINES = (() => { const L = []; for (let i = 0; i < 5; i++) { L.push([0, 1, 2, 3, 4].map(r => i * 5 + r)); L.push([0, 1, 2, 3, 4].map(c => c * 5 + i)); } L.push([0, 6, 12, 18, 24], [4, 8, 12, 16, 20], [0, 4, 20, 24]); return L; })();
+  const BPAY = [[16, 12], [22, 6], [99, 4]];   // bingo within this many balls pays this many times the card
+  const bingoPay = n => BPAY.find(([lim]) => n <= lim)[1];
+  function bingoCard() { const c = []; for (let col = 0; col < 5; col++) { const pool = []; for (let k = 1; k <= 15; k++) pool.push(col * 15 + k); for (let i = 0; i < 5; i++) c.push(pool.splice(rnd(pool.length), 1)[0]); } c[12] = 0; return c; }   // c[col * 5 + row]; 0 is FREE
+  const bingoToGo = (c, called) => Math.min(...BLINES.map(L => L.filter(k => c[k] && !called.has(c[k])).length));
+  M.BLINES = BLINES; M.BPAY = BPAY; M.bingoPay = bingoPay; M.bingoCard = bingoCard; M.bingoToGo = bingoToGo;
+
   // ================================================================ the save: stats, and the free ticket for the broke
   const CKEY = 'dootledots.casino.v1';
   let C; function cload() { try { C = JSON.parse(localStorage.getItem(CKEY)) || {}; } catch (e) { C = {}; } C = Object.assign({ big: 0, best: 0, streak: 0, net: 0, rounds: 0, seen: 0, brokeAt: -1 }, C); }
@@ -207,7 +215,7 @@
   // ---- slot symbols: sprites at whole sizes only, a drawn 7 and a drawn WILD card
   const SPR = { kernel: ['kernel', 2], pop: ['pop', 2], cup: ['cup', 1], tub: ['tub', 1], vhs: ['vhs', 1], gregg: ['portrait_gregg', 1], tim: ['portrait_tim', 1], card: ['card', 1] };
   const BOSSES = [['w10_portrait_rat', 10], ['w11_portrait_new', 11], ['w12_portrait_amato', 12]];
-  if (DD.loadSprites) DD.loadSprites(['kernel', 'pop', 'cup', 'tub', 'vhs', 'portrait_gregg', 'portrait_tim', 'card', 'gregg', 'tim', 'w10_portrait_rat', 'w11_portrait_new', 'w12_portrait_amato', 'w2_curtain']);
+  if (DD.loadSprites) DD.loadSprites(['kernel', 'pop', 'cup', 'tub', 'vhs', 'portrait_gregg', 'portrait_tim', 'card', 'gregg', 'tim', 'w10_portrait_rat', 'w11_portrait_new', 'w12_portrait_amato', 'w2_curtain', 'w11_portrait_new_manor', 'w11_seniors', 'w11_bingosign', 'w11_cork', 'w11_lino']);
   const SEVEN = (() => {   // a 16 x 22 seven: outline, body, lit edge, shaded edge
     const W = 16, H = 22, inS = (x, y) => (y >= 1 && y <= 4 && x >= 1 && x <= 14) || (y > 4 && y <= 20 && x >= Math.round(10.5 - (y - 5) * 0.42) && x < Math.round(10.5 - (y - 5) * 0.42) + 4);
     const g = []; for (let y = 0; y < H; y++) { let row = ''; for (let x = 0; x < W; x++) { if (inS(x, y)) row += !inS(x - 1, y) || !inS(x, y - 1) ? 'l' : !inS(x + 1, y) || !inS(x, y + 1) ? 'd' : 'r'; else row += [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => inS(x + a, y + b)) ? 'k' : '.'; } g.push(row); }
@@ -344,14 +352,15 @@
   }
 
   // ================================================================ the lobby
-  const GAMES = [{ id: 'slots', name: 'LUCKY SEVEN', sub: 'SLOTS' }, { id: 'scratch', name: 'SCRATCHERS', sub: '10 OR 25' }, { id: 'roul', name: 'ROULETTE', sub: 'ONE ZERO' }, { id: 'bj', name: 'BLACKJACK', sub: '3 TO 2' }];
-  const GX = i => 46 + i * 76, FLOOR = 126;
-  const CAB = i => ({ x: GX(i) - 34, y: 54, w: 68, h: 88 });
+  const GAMES = [{ id: 'slots', name: 'LUCKY SEVEN', sub: 'SLOTS' }, { id: 'scratch', name: 'SCRATCHERS', sub: '10 OR 25' }, { id: 'roul', name: 'ROULETTE', sub: 'ONE ZERO' }, { id: 'bj', name: 'BLACKJACK', sub: '3 TO 2' }, { id: 'bingo', name: 'BINGO NIGHT', sub: 'AT THE MANOR' }];
+  const GX = i => 34 + i * 63, FLOOR = 126;
+  const CAB = i => ({ x: GX(i) - 30, y: 54, w: 60, h: 88 });
   function enter(id) {
     scr = id; t = 0; SFX.switch(); banner = null;
     if (id === 'slots') { S.state = 'idle'; }
     if (id === 'scratch') { K.state = 'pick'; if (freeTix()) say('FREE TICKET! TIM PICKED ONE UP ON THE WAY IN.', 200); }
     if (id === 'roul') { R.state = 'bet'; }
+    if (id === 'bingo') { BG.state = BG.state === 'play' ? 'play' : 'bet'; }
     if (id === 'bj') { B.state = 'bet'; B.dealer = 'gregg'; B.dx = 0; B.wins = 0; B.say = 'THE BUFF DEALS. PLACE YOUR BET.'; B.sayT = 200; B.P = []; B.D = []; }
   }
   function lobbyStep(IN, c) {
@@ -387,19 +396,27 @@
   }
   function rouTable(cx, tt, on) {   // a roulette table seen from the side: legs, a wood rim, felt, the wheel
     box(cx - 22, 106, 4, FLOOR - 106, '#4a2810'); box(cx + 18, 106, 4, FLOOR - 106, '#4a2810'); box(cx - 3, 110, 6, FLOOR - 110, '#c98f22');
-    ell(cx, 102, 32, 11, '#2a1408'); ell(cx, 101, 31, 10, '#6a3a18'); ell(cx, 100, 28, 8, '#1a7a3a');
-    rect('#9a5a28', cx - 31, 101, 62, 1);
+    ell(cx, 102, 28, 11, '#2a1408'); ell(cx, 101, 27, 10, '#6a3a18'); ell(cx, 100, 24, 8, '#1a7a3a');
+    rect('#9a5a28', cx - 27, 101, 54, 1);
     wheel(cx, 96, 16, on ? tt * 0.05 : 0.4, { a: on ? -tt * 0.09 : 2.2, rr: 12 }, 0.55);
     if (on) glow(cx, 96, 26, '#fff2c0', 0.16);
-    for (let k = 0; k < 3; k++) chip(cx + 22, 100, [5, 25, 100][k], 3, 3 - k);
+    chip(cx + 19, 100, 25, 3, 3);
   }
   function bjTable(cx, tt, on) {   // Gregg behind a half-moon table with two cards dealt
     spr('portrait_gregg', cx, 99 + (on ? Math.round(Math.sin(tt / 20)) : 0));
     box(cx - 3, 112, 6, FLOOR - 112, '#4a2810');
-    rect('#3a1a10', cx - 31, 98, 62, 3); ell(cx, 100, 30, 12, '#2a1008', 1); ell(cx, 100, 27, 9, '#7a1420', 1); rect('#9a5a28', cx - 31, 98, 62, 1);
+    rect('#3a1a10', cx - 27, 98, 54, 3); ell(cx, 100, 27, 12, '#2a1008', 1); ell(cx, 100, 24, 9, '#7a1420', 1); rect('#9a5a28', cx - 27, 98, 54, 1);
     const mini = (x, y, r2, red) => { rect('#1a1014', x - 1, y - 1, 9, 12); rect('#fbf4e6', x, y, 7, 10); text(r2, x + 1, y + 1, red ? '#d8202c' : '#1a1418', 1, null); };
     mini(cx - 9, 101, 'A', false); mini(cx + 1, 102, 'K', true);
-    if (on) { text('21', cx + 16, 92, rainbow(0, tt), 1, '#000', 'center'); glow(cx, 100, 24, '#fff2c0', 0.14); }
+    if (on) { text('21', cx + 15, 92, rainbow(0, tt), 1, '#000', 'center'); glow(cx, 100, 24, '#fff2c0', 0.14); }
+  }
+  function bingoStand(cx, tt, on) {   // the Manor's bingo table: a little BINGO plate, the cage, a resident waiting
+    rect('#5a4a30', cx - 16, 70, 1, 30); rect('#5a4a30', cx + 15, 70, 1, 30);
+    box(cx - 22, 62, 44, 10, '#f4ece0'); 'BINGO'.split('').forEach((L, k) => text(L, cx - 16 + k * 8, 65, BALLC[k] === '#e8e0d0' ? '#7a6a5a' : BALLC[k], 1, null, 'center'));
+    senior(1, cx + 15, 100);
+    box(cx - 24, 98, 48, 5, '#6a3a18'); rect('#f4ece0', cx - 24, 98, 48, 1); box(cx - 21, 103, 3, FLOOR - 103, '#4a2810'); box(cx + 18, 103, 3, FLOOR - 103, '#4a2810');
+    cage(cx - 6, 84, 10, on ? tt * 0.2 : 0.3, on, tt);
+    if (on) { bingoBall(cx - 20, 94, 7 + (Math.floor(tt / 40) * 13) % 68, 5); glow(cx, 86, 24, '#fff2c0', 0.16); }
   }
   function lobbyDraw(tt) {
     room(tt, 110);
@@ -412,16 +429,16 @@
     // the games, each under a light
     GAMES.forEach((g, i) => {
       const cx = GX(i), on = i === lc;
-      ell(cx, FLOOR, 26, 3, 'rgba(0,0,0,0.45)');
+      ell(cx, FLOOR, 24, 3, 'rgba(0,0,0,0.45)');
       if (on && A) A.cone(cx, 15, FLOOR - 15, 34, '#fff2c0', 0.12);
       ctx.save(); if (!on) ctx.globalAlpha = 0.82;
-      if (g.id === 'slots') slotCab(cx, tt, on); else if (g.id === 'scratch') kiosk(cx, tt, on); else if (g.id === 'roul') rouTable(cx, tt, on); else bjTable(cx, tt, on);
+      if (g.id === 'slots') slotCab(cx, tt, on); else if (g.id === 'scratch') kiosk(cx, tt, on); else if (g.id === 'roul') rouTable(cx, tt, on); else if (g.id === 'bj') bjTable(cx, tt, on); else bingoStand(cx, tt, on);
       ctx.restore();
-      if (!on) rect('rgba(14,4,12,0.25)', cx - 32, 56, 64, FLOOR - 56);
-      const px = cx - 33, py = 131;
-      box(px, py, 66, 11, on ? '#c98f22' : '#3a1420');
+      if (!on) rect('rgba(14,4,12,0.25)', cx - 30, 56, 60, FLOOR - 56);
+      const px = cx - 29, py = 131;
+      box(px, py, 58, 11, on ? '#c98f22' : '#3a1420');
       text(g.name, cx, py + 3, on ? '#2a0e1a' : '#e8d0b0', 1, null, 'center');
-      if (on && A) A.bulbs(px + 2, py - 3, 62, 6, tt);
+      if (on && A) A.bulbs(px + 2, py - 3, 54, 6, tt);
     });
     if (A) A.vignette(0.4);
   }
@@ -932,6 +949,136 @@
     if (A) A.vignette(0.3);
   }
 
+  // ================================================================ BINGO NIGHT at Grand Terrace Manor (S16 eps 5-8; the activity room had a BINGO NIGHT sign)
+  // New calls, faster every ball. You daub your own card; five residents daub theirs and shout a beat after they're done. First bingo wins.
+  const BALLC = ['#d8202c', '#2a6ad8', '#e8e0d0', '#1a9a4a', '#e8a020'];   // B I N G O
+  const BG = { state: 'bet', card: null, mark: [], cur: 12, order: [], calls: [], called: new Set(), next: 0, roll: 99, res: [], lock: 0, stake: 0, win: 0, who: -1, say: '', sayT: 0, splat: [], first: true, bad: -1, badT: -99 };
+  const bsay = (s, n = 110) => { BG.say = s; BG.sayT = n; };
+  const letter = n => 'BINGO'[Math.floor((n - 1) / 15)];
+  const BCX = 110, BCY = 57, BCW = 17, BCH = 14;   // the card's grid
+  const BUYP = () => BG.state === 'done' ? { bet: { x: 206, y: 96 }, buy: { x: 263, y: 104, w: 50, h: 14 }, box: [204, 92, 112, 32] } : { bet: { x: 126, y: 74 }, buy: { x: 118, y: 104, w: 70, h: 14 }, box: [112, 70, 82, 52] };   // after a round it moves off the card
+  function bingoBuy() {
+    const bet = BETS[bi]; if (!take(bet)) return;
+    BG.stake = bet; BG.card = bingoCard(); BG.mark = BG.card.map(n => n === 0); BG.cur = 12;
+    BG.order = shuffle([...Array(75)].map((_, k) => k + 1)); BG.calls = []; BG.called = new Set(); BG.res = [];
+    for (let i = 0; i < 5; i++) BG.res.push({ card: bingoCard(), go: 4, shout: 0, react: 26 + rnd(28), bob: 0 });
+    BG.state = 'play'; BG.next = t + (BG.first ? 130 : 45); BG.lock = 0; BG.who = -1; BG.win = 0; BG.splat = []; banner = null;
+    if (BG.first) { bsay('ONE QUICK ANNOUNCEMENT: THE CASINO SHUTTLE NOW LEAVES AT 10.', 130); BG.first = false; } else bsay('HERE WE GO.', 45);
+    tone(392, 523, 0.1, 'square', 0.04);
+  }
+  function bingoCall() {
+    const n = BG.order[BG.calls.length]; BG.calls.push(n); BG.called.add(n); BG.roll = 0;
+    const col = Math.floor((n - 1) / 15); tone(330 + col * 90, 330 + col * 90, 0.07, 'square', 0.05); noise(0.05, 0.04, 1800);
+    bsay(letter(n) + ' ' + n, 34);
+    BG.res.forEach(r => { const g = bingoToGo(r.card, BG.called); if (g < r.go) r.bob = 8; r.go = g; if (g === 0 && !r.shout) r.shout = t + r.react; });
+    if (BG.res.some(r => r.go === 1)) { tone(90, 80, 0.07, 'sine', 0.08); tone(90, 80, 0.07, 'sine', 0.06, 0.12); }   // a heartbeat: somebody's one away
+    BG.next = t + Math.round(Math.max(24, 62 - BG.calls.length * 2.2));
+  }
+  function daub(i) {
+    if (BG.state !== 'play' || BG.lock > t || BG.mark[i]) return;
+    if (!BG.called.has(BG.card[i])) { BG.lock = t + 24; BG.bad = i; BG.badT = t; SFX.buzz(); return; }   // a bad daub costs a beat
+    BG.mark[i] = true; BG.splat.push({ i, t }); tone(660, 990, 0.05, 'square', 0.04); noise(0.04, 0.05, 2200);
+    if (BLINES.some(L => L.every(k => BG.mark[k]))) bingoWin();
+  }
+  function bingoWin() {
+    const n = BG.calls.length, m = bingoPay(n), back = BG.stake * m;
+    BG.state = 'done'; BG.win = back; BG.who = -1;
+    give(back, 152, 90); tier(back, BG.stake, 152, 90, m >= BPAY[0][1] ? 'QUICK BINGO! +' + back : 'BINGO! +' + back);
+    bsay('BINGO IN ' + n + ' BALLS.', 160); BG.res.forEach(r => r.bob = 0);
+    settle(BG.stake, back, false);
+  }
+  function bingoLose(i) {
+    BG.state = 'done'; BG.who = i; BG.res[i].bob = 40;
+    bsay("LET'S GET A ROUND OF APPLAUSE.", 160);
+    bannerUp('A RESIDENT GOT BINGO', '#c8a0a8', 1, 110); tone(260, 170, 0.18, 'triangle', 0.04);
+    for (let k = 0; k < 10; k++) noise(0.04, 0.035, 1500 + rnd(1500), 0.15 + k * 0.07);   // polite applause
+    settle(BG.stake, 0, BG.stake >= 100);
+  }
+  function bingoStep(IN, c) {
+    if (BG.sayT > 0) BG.sayT--; BG.res.forEach(r => { if (r.bob > 0) r.bob--; }); if (BG.roll < 99) BG.roll++;
+    if (BG.state === 'play') {
+      if (t >= BG.next && BG.calls.length < 75) bingoCall();
+      const sh = BG.res.findIndex(r => r.shout && t >= r.shout); if (sh >= 0) { bingoLose(sh); return; }
+      if (IN.nx || IN.ny) { const col = mod(Math.floor(BG.cur / 5) + IN.nx, 5), row = mod(BG.cur % 5 + IN.ny, 5); BG.cur = col * 5 + row; SFX.tick(); }
+      if (c) { const col = Math.floor((c.x - BCX) / BCW), row = Math.floor((c.y - BCY) / BCH); if (col >= 0 && col < 5 && row >= 0 && row < 5) { BG.cur = col * 5 + row; daub(BG.cur); } }
+      else if (IN.ok) daub(BG.cur);
+      return;
+    }
+    if (IN.ny) bump(-IN.ny); if (IN.nx) bump(IN.nx);
+    const P = BUYP(); if (c) { if (betClick(c, P.bet.x, P.bet.y)) return; if (inR(c, P.buy.x, P.buy.y, P.buy.w, P.buy.h)) { bingoBuy(); return; } }
+    else if (IN.ok) { bingoBuy(); return; }
+    if (IN.back) { scr = 'lobby'; SFX.switch(); }
+  }
+  function senior(i, x, by) { const im = DD.IMG && DD.IMG.w11_seniors; if (im && im.complete && im.naturalWidth) ctx.drawImage(im, i * 22, 0, 22, 30, Math.round(x - 11), Math.round(by - 30), 22, 30); }
+  function bingoBall(x, y, n, r = 11) {
+    const col = BALLC[Math.floor((n - 1) / 15)];
+    bead(x, y, r, col); bead(x, y, Math.round(r * 0.62), '#fff8ec');
+    if (r >= 9) { text(letter(n), x, y - 5, '#2a1a1a', 1, null, 'center'); text(String(n), x, y + 1, '#1a1014', 1, null, 'center'); }
+    else text(String(n), x, y - 2, '#1a1014', 1, null, 'center');
+  }
+  function cage(cx, cy, r, ang, spinning, tt) {   // a wire bingo cage on its stand, balls tumbling inside
+    box(cx - r - 2, cy + r - 1, 4, 10, '#8a8a98'); box(cx + r - 2, cy + r - 1, 4, 10, '#8a8a98'); box(cx - r - 4, cy + r + 8, r * 2 + 8, 4, '#5a3014');
+    for (let k = 0; k < 6; k++) { const a = spinning ? tt * 0.15 + k * 1.3 : k * 1.05, rr = (k * 37 % 7) / 7 * (r - 5); bead(Math.round(cx + Math.cos(a) * rr), Math.round(cy + r * 0.35 + Math.sin(a) * rr * 0.5), 2, BALLC[k % 5]); }
+    const n = Math.round(r * 6.3); for (let k = 0; k < n; k++) { const a = k / n * Math.PI * 2; rect('#c8c8d4', Math.round(cx + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r), 1, 1); }
+    for (let k = 0; k < 4; k++) { const a = ang + k * Math.PI / 4; for (let s = -r; s <= r; s += 2) rect('#9a9aa8', Math.round(cx + Math.cos(a) * s), Math.round(cy + Math.sin(a) * s * 0.35), 1, 1); }
+    bead(cx, cy, 2, '#e8c060'); rect('#c8c8d4', cx + r, cy - 1, 5, 2); rect('#e8302a', cx + r + 4, cy - 2, 3, 4);   // the hub and crank
+  }
+  function bingoDraw(tt) {
+    // the activity room: tan wall, wood wainscot, BINGO NIGHT, the cork board, lino underfoot
+    rect('#cbb48c', 0, 15, VW, 71); if (A) A.tex(0, 15, VW, 71, '#cbb48c', 0.05, 9);
+    rect('#8a5426', 0, 86, VW, 42); if (A) { A.planks(0, 86, VW, 42, '#8a5426', 16, true); A.trim(0, 85, VW, '#b07a40'); }
+    rect('#d8d0b8', 0, 128, VW, 21); for (let x = 0; x < VW; x += 16) spr('w11_lino', x + 8, 149);
+    rect('rgba(0,0,0,0.25)', 0, 128, VW, 2);
+    spr('w11_cork', 286, 58); spr('w11_bingosign', 160, 42);
+    glow(160, 30, 70, '#fff2c0', 0.14);
+    // New calls it
+    spr('w11_portrait_new_manor', 18, 66 + (BG.roll < 6 ? -1 : 0));
+    if (BG.sayT > 0 && BG.say) bubble(BG.say, 36, 44, 66, true);
+    cage(70, 94, 14, BG.state === 'play' ? tt * 0.2 : 0.3, BG.state === 'play', tt);
+    const last = BG.calls[BG.calls.length - 1];
+    if (last) { const k = Math.min(1, BG.roll / 12), e = 1 - Math.pow(1 - k, 3), bx = 70 + (24 - 70) * e, by = 96 - Math.sin(k * Math.PI) * 14; bingoBall(Math.round(bx), Math.round(by), last); if (BG.roll < 20) glow(bx, by, 20, BALLC[Math.floor((last - 1) / 15)], 0.2); }
+    else { bead(24, 96, 11, '#3a2a20'); text('?', 24, 94, '#8a7a6a', 1, null, 'center'); }
+    box(4, 111, 98, 12, '#5a3014'); BG.calls.slice(-7, -1).reverse().forEach((n, i) => bingoBall(13 + i * 15, 117, n, 5));
+    // what a bingo pays right now
+    const nb = BG.calls.length, tierI = BPAY.findIndex(([lim]) => nb <= lim), cur = BPAY[Math.max(0, tierI)];
+    box(4, 126, 98, 20, '#2a1a10'); text('BALLS ' + nb, 8, 129, '#fff6d4', 1, null);
+    if (BG.state === 'play') { const left = cur[0] < 99 ? cur[0] - nb : 0; text('NOW ' + cur[1] + 'X' + (left ? '  ' + left + ' LEFT' : ''), 8, 138, left && left <= 3 ? (Math.floor(tt / 6) % 2 ? '#ff8a6a' : '#ffe680') : '#ffe680', 1, '#000'); }
+    else text('BY ' + BPAY[0][0] + ': ' + BPAY[0][1] + 'X  BY ' + BPAY[1][0] + ': ' + BPAY[1][1] + 'X', 8, 138, '#ffe680', 1, null);
+    // your card
+    rect('rgba(0,0,0,0.35)', 109, 47, 93, 88); box(106, 44, 93, 88, '#f4ece0', { outline: '#3a2a1a' });
+    'BINGO'.split('').forEach((L, k) => { box(BCX + k * BCW, 46, BCW - 1, 10, BALLC[k], { outline: false }); text(L, BCX + k * BCW + 8, 48, k === 2 ? '#2a1a1a' : '#fff6d4', 1, null, 'center'); });
+    for (let col = 0; col < 5; col++) for (let row = 0; row < 5; row++) {
+      const i = col * 5 + row, x = BCX + col * BCW, y = BCY + row * BCH, n = BG.card ? BG.card[i] : -1;
+      rect('#d8ccb4', x, y, BCW, 1); rect('#d8ccb4', x, y, 1, BCH);
+      if (n < 0) continue;
+      const hot = BG.state === 'play' && n > 0 && BG.called.has(n) && !BG.mark[i];
+      if (hot) rect(Math.floor(tt / 5) % 2 ? '#fff0a0' : '#ffe070', x + 1, y + 1, BCW - 1, BCH - 1);
+      if (BG.mark[i]) { const sp = BG.splat.find(q => q.i === i), g = sp ? Math.min(1, (t - sp.t) / 5) : 1; bead(x + 9, y + 7, Math.max(2, Math.round(6 * g)), '#c83a9a'); if (g >= 1) { rect('#c83a9a', x + 3, y + 3, 1, 1); rect('#c83a9a', x + 14, y + 11, 1, 1); } }
+      if (n === 0) pmap(['..x..', 'xxxxx', '.xxx.', 'x.x.x'], { x: '#fff6d4' }, x + 7, y + 5); else text(String(n), x + 9, y + 5, BG.mark[i] ? '#fff6d4' : '#2a1a1a', 1, null, 'center');
+      if (BG.bad === i && t - BG.badT < 24) { rect('#e8302a', x + 2, y + 2, BCW - 3, 1); rect('#e8302a', x + 2, y + BCH - 2, BCW - 3, 1); }
+    }
+    if (BG.state === 'play') { const x = BCX + Math.floor(BG.cur / 5) * BCW, y = BCY + (BG.cur % 5) * BCH, g = BG.lock > t ? '#e8302a' : Math.floor(tt / 6) % 2 ? '#2a6ad8' : '#1a1014'; rect(g, x, y, BCW + 1, 1); rect(g, x, y + BCH, BCW + 1, 1); rect(g, x, y, 1, BCH); rect(g, x + BCW, y, 1, BCH); }
+    if (BG.state === 'done' && BG.who < 0 && Math.floor(tt / 8) % 2) { const L = BLINES.find(L => L.every(k => BG.mark[k])); if (L) L.forEach(k => { const x = BCX + Math.floor(k / 5) * BCW, y = BCY + (k % 5) * BCH; rect('#e8b030', x, y, BCW + 1, 1); rect('#e8b030', x, y + BCH, BCW + 1, 1); rect('#e8b030', x, y, 1, BCH); rect('#e8b030', x + BCW, y, 1, BCH); }); }   // the winning line
+    // the residents at their table, and how close each is
+    box(204, 77, 114, 9, '#6a3a18'); rect('#f4ece0', 204, 77, 114, 2);
+    BG.res.forEach((r, i) => {
+      const x = 216 + i * 22, by = 80 - (r.bob > 0 ? Math.round(Math.abs(Math.sin(r.bob / 2)) * 2) : 0);
+      senior(i, x, by); rect('#6a3a18', x - 11, 77, 22, 3);
+      const won = BG.who === i, near = r.go === 1 && BG.state === 'play', go = won || (r.shout && BG.state === 'play') ? '!' : String(r.go);
+      box(x - 6, 79, 12, 6, won || near ? (Math.floor(tt / 5) % 2 ? '#e8302a' : '#ffe680') : '#f4ece0', { outline: '#3a2a1a' }); text(go, x, 80, won || near ? '#2a0a08' : '#3a2a1a', 1, null, 'center');
+      if (won || (r.shout && BG.state === 'play')) bubble('BINGO!', x - 14, 30, 30, false);
+    });
+    if (!BG.res.length) for (let i = 0; i < 5; i++) { senior(i, 216 + i * 22, 80); rect('#6a3a18', 205 + i * 22, 77, 22, 3); }
+    // the board of called numbers
+    box(204, 90, 112, 37, '#2a1a10');
+    for (let col = 0; col < 5; col++) { text('BINGO'[col], 209, 92 + col * 7, BALLC[col], 1, null, 'center'); for (let k = 0; k < 15; k++) { const n = col * 15 + k + 1, on = BG.called.has(n); rect(on ? BALLC[col] : '#4a3020', 214 + k * 6, 93 + col * 7, 4, 4); if (on && n === last) rect('#ffffff', 214 + k * 6, 93 + col * 7, 4, 1); } }
+    if (BG.state !== 'play') {   // buy a card: over the card before a round, over the board after one
+      const P = BUYP(); box(P.box[0], P.box[1], P.box[2], P.box[3], '#2a1018'); betBox(P.bet.x, P.bet.y, true);
+      const hb = Math.round(Math.abs(Math.sin(tt / 10))); btn(P.buy.x, P.buy.y - hb, P.buy.w, P.buy.h, BG.state === 'done' ? 'NEW CARD' : 'BUY A CARD', true, '#ffd27a');
+    }
+    if (A) A.vignette(0.25);
+  }
+
   // ================================================================ the screen
   function open() {
     t = 0; scr = 'lobby'; banner = null;
@@ -946,13 +1093,13 @@
     coins = coins.filter(f => { f.t++; if (f.t === f.d) SFX.count(f.k % 12); return f.t < f.d; });
     spark = spark.filter(p => { p.t++; p.x += p.vx; p.y += p.vy; p.vy += 0.18; return p.t < p.life; });
     if (scr === 'lobby') return lobbyStep(IN, c);
-    if (scr === 'slots') slotsStep(IN, c); else if (scr === 'scratch') scratchStep(IN, c); else if (scr === 'roul') rouletteStep(IN, c); else if (scr === 'bj') bjStep(IN, c);
+    if (scr === 'slots') slotsStep(IN, c); else if (scr === 'scratch') scratchStep(IN, c); else if (scr === 'roul') rouletteStep(IN, c); else if (scr === 'bj') bjStep(IN, c); else if (scr === 'bingo') bingoStep(IN, c);
   }
-  const busy = () => (scr === 'slots' && S.state === 'spin') || (scr === 'roul' && R.state === 'spin') || (scr === 'bj' && !['bet', 'done', 'play'].includes(B.state)) || (scr === 'scratch' && K.state === 'scratch');
+  const busy = () => (scr === 'slots' && S.state === 'spin') || (scr === 'roul' && R.state === 'spin') || (scr === 'bj' && !['bet', 'done', 'play'].includes(B.state)) || (scr === 'scratch' && K.state === 'scratch') || (scr === 'bingo' && BG.state === 'play');
   function draw() {
     const tt = t;
     ctx.save(); if (shake) ctx.translate(Math.round((Math.random() - 0.5) * Math.min(6, shake / 3)), Math.round((Math.random() - 0.5) * Math.min(6, shake / 3)));
-    if (scr === 'lobby') lobbyDraw(tt); else if (scr === 'slots') slotsDraw(tt); else if (scr === 'scratch') scratchDraw(tt); else if (scr === 'roul') rouletteDraw(tt); else bjDraw(tt);
+    if (scr === 'lobby') lobbyDraw(tt); else if (scr === 'slots') slotsDraw(tt); else if (scr === 'scratch') scratchDraw(tt); else if (scr === 'roul') rouletteDraw(tt); else if (scr === 'bingo') bingoDraw(tt); else bjDraw(tt);
     ctx.restore();
     // footer
     rect('#0a0408', 0, 149, VW, 31); if (A) A.trim(0, 148, VW, '#c98f22');
@@ -963,6 +1110,7 @@
       : scr === 'slots' ? (S.state === 'spin' ? J + ': STOP THE REELS' : J + ': SPIN   ARROWS: BET   ' + X + ': CASINO')
       : scr === 'scratch' ? (K.state === 'pick' ? 'LEFT/RIGHT: PICK   ' + J + ': BUY   ' + X + ': CASINO' : K.state === 'scratch' ? 'DRAG OR ARROWS: SCRATCH   ' + J + ': ALL   ' + X + ': REVEAL' : J + ': AGAIN   ' + X + ': TICKETS')
       : scr === 'roul' ? (R.state === 'spin' ? J + ': HURRY IT UP' : 'ARROWS: MOVE   ' + J + ': CHIP DOWN / PRESS   ' + X + ': CASINO')
+      : scr === 'bingo' ? (BG.state === 'play' ? 'ARROWS OR MOUSE: MOVE   ' + J + ' OR CLICK: DAUB A CALLED NUMBER' : J + ': BUY A CARD   ARROWS: BET   ' + X + ': CASINO')
       : B.state === 'play' ? 'ARROWS: PICK   ' + J + ': DO IT' : J + ': DEAL   ARROWS: BET   ' + X + ': CASINO';
     text(help, VW / 2, 167, '#ffd27a', 1, '#000', 'center');
   }
@@ -970,7 +1118,7 @@
     for (const p of spark) { const a = 1 - p.t / p.life; ctx.globalAlpha = a; rect('#000', p.x, p.y + 1, 2, 2); rect(p.c, p.x, p.y, 2, 2); ctx.globalAlpha = 1; }
     for (const f of coins) { if (f.t < 0) continue; const k = f.t / f.d, e = k * k * (3 - 2 * k), arc = Math.sin(k * Math.PI) * 24, x = f.x0 + (BAL.x - f.x0) * e, y = f.y0 + (BAL.y - f.y0) * e - arc; rect('#6a3a08', x - 1, y - 1, 5, 5); rect('#e8b030', x, y, 3, 3); rect('#fff0a0', x, y, 1, 1); }
     if (banner) {
-      const b = banner, s = b.size, w = b.s.length * 4 * s, pop = b.t < 8 ? Math.round((8 - b.t) * 1.5) : 0, y = ({ slots: 26, scratch: 135, bj: 86, roul: 128 }[scr] || 66) - pop + (b.t > b.n - 10 ? (b.t - (b.n - 10)) * 3 : 0);
+      const b = banner, s = b.size, w = b.s.length * 4 * s, pop = b.t < 8 ? Math.round((8 - b.t) * 1.5) : 0, y = ({ slots: 26, scratch: 135, bj: 86, roul: 128, bingo: 22 }[scr] || 66) - pop + (b.t > b.n - 10 ? (b.t - (b.n - 10)) * 3 : 0);
       const big = b.col === 'rain', px = Math.round(VW / 2 - w / 2 - 10), pw = w + 20, ph = 5 * s + 10;
       if (big) glow(VW / 2, y + ph / 2 - 4, w, '#ffe680', 0.25);
       box(px, y - 5, pw, ph, big ? '#5a0a14' : '#2a0e1a');
@@ -986,10 +1134,10 @@
   if (Qs && Qs.has('casino') && ST()) { const iv = setInterval(() => { if (!window.__menu || window.__menu.st === 'load') return; clearInterval(iv);
     const st = ST(), w = Qs.get('casino'); if (st.pts < 500 && !st.unlimited) st.bank(500 - st.pts);
     st.tab = 1; st.open({ label: 'BACK' }); if (w && w !== 'lobby') enter(w); if (Qs.has('lc')) lc = +Qs.get('lc');
-    if (Qs.has('demo')) { if (w === 'slots') { spin(); S.stops = STRIPS.map(a => a.indexOf(SEV)); } if (w === 'scratch') { buyTicket(+Qs.get('demo') || 0); } if (w === 'roul') { placeBet('red', 25); placeBet('n7', 10); placeBet('d2', 5); } if (w === 'bj') deal(); }
+    if (Qs.has('demo')) { if (w === 'slots') { spin(); S.stops = STRIPS.map(a => a.indexOf(SEV)); } if (w === 'scratch') { buyTicket(+Qs.get('demo') || 0); } if (w === 'roul') { placeBet('red', 25); placeBet('n7', 10); placeBet('d2', 5); } if (w === 'bj') deal(); if (w === 'bingo') bingoBuy(); }
     DD.setScene({ step: IN => { if (st.step(IN, IN.click) === 'back') st.open({ label: 'BACK' }); }, draw: () => st.draw() });
   }, 100); }
 
   window.DDCasino = { open, step, draw, drawTop, M, BETS, get scr() { return scr; }, get busy() { return busy(); }, get stats() { return C; }, reload: cload,
-    test: { S, K, R, B, get t() { return t; }, set bi(n) { bi = n; }, enter, spin, deal, buyTicket, spinWheel, placeBet, settle, freeTix } };
+    test: { S, K, R, B, BG, bingoBuy, daub, get t() { return t; }, set bi(n) { bi = n; }, enter, spin, deal, buyTicket, spinWheel, placeBet, settle, freeTix } };
 })();
