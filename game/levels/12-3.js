@@ -120,12 +120,18 @@ window.LEVEL = {"id": "12-3", "name": "OSCAR FEVER", "sub": "THE OSCAR SPECIAL S
       // the audience, bobbing on the beat
       const low = (c.x + 160) / TS > 246 || (s.lowT || 0) > 0, Yf = Math.round(DD.wy((low ? DD.L.LOW : DD.L.FLOOR) * TS)), step = 14, ax = -((Math.round(c.x * 0.7)) % step + step) % step;
       for (let x = ax - step, i = Math.floor(c.x * 0.7 / step) - 1; x < VW + step; x += step, i++) {
-        const h = (i * 7) & 3, bob = ((beat + i) & 1) && ph < 6 ? 1 : 0, up = down && ph < 12 && (i & 1);
-        ctx.fillStyle = '#080520'; ctx.fillRect(x - 5, Yf - 14 - h - bob, 10, 14 + h + bob); ctx.beginPath(); ctx.arc(x, Yf - 17 - h - bob, 4, 0, 7); ctx.fill();
+        const hr = DD.art.hash(i, 5), hurt = G.pl.inv > 0, h = (i * 7) & 3, bob = (((beat + i) & 1) && ph < 6 ? 1 : 0) - (hurt ? 2 : 0), up = down && ph < 12 && (i & 1), gl = !hurt && ((f + ((hr * 400) | 0)) % 400) < 50 ? (hr > 0.5 ? 1 : -1) : (hurt ? (i & 1 ? 1 : -1) : 0);   // heads bob on the beat, glance aside now and then, and duck when the Dot is hurt
+        ctx.fillStyle = '#080520'; ctx.fillRect(x - 5, Yf - 14 - h - bob, 10, 14 + h + bob); ctx.beginPath(); ctx.arc(x + gl, Yf - 17 - h - bob, 4, 0, 7); ctx.fill();
+        if (hr > 0.9 && ((f + i * 13) % 220) < 150) { DD.art.R(x + 3, Yf - 24 - h - bob, 3, 4, '#bfe4ff'); DD.art.R(x + 2, Yf - 25 - h - bob, 5, 1, 'rgba(191,228,255,0.35)'); }   // a phone held up
         if (up) ctx.fillRect(x + (i & 2 ? 5 : -7), Yf - 28 - h, 2, 12);
       }
       const dy = DD.L.FLOOR - 21;   // the dark rooms cut into the stage: the under-stage hall, Baxter's pocket, Mel's chamber
-      for (const [x, y, w, h] of [[199, 22, 16, 4], [190, 22, 3, 2], [109, 17, 3, 4]]) { const X = Math.round(DD.wx(x * TS)), Y = Math.round(DD.wy((y + dy) * TS)); if (X > VW || X + w * TS < 0) continue; ctx.fillStyle = '#06030f'; ctx.fillRect(X, Y, w * TS, h * TS); ctx.fillStyle = 'rgba(255,200,90,0.07)'; ctx.fillRect(X, Y, w * TS, 3); }
+      for (const [x, y, w, h] of [[199, 22, 16, 4], [190, 22, 3, 2], [109, 17, 3, 4]]) { const X = Math.round(DD.wx(x * TS)), Y = Math.round(DD.wy((y + dy) * TS)); if (X > VW || X + w * TS < 0) continue; ctx.fillStyle = '#06030f'; ctx.fillRect(X, Y, w * TS, h * TS); ctx.fillStyle = 'rgba(255,200,90,0.07)'; ctx.fillRect(X, Y, w * TS, 3);
+        { const A = DD.art, fl = (f + w * 7) % 90 < 3, bot = Y + h * TS;   // the dark rooms are dressed: a pipe run, hanging work lamps with cones, stacked road cases and a cable coil
+          A.R(X, Y + 3, w * TS, 3, '#3a3650'); A.R(X, Y + 3, w * TS, 1, '#6a6686'); for (let q = 2; q < w * TS; q += 40) A.R(X + q, Y + 6, 2, 3, '#2a2840');
+          for (let q = 1; q < w; q += w >= 10 ? 5 : 3) { const lx = X + q * TS + 8; A.R(lx, Y + 6, 1, 6, '#3a3650'); A.R(lx - 3, Y + 12, 7, 3, '#2a2840'); A.R(lx - 2, Y + 15, 5, 2, fl ? '#ffffff' : '#ffd890'); A.cone(lx, Y + 16, 56, 30, '#ffd890', fl ? 0.05 : 0.13); A.glow(lx, Y + 17, 14, '#ffd890', 0.22); }
+          if (w >= 10) { for (let q = 2; q < w - 1; q += 4) { const kx = X + q * TS; A.box(kx, bot - 18, 22, 18, '#2a2838', { outline: '#0a0814' }); A.R(kx + 9, bot - 12, 4, 3, '#8a8a96'); A.R(kx + 2, bot - 16, 18, 1, '#4a465a'); A.R(kx + 1, bot - 6, 20, 1, '#e8c02a'); }
+            const kx = X + (w - 3) * TS; for (let q = 0; q < 3; q++) A.R(kx + q, bot - 4 + q % 2, 14 - q * 3, 2, '#0a0814'); A.R(kx, bot - 4, 14, 1, '#c8302c'); } } }
       art123(ctx, G, beat, ph, down, key);
       if (down && ph < 5) { ctx.fillStyle = 'rgba(255,255,255,' + (0.07 - ph * 0.012).toFixed(3) + ')'; ctx.fillRect(0, 0, VW, VH); }
     },
@@ -137,7 +143,16 @@ window.LEVEL = {"id": "12-3", "name": "OSCAR FEVER", "sub": "THE OSCAR SPECIAL S
           ctx.fillStyle = key ? '#ffd04a' : '#8fe8ff'; ctx.fillRect(X, Y, 16, 2); ctx.fillStyle = '#ffffff'; ctx.fillRect(X, Y, 16, 1);
           for (let q = 0; q < 2; q++) { const col = (tx * 2 + q + beat) % 3, hot = ph < 8 ? 0.35 : 0; ctx.fillStyle = key ? ['#ffb030', '#ff6a8a', '#ffe680'][col] : ['#ff4ad0', '#3ae0ff', '#ffe680'][col]; ctx.fillRect(X + 1 + q * 8, Y + 3, 6, 6); if (hot) { ctx.fillStyle = 'rgba(255,255,255,' + hot + ')'; ctx.fillRect(X + 1 + q * 8, Y + 3, 6, 6); } }
           ctx.fillStyle = '#241f48'; ctx.fillRect(X, Y + 10, 16, 6);
-        } else { ctx.fillStyle = '#1c1840'; ctx.fillRect(X, Y, 16, 1); ctx.fillRect(X + ((tx + ty) & 1 ? 8 : 0), Y, 1, 16); }
+        } else {   // under the dance floor: a pleated black skirt with an LED strip chasing on the beat, then the understage with steel posts, taped cable runs and road cases, calmer with depth
+          ctx.fillStyle = '#1c1840'; ctx.fillRect(X, Y, 16, 1); ctx.fillRect(X + ((tx + ty) & 1 ? 8 : 0), Y, 1, 16);
+          const A = DD.art, R = A.R; let d = 1; while (d < 5 && K(tx, ty - d - 1) === k) d++;
+          if (d === 1) { R(X, Y, 16, 16, '#150c32'); for (let i = 1; i < 16; i += 4) R(X + i, Y, 2, 16, '#241648'); R(X, Y + 2, 16, 1, 'rgba(0,0,0,0.5)'); R(X, Y + 14, 16, 2, '#7a5a1a'); R(X, Y + 14, 16, 1, '#c98f22');
+            for (let b = 0; b < 4; b++) { const on = (beat + tx * 4 + b) % 4 === 0; R(X + 1 + b * 4, Y + 5, 2, 2, on ? ['#ff4ad0', '#3ae0ff', '#ffe680'][(tx + b) % 3] : '#3a2a58'); } }
+          else { const h = A.hash(tx, ty); R(X, Y, 16, 16, '#0a0620'); A.tex(X, Y, 16, 16, '#1c1840', 0.05, 8);
+            if (tx % 6 === 1) { R(X + 5, Y, 6, 16, '#2a2648'); R(X + 5, Y, 1, 16, '#5a567a'); R(X + 10, Y, 1, 16, '#06040c'); }
+            else if (tx % 7 === 3 && d === 2) { R(X, Y + 1, 16, 14, '#1c1a30'); R(X, Y + 1, 16, 1, '#4a466a'); R(X, Y + 3, 16, 1, '#0a0818'); R(X + 6, Y + 7, 4, 3, '#8a8a96'); R(X + 6, Y + 7, 4, 1, '#c0c0cc'); }
+            else { R(X, Y + 6, 16, 3, '#04020c'); R(X, Y + 6, 16, 1, '#2a2648'); R(X, Y + 8, 16, 1, ['#e8c02a', '#d8202c', '#e8e8e8'][(tx >> 2) % 3]); if (h > 0.7) { R(X + 4, Y + 4, 7, 7, '#8a8a9a'); R(X + 4, Y + 4, 7, 1, '#b8b8c8'); } }
+            R(X, Y, 16, 16, 'rgba(0,0,0,' + (0.08 + 0.1 * d) + ')'); } }
         return true;
       }
       if (k === 'pulseA' || k === 'pulseB') {

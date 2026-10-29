@@ -66,6 +66,11 @@ Object.assign(window.LEVEL, {
           const lv = Math.max(lit, flash); ctx.fillStyle = lv > 0.02 ? 'rgb(' + Math.round(40 + 215 * lv) + ',' + Math.round(38 + 190 * lv) + ',' + Math.round(30 + 90 * lv) + ')' : '#12141e'; ctx.fillRect(wxp, wyp, 48, 32);
           ctx.fillStyle = 'rgba(20,16,10,0.6)'; for (let y = 3; y < 32; y += 5) ctx.fillRect(wxp, wyp + y, 48, 2);   // the blinds
           ctx.fillStyle = '#2a2c3a'; ctx.fillRect(wxp + 23, wyp, 2, 32); A.R(wxp - 4, wyp + 33, 56, 3, '#4a4e60'); A.R(wxp - 4, wyp + 33, 56, 1, '#8a90a8'); A.R(wxp - 4, wyp + 35, 56, 1, '#14161e'); A.R(wxp, wyp, 48, 1, 'rgba(255,255,255,0.12)');   // sill and glass edge
+          if (lv > 0.12) {   // the landlord behind the blinds: a head and shoulders against the light, bobbing; he leans to the glass as the noise builds and jabs a finger when you are caught
+            const lean = nz > 0.7 ? 4 : nz > 0.4 ? 2 : 0, bobL = Math.round(Math.sin(f / 36) * 0.8), turn = Math.round(Math.sin(f / 95) * 2), a = Math.min(1, lv * 1.6); ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = '#0a0810';
+            ctx.fillRect(wxp + 29 + turn, wyp + 32 - 17 - lean + bobL, 8, 9); ctx.fillRect(wxp + 30 + turn, wyp + 32 - 18 - lean + bobL, 6, 1); ctx.fillRect(wxp + 25, wyp + 32 - 9 - lean + bobL, 16, 10 + lean);
+            if (flash || nz > 0.7) { const up = (f >> 3) & 1; ctx.fillRect(wxp + 38, wyp + 32 - 16 - lean - up * 3, 2, 10); ctx.fillRect(wxp + 38, wyp + 32 - 19 - lean - up * 3, 2, 4); }
+            ctx.restore(); }
           DD.text('OFFICE', wxp + 24, wyp - 10, '#8a90a8', 1, null, 'center');
           if (lv > 0.1) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; glow(ctx, wxp + 24, wyp + 16, 70 + 60 * flash, '255,230,150', 0.25 * lv + 0.4 * flash); ctx.restore(); }
         }
@@ -87,6 +92,9 @@ Object.assign(window.LEVEL, {
           ctx.fillStyle = 'rgba(8,10,28,0.38)'; ctx.fillRect(X, Y, 16, 16);
           if (!dn) { ctx.fillStyle = '#05060c'; ctx.fillRect(X, Y + 11, 16, 5); ctx.fillStyle = '#2a2c3a'; ctx.fillRect(X, Y + 11, 16, 1); }   // the underside of a slab
           if (lip) { ctx.fillStyle = '#8a90aa'; ctx.fillRect(X, Y, 16, 1); ctx.fillStyle = '#4a5068'; ctx.fillRect(X, Y + 1, 16, 1); if (tx % 7 === 2) { ctx.fillStyle = 'rgba(120,150,200,0.25)'; ctx.fillRect(X + 3, Y + 2, 10, 1); } }   // sealed concrete: a bright edge, the odd wet patch
+          { const A = DD.art, r1 = K(tx, ty - 1) && !K(tx, ty - 2);   // the slab cut away: a cable tray run with clamps every five tiles and a caution wrap, darker as it goes deeper
+            if (r1) { A.R(X, Y + 5, 16, 4, '#2a2e40'); A.R(X, Y + 5, 16, 1, '#5a6280'); A.R(X, Y + 8, 16, 1, '#0c0e18'); if (tx % 5 === 2) { A.R(X + 6, Y + 3, 4, 8, '#3a4058'); A.R(X + 6, Y + 3, 4, 1, '#7a82a0'); } if (tx % 9 === 4) A.R(X + 1, Y + 5, 8, 4, '#c8b030'); }
+            else if (K(tx, ty - 1) && K(tx, ty - 2) && !K(tx, ty - 3)) { A.R(X, Y, 16, 16, 'rgba(4,4,12,0.22)'); } }
           rim('rgba(210,222,255,0.5)'); return true;
         }
         return false;

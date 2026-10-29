@@ -92,6 +92,13 @@ Object.assign(window.LEVEL, {
     },
     tile(ctx, k, X, Y, tx, ty) {
       const K = DD.kindAt, top = K(tx, ty - 1) !== k, h = (tx * 73 + ty * 37) & 15, G = DD.G;
+      if (ty >= 22 && ty < 24 && !top && (k === 'rug' || k === 'lino' || k === 'aisle' || k === 'tile')) {   // looks pass 2: the floor band, cut away to the subfloor: a timber joist with nail heads and a copper pipe on its coupling, then foundation blocks, darker with depth
+        const A = DD.art;
+        if (ty === 22) { A.R(X, Y, 16, 16, '#1e120c'); A.R(X, Y + 2, 16, 9, '#4a2e1a'); A.R(X, Y + 2, 16, 1, '#7a5030'); A.R(X, Y + 10, 16, 1, '#1a0e08'); A.R(X + 3 + (h & 7), Y + 5, 4, 1, '#38200f'); if (tx & 1) A.R(X + 7, Y + 4, 1, 1, '#a8a8b0');
+          A.R(X, Y + 12, 16, 2, '#8a4a24'); A.R(X, Y + 12, 16, 1, '#d8884a'); if (tx % 6 === 1) { A.R(X + 6, Y + 11, 4, 4, '#a85a2a'); A.R(X + 6, Y + 11, 4, 1, '#e8a060'); A.R(X + 6, Y + 14, 4, 1, '#4a2410'); } A.R(X, Y, 16, 16, 'rgba(0,0,0,0.18)'); }
+        else { A.R(X, Y, 16, 16, '#2a2a30'); A.tex(X, Y, 16, 16, '#2a2a30', 0.06, tx); A.R(X, Y + 7, 16, 1, '#141418'); A.R(X, Y + 8, 16, 1, 'rgba(255,255,255,0.06)'); A.R(X + ((tx & 1) ? 4 : 12), Y, 1, 7, '#141418'); A.R(X + ((tx & 1) ? 12 : 4), Y + 8, 1, 8, '#141418'); A.R(X, Y, 16, 16, 'rgba(0,0,0,0.32)'); }
+        return true;
+      }
       { const A = DD.art, f = G.frame, dk = ty > 21 ? Math.min(0.45, (ty - 21) * 0.12) : 0, lf = K(tx - 1, ty) !== k, rt = K(tx + 1, ty) !== k, bt = K(tx, ty + 1) !== k;
         const shade = () => { if (dk) A.R(X, Y, 16, 16, 'rgba(0,0,0,' + dk + ')'); };
         if (k === 'rug') {   // a worn Persian rug: red-brown, a lit nap along the top, diamonds in two golds, a woven border

@@ -188,11 +188,15 @@ const B_W_PROPS = [   // episode 4: the same ESA room, shot again
 ];
 const SENIORS = [[68, 0], [70.5, 1], [79, 2], [85, 3], [105, 4], [108, 0], [113, 1]];   // [tile, which of the 5 in the strip]
 const TABLES = [69.5, 82, 106.5, 112.5];
-function seniorAt(ctx, c, tx, k, f) {
+function seniorAt(ctx, c, tx, k, f, G) {   // the Manor residents: a blink every few seconds on each one's own offset, a slow nod, and a wince and lean toward the Dot when it is hurt
   const im = img('w11_seniors'); if (!im) return;
   const X = Math.round(160 + (tx * 16 - 160 - c.x) * f - 11), Y = Math.round(FLOOR - 34 - 24 - c.y);
   if (X > 320 || X < -24) return;
-  ctx.drawImage(im, k * 22, 0, 22, 30, X, Y, 22, 30);
+  const A = DD.art, fr = G ? G.frame : 0, id = Math.floor(tx * 7 + k), per = 180 + ((A.hash(id, 3) * 150) | 0), ph = (fr + ((A.hash(id, 1) * per) | 0)) % per;
+  const hurt = !!(G && G.pl && G.pl.inv > 0), nod = ((fr + id * 41) % 420) < 40 ? 1 : 0, lean = hurt ? (G.pl.x < tx * 16 ? -1 : 1) : 0, hy = Y + nod + (hurt ? 1 : 0);
+  ctx.drawImage(im, k * 22, 15, 22, 15, X, Y + 15, 22, 15);
+  ctx.drawImage(im, k * 22, 0, 22, 15, X + lean, hy, 22, 15);
+  if (hurt || ph < 6) { A.R(X + lean + 8, hy + 9, 2, 1, '#b27458'); A.R(X + lean + 12, hy + 9, 2, 1, '#b27458'); }
 }
 
 function art11(ctx, G) {   // the art pass: lamp cones and pools, bulbs round the signs, gilt rails, a flickering TV glow
@@ -248,7 +252,7 @@ LEVEL.theme = {
       prop(ctx, c, 'w11_tvcart', 66.5, FLOOR, 0.95); prop(ctx, c, 'w11_dchair', 70, FLOOR, 0.95); prop(ctx, c, 'w11_dchair', 63, FLOOR, 0.95, true);
       prop(ctx, c, 'w11_popcart', 116, FLOOR, 0.95);
       glow(ctx, c, 66.5, 270, 52, '120,160,255', 0.28, 0.95); glow(ctx, c, 107, 150, 56, '255,80,60', 0.2, 0.92);
-      for (const [t, k] of SENIORS) seniorAt(ctx, c, t, k, 0.97);
+      for (const [t, k] of SENIORS) seniorAt(ctx, c, t, k, 0.97, G);
       for (const t of TABLES) prop(ctx, c, 'w11_table', t, FLOOR + 1, 0.97);
     });
     // ---- episode 4: the ESA room again, in black and white (the grey pass is in drawFG)
@@ -289,8 +293,17 @@ LEVEL.theme = {
       const im = hall ? I.w11_lino : I.w11_carpet; if (!ok(hall ? 'w11_lino' : 'w11_carpet')) return false;
       ctx.drawImage(im, X, Y);
       if (lip) { ctx.fillStyle = hall ? '#fff8e4' : '#9a6a6a'; ctx.fillRect(X, Y, 16, 1); ctx.fillStyle = hall ? '#a89878' : '#14101c'; ctx.fillRect(X, Y + 1, 16, 1); }
-      else if (ty === 21) { ctx.fillStyle = 'rgba(0,0,0,0.0)'; }
-      if (ty > 21) { ctx.fillStyle = 'rgba(10,6,4,' + (0.35 + 0.2 * (ty - 22)) + ')'; ctx.fillRect(X, Y, 16, 16); }
+      if (ty > 21) {   // the cut-away under the floor: carpet pad and plywood sheets over joists and a taped conduit (the Manor: a concrete slab over a copper pipe and a drain), darker with depth
+        const A = DD.art, R = A.R, d = ty - 21, h = A.hash(tx, ty), Rt = !kind(tx + 1, ty), Lf = !kind(tx - 1, ty);
+        if (!hall) {
+          if (d === 1) { R(X, Y, 16, 16, '#5a4636'); A.tex(X, Y, 16, 16, '#7a6248', 0.06, 5); R(X, Y, 16, 2, '#8a6a5a'); if ((tx & 3) === 0) R(X, Y, 1, 16, '#2a1c12'); for (const [nx, ny] of [[4, 5], [12, 5], [4, 11], [12, 11]]) R(X + nx, Y + ny, 1, 1, '#9a8a6a'); }
+          else { R(X, Y, 16, 16, '#2e2218'); R(X, Y + 3, 16, 5, '#5a4228'); R(X, Y + 3, 16, 1, '#7a5a38'); R(X, Y + 7, 16, 1, '#1a120a'); R(X, Y + 10, 16, 3, '#1a1a20'); R(X, Y + 10, 16, 1, '#3a3a46'); if (h > 0.6) R(X + 5, Y + 9, 4, 5, '#b8b0a0'); }   // gaffer tape on the conduit
+        } else {
+          if (d === 1) { R(X, Y, 16, 16, '#6a665c'); A.tex(X, Y, 16, 16, '#8a8576', 0.07, 6); R(X, Y, 16, 1, '#3a362e'); if (tx % 6 === 0) R(X, Y, 1, 16, '#34302a'); }
+          else { R(X, Y, 16, 16, '#34302a'); A.tex(X, Y, 16, 16, '#4a443a', 0.05, 7); R(X, Y + 5, 16, 3, '#b86a3a'); R(X, Y + 5, 16, 1, '#e89a5a'); R(X, Y + 7, 16, 1, '#6a3414'); if (tx % 4 === 0) R(X + 6, Y + 3, 4, 7, '#8a8a96'); if (tx % 9 === 4) { R(X + 3, Y + 11, 10, 4, '#14120e'); for (let i = 4; i < 13; i += 3) R(X + i, Y + 11, 1, 4, '#5a5a66'); } }
+        }
+        R(X, Y, 16, 16, 'rgba(8,4,2,' + (0.12 + 0.2 * d) + ')'); if (Rt) R(X + 15, Y, 1, 16, 'rgba(0,0,0,0.4)'); if (Lf) R(X, Y, 1, 16, 'rgba(255,255,255,0.08)');
+      }
       return true;
     }
     if (k === 'furn' || k === 'shelf') {

@@ -255,6 +255,9 @@
         if (k === 'road' && ok('w1_road')) {
           ctx.drawImage(im.w1_road, sx, lip ? 0 : 16, 16, 16, X, Y, 16, 16);
           { const A = DD.art; if (lip) { A.R(X, Y, 16, 1, '#f6f8ff'); A.R(X, Y + 3, 16, 1, 'rgba(40,44,90,0.18)'); if (!(tx & 1)) { A.R(X, Y + 4, 1, 12, 'rgba(30,34,80,0.22)'); A.R(X + 1, Y + 4, 1, 12, 'rgba(255,255,255,0.14)'); } } else { const o = (ty & 1) ? 8 : 0; A.R(X, Y, 16, 1, 'rgba(255,255,255,0.13)'); A.R(X, Y + 15, 16, 1, 'rgba(10,10,40,0.30)'); A.R(X + o, Y + 1, 1, 14, 'rgba(10,10,40,0.28)'); A.R(X + o + 1, Y + 1, 1, 14, 'rgba(255,255,255,0.10)'); } }
+          { const A = DD.art; if (!lip && ty === 22) { A.R(X, Y, 16, 16, 'rgba(14,12,40,0.22)'); A.R(X, Y + 5, 16, 6, '#3c4272'); A.R(X, Y + 5, 16, 1, '#7a82bc'); A.R(X, Y + 6, 16, 1, '#5a6298'); A.R(X, Y + 10, 16, 1, '#20244a');   // looks pass 2: a buried drain pipe with flanges under the pavement
+              if ((tx & 7) === 2) { A.R(X + 6, Y + 3, 4, 10, '#4a5086'); A.R(X + 6, Y + 3, 4, 1, '#98a0d8'); A.R(X + 6, Y + 12, 4, 1, '#1a1e40'); A.R(X + 7, Y + 6, 1, 1, '#c8d0ff'); A.R(X + 7, Y + 9, 1, 1, '#c8d0ff'); } }
+            else if (!lip && ty >= 23) { A.R(X, Y, 16, 16, 'rgba(10,8,30,0.14)'); for (let q = 0; q < 3; q++) { const hh = A.hash(tx * 7 + q, ty); A.R(X + Math.floor(hh * 13), Y + 3 + q * 4, 2, 1, 'rgba(120,124,170,0.35)'); } } }
           if (ty >= 23) { ctx.fillStyle = 'rgba(12,10,30,0.3)'; ctx.fillRect(X, Y, 16, 16); }
           return true;
         }
@@ -303,7 +306,10 @@
           const party = G.s.cheer > 0; let f = (Math.floor(G.frame / 22 + o.ph * 9) & 1), hop = 0;
           if (party) { f = 2; hop = Math.abs(Math.sin(G.frame / 5 + o.ph * 20)) * (G.s.cheer > 9000 ? 4 : 2.5); }
           else if (B && B.engaged && ((G.frame >> 3) + (o.ph * 10 | 0)) % 9 === 0) f = 1;   // nervous shuffling
-          ctx.drawImage(I()[n], f * 16, 0, 16, 24, X, Math.round(DD.wy(FLOOR_Y - 1 - o.row * 5) - 23 - hop), 16, 24);
+          let lean = 0;   // looks pass 2: the crowd winces (hunkers, leans away) when the Dot is hurt, and hops when the Mayor's scissors take a hit
+          if (G.pl.inv > 0 && Math.abs(DD.cx(G.pl) - o.x) < 160) { f = 1; hop = 0; lean = (o.x >= DD.cx(G.pl) ? 1 : -1); }
+          else if (G.frame - (G.flashAt ?? -999) < 30) { f = 2; hop = Math.abs(Math.sin((G.frame - G.flashAt) / 3 + o.ph * 6)) * 3; }
+          ctx.drawImage(I()[n], f * 16, 0, 16, 24, X + lean, Math.round(DD.wy(FLOOR_Y - 1 - o.row * 5) - 23 - hop), 16, 24);
         }
         // the red ribbon between the posts: it sags, flutters, and drops in two pieces after the snip
         const ax = 22 * 16, bx = 69 * 16;

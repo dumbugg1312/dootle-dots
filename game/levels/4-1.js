@@ -88,7 +88,8 @@ Object.assign(window.LEVEL, {
       }
       if (Z.B > 0.01) {
         ctx.save(); ctx.globalAlpha = Z.B; ctx.fillStyle = '#0a0506'; ctx.fillRect(0, 0, VW, VH);
-        const g = ctx.createLinearGradient(0, 0, 0, VH); g.addColorStop(0, '#1a0c0a'); g.addColorStop(1, '#341812'); ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH); ctx.restore();
+        const g = ctx.createLinearGradient(0, 0, 0, VH); g.addColorStop(0, '#1a0c0a'); g.addColorStop(1, '#341812'); ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
+        ctx.restore();
       }
       if (Z.C > 0.01) {
         ctx.save(); ctx.globalAlpha = Z.C;
@@ -98,7 +99,11 @@ Object.assign(window.LEVEL, {
         const seat0 = img('w4_seat');   // three rows of seats, darker and smaller than the last as they climb away
         if (seat0) for (const [par, dim0, base] of [[0.45, 0.22, 126], [0.6, 0.34, 148], [0.78, 0.5, 168]]) {
           const Y = Math.round(base - c.y * par * 0.5), ox = -Math.round(c.x * par) % 27;
-          const sd = shade('w4_seat', dim0); if (sd) for (let x = ox - 27; x < VW + 27; x += 27) ctx.drawImage(sd, x, Y);
+          const sd = shade('w4_seat', dim0); if (sd) for (let x = ox - 27; x < VW + 27; x += 27) {
+            const k = Math.round((x + c.x * par) / 27), hh = A.hash(k * 3 + (base | 0), 4);
+            if (hh > 0.52) { const bob = ((f + Math.floor(hh * 400)) % 260 < 8 ? 1 : 0) + (G.pl && G.pl.inv > 0 ? 2 : 0), hx = x + 13 + (hh > 0.8 ? Math.round(Math.sin(f / 50 + k)) : 0), hy = Y - 6 + bob;   // a dim head in the seat: bobs now and then, ducks when the Dot is hurt
+              A.R(hx - 4, hy, 8, 7, A.mix('#2a0c12', -dim0 * 0.3)); A.R(hx - 3, hy - 1, 6, 1, A.mix('#2a0c12', -dim0 * 0.3)); A.R(hx - 6, hy + 7, 12, 8, A.mix('#2a0c12', -dim0 * 0.3)); A.R(hx - 4, hy, 1, 5, 'rgba(255,170,150,' + (0.1 * dim0 + 0.04) + ')'); }
+            ctx.drawImage(sd, x, Y); }
           ctx.fillStyle = 'rgba(8,2,6,' + (0.55 - dim0 * 0.3) + ')'; ctx.fillRect(0, Y + 24, VW, VH);
         }
         ctx.restore();
@@ -150,6 +155,17 @@ Object.assign(window.LEVEL, {
           for (let x = 101; x < 127; x++) { if (hash(x, sy, 8) < 0.28) continue; const X = DD.wx(x * TS) + 2, h = 5 + Math.floor(hash(x, sy, 9) * 4);
             ctx.fillStyle = '#5a5e6a'; ctx.fillRect(X, Y - h, 11, h); ctx.fillStyle = '#8a8e9c'; ctx.fillRect(X, Y - h, 11, 1); ctx.fillStyle = '#2a2c36'; ctx.fillRect(X + 10, Y - h, 1, h); ctx.fillStyle = '#c8302c'; ctx.fillRect(X + 2, Y - h + 2, 7, 1); }
         }
+        // the booth wall: projection ports looking down on the house (screen light flickering in them), film strips hung to dry, bare bulbs on cords, a fuse box with a blinking lamp
+        const wxs = tx => Math.round(tx * TS - c.x);
+        for (const tx of [108, 121, 135, 146]) { const X = wxs(tx), Y = Math.round(gyf - 118); if (X < -40 || X > VW + 10) continue; const sh = 0.5 + 0.5 * Math.sin(f / 9 + tx);
+          A.box(X - 3, Y - 3, 38, 22, '#1a100e', { outline: '#050203' }); A.R(X, Y, 32, 16, '#2a0e14'); A.R(X, Y + 8, 32, 8, '#3a1018'); for (let k = 0; k < 4; k++) A.R(X + 3 + k * 8, Y + 10, 5, 2, '#18060a');
+          A.R(X, Y, 32, 5, 'rgba(176,196,220,' + (0.3 + 0.12 * sh) + ')'); A.R(X, Y, 32, 1, 'rgba(255,255,255,0.2)'); A.R(X + 2, Y + 3, 9, 1, 'rgba(255,255,255,0.22)'); A.R(X - 3, Y + 18, 38, 1, '#5a3a2c'); A.glow(X + 16, Y + 8, 30, '#a8c0dc', 0.08 + 0.04 * sh); }
+        { const rx = wxs(124), ry = Math.round(gyf - 142); if (rx < VW + 80 && rx > -160) { A.R(rx - 4, ry, 108, 2, '#05020a'); A.R(rx - 4, ry, 108, 1, '#5a4a40');
+          for (let i = 0; i < 4; i++) { const X = rx + 6 + i * 26 + Math.round(Math.sin(f / 70 + i * 1.7) * 0.8), L = 26 + (i % 2) * 8; A.R(X, ry + 2, 7, 2, '#8a8a92'); A.R(X, ry + 4, 7, L, '#0a0608'); A.R(X + 1, ry + 4, 5, L, '#1a1014');
+            for (let y = ry + 6; y < ry + 4 + L; y += 3) { A.R(X, y, 1, 1, '#d8c8a8'); A.R(X + 6, y, 1, 1, '#d8c8a8'); } for (let y = ry + 6; y < ry + 2 + L; y += 7) A.R(X + 2, y, 3, 4, i % 2 ? '#3a2a40' : '#40301c'); } } }
+        for (const [tx, ph] of [[116, 0], [132, 2]]) { const X = wxs(tx); if (X < -40 || X > VW + 40) continue; const fl = (f + ph * 37) % 170 < 5 ? 0.35 : 1, sw = Math.round(Math.sin(f / 55 + tx) * 1);
+          A.R(X, 0, 1, 40, '#05020a'); A.R(X - 2 + sw, 40, 5, 3, '#4a3a30'); A.R(X - 2 + sw, 43, 5, 4, fl > 0.5 ? '#ffe2a0' : '#7a6a50'); A.glow(X + sw, 45, 40, '#ffc870', 0.3 * fl); A.cone(X + sw, 47, 90, 46, '#ffd890', 0.09 * fl); }
+        { const X = wxs(130), Y = Math.round(gyf - 48); if (X > -30 && X < VW + 10) { A.box(X, Y, 18, 22, '#2c2a2e', { outline: '#050203' }); A.R(X + 3, Y + 3, 12, 1, '#6a6a72'); A.R(X + 3, Y + 6, 12, 8, '#1a1a1e'); A.R(X + 14, Y + 16, 3, 3, f % 120 < 60 ? '#ff4a3a' : '#4a1a16'); A.glow(X + 15, Y + 17, 12, '#ff4a3a', f % 120 < 60 ? 0.3 : 0.05); } }
         ctx.restore();
       }
       if (Z.C > 0.01) {
@@ -318,6 +334,9 @@ Object.assign(window.LEVEL, {
           if (i === 5 && ok('w4_tim_bust')) ctx.drawImage(I.w4_tim_bust, sx - 4, sy2 - 24 + Math.round(Math.sin(f / 50) * 0.8));
           if (i === 6 && ok('w4_gregg_bust')) ctx.drawImage(I.w4_gregg_bust, sx - 4, sy2 - 24 + Math.round(Math.sin(f / 44 + 1) * 0.8));
           ctx.drawImage(shade('w4_seat', 0.78) || seat, sx, sy2);
+          if ((i === 5 || i === 6) && ok('w4_tim_bust')) {   // the pair blink every few seconds, each on its own offset, and shrink into their seats when the Dot is hurt
+            const by = sy2 - 24 + Math.round(Math.sin(f / (i === 5 ? 50 : 44) + (i === 5 ? 0 : 1)) * 0.8) + (G.pl && G.pl.inv > 0 ? 1 : 0), per = i === 5 ? 233 : 281, off = Math.floor(DD.art.hash(i, 77) * per);
+            if ((f + off) % per < 6) { ctx.fillStyle = '#cc8462'; if (i === 5) { ctx.fillRect(sx - 4 + 11, by + 9, 3, 2); ctx.fillRect(sx - 4 + 18, by + 9, 3, 2); } else { ctx.fillRect(sx - 4 + 13, by + 6, 2, 2); ctx.fillRect(sx - 4 + 19, by + 6, 2, 2); } } }
         }
         if (on(204, 214)) {   // the tub between them, and a little spotlight pool
           glow(wx(213.5 * TS), wy(GY) - 22, 60, '255,214,160', 0.10);

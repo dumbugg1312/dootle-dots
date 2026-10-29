@@ -20,6 +20,13 @@
     return flashC[f];
   };
   const hash = i => { let h = (i * 2654435761) >>> 0; h ^= h >>> 15; return (h >>> 0) % 997; };
+  const galHead = (ctx, G, I, h, kind, X, Y, bounce, arms) => {   // a spectator with a little life: blinks on its own clock, turns its head now and then, winces in when the Dot is hurt, arms up on a boss hit
+    const hurt = G.pl && G.pl.inv > 0, tt = (G.frame + h * 7) % (230 + (h % 5) * 41), dx = tt < 26 ? ((h & 1) ? 1 : -1) : 0, dy = Math.round(bounce) + (hurt ? 1 : 0), by = Math.round(bounce);
+    ctx.drawImage(I.w6_gallery, kind * 16, 9, 16, 9, X, Y + 9 + by, 16, 9);
+    if (arms) { ctx.fillStyle = '#f8d2aa'; ctx.fillRect(X, Y + 3 + by, 2, 7); ctx.fillRect(X + 14, Y + 3 + by, 2, 7); ctx.fillStyle = '#ecb088'; ctx.fillRect(X, Y + 3 + by, 2, 1); ctx.fillRect(X + 14, Y + 3 + by, 2, 1); }
+    ctx.drawImage(I.w6_gallery, kind * 16, 0, 16, 9, X + dx, Y + dy, 16, 9);
+    if ((G.frame + h * 11) % (190 + (h % 4) * 45) < 6) { ctx.fillStyle = '#ecb088'; ctx.fillRect(X + dx + 5, Y + dy + 4, 2, 1); ctx.fillRect(X + dx + (kind === 2 ? 11 : 9), Y + dy + 4, 2, 1); }
+  };
   const say = n => { if (typeof DD.say === 'function' && DD.lines) DD.lines(n); };
 
   DD.defineEntity('lt_shock', {   // the floor shockwave from a gavel hop or a bang: runs along the floor, hurts on touch, a jump clears it
@@ -214,14 +221,14 @@
         }
         const wx = x => Math.round(x - c.x * 0.5);
         // the gallery: two rows of seats with spectators, who jump when the fight gets loud
-        const cheer = (s.cheer || 0) > 0 || ph2;
+        const hit = G.frame - (G.flashAt ?? -999) < 30, cheer = (s.cheer || 0) > 0 || ph2 || hit;
         for (let row = 0; row < 2; row++) {
           const par = row ? 0.62 : 0.52, ys = Math.round(Yf - (row ? 66 : 100)), off = Math.round(c.x * par);
           ctx.save(); ctx.filter = row ? 'brightness(0.5)' : 'brightness(0.72)';
           if (ok('w6_gallery')) for (let i = Math.floor(off / 32) - 1; i <= Math.floor((off + VW) / 32) + 1; i++) {
             const h = hash(i * 7 + row * 131 + 5); if (h % 4 === 0) continue;
             const bounce = cheer ? -Math.abs(Math.sin((G.frame + i * 5) / 3)) * (ph2 ? 4 : 3) : 0;
-            ctx.drawImage(I.w6_gallery, (h % 3) * 16, 0, 16, 18, i * 32 + 8 - off, Math.round(ys - 6 + bounce), 16, 18);
+            galHead(ctx, G, I, h, h % 3, i * 32 + 8 - off, Math.round(ys - 6), bounce, hit);
           }
           if (ok('w6_seatrow')) for (let x = -(off % 64) - 64; x < VW; x += 64) ctx.drawImage(I.w6_seatrow, x, ys);
           ctx.restore();
@@ -237,7 +244,7 @@
         ctx.fillStyle = g; ctx.fillRect(0, Yf - 20, VW, 24);
         if (ok('w6_lamp')) for (let i = Math.floor((c.x * 0.55 - 40) / 190) - 1; i <= Math.floor((c.x * 0.55 + VW) / 190) + 1; i++) {
           const X = Math.round(i * 190 + 95 - c.x * 0.55);
-          ctx.drawImage(I.w6_lamp, X - 12, -4);
+          ctx.drawImage(I.w6_lamp, X - 12 + ((G.frame - (G.dipAt ?? -999)) < 14 && G.frame % 4 < 2 ? 1 : 0), -4);   // rattles when the gavel/slam lands
           ctx.save(); ctx.globalCompositeOperation = 'lighter';
           const r = ctx.createRadialGradient(X, 20, 3, X, 20, 90); r.addColorStop(0, ph2 ? 'rgba(255,140,90,0.3)' : 'rgba(255,214,120,0.3)'); r.addColorStop(1, 'rgba(255,214,120,0)');
           ctx.fillStyle = r; ctx.fillRect(X - 90, -70, 180, 180); ctx.restore();

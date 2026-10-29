@@ -184,7 +184,22 @@ window.LEVEL = {"id": "3-3", "name": "DON'T TOUCH MY CARD", "sub": "WHERE'S MY L
         ctx.fillStyle = '#2e2028'; for (let i = 0; i < 7; i++) ctx.fillRect(X0 + 20 + i * 100, Y0 + 70 + (i % 3) * 14, 28, 16);
         for (const bx of [30, 44, 58, 66]) { const bX = DD.wx(bx * TS), bY = DD.wy(36 * TS); ctx.fillStyle = '#12080a'; ctx.fillRect(bX, bY - 6, 1, 8); ctx.fillStyle = '#ffd890'; ctx.fillRect(bX - 2, bY + 2, 5, 4); ctx.save(); ctx.globalCompositeOperation = 'lighter'; const g = ctx.createRadialGradient(bX, bY + 4, 1, bX, bY + 4, 64); g.addColorStop(0, 'rgba(255,170,90,0.2)'); g.addColorStop(1, 'rgba(255,170,90,0)'); ctx.fillStyle = g; ctx.fillRect(bX - 64, bY - 60, 128, 128); ctx.restore(); }
       },
-      drawMid(ctx, G) { for (const b of DD.bodies) if (b.kind === 'car3') drawCar(b, ctx, G); },
+      drawMid(ctx, G) {
+        { const A = DD.art, c = G.cam, VW = DD.VW, VH = DD.VH, y0 = Math.round(22 * 16 - c.y), y1 = Math.round(24 * 16 - c.y);   // the floor band: the lot's asphalt and strata darken and calm with depth, fixed stones, a buried conduit with a flange every six tiles
+          if (y1 > 0 && y0 < VH) {
+            const gr = ctx.createLinearGradient(0, y0, 0, y1); gr.addColorStop(0, 'rgba(24,8,24,0.08)'); gr.addColorStop(1, 'rgba(24,8,24,0.7)'); ctx.fillStyle = gr; ctx.fillRect(0, y0, VW, y1 - y0);
+            const tx0 = Math.floor(c.x / 16);
+            for (let tx = tx0; tx < tx0 + 22; tx++) { const X = tx * 16 - Math.round(c.x);
+              for (let ty = 22; ty < 26; ty++) { if (!DD.kindAt(tx, ty)) continue; const h = A.hash(tx * 7 + ty, 11), Y = ty * 16 - Math.round(c.y);
+                if (h > 0.78) { A.R(X + 3 + Math.floor(h * 90) % 8, Y + 4 + Math.floor(h * 50) % 7, 4, 3, A.mix('#8a6a58', -0.1 * (ty - 21))); A.R(X + 3 + Math.floor(h * 90) % 8, Y + 4 + Math.floor(h * 50) % 7, 4, 1, 'rgba(255,224,180,0.3)'); }
+                else if (h < 0.1) { A.R(X, Y + 8, 16, 1, 'rgba(20,6,20,0.35)'); A.R(X + 4, Y + 9, 7, 1, 'rgba(20,6,20,0.25)'); } }
+              if (DD.kindAt(tx, 22)) { const py = 22 * 16 + 4 - Math.round(c.y); A.R(X, py, 16, 5, '#3a3040'); A.R(X, py, 16, 1, '#6a5a70'); A.R(X, py + 4, 16, 1, '#1a1220'); if (tx % 6 === 0) { A.R(X + 6, py - 1, 3, 7, '#52465a'); A.R(X + 6, py - 1, 3, 1, '#8a7a90'); } } }
+          } }
+        { const A = DD.art, c = G.cam, f = G.frame, fy = FLOOR_Y - Math.round(c.y);   // the lot's sodium lamps at dusk: dark poles with a lit head, a pool of light on the asphalt, one of them flickering
+          for (let i = 0; i < 5; i++) { const wx = (140 + i * 8) * TS, X = Math.round(wx - c.x); if (X < -30 || X > DD.VW + 30) continue; const fl = i === 2 ? (f % 90 < 5 ? 0.3 : 1) : 1, top = fy - 84;
+            A.R(X - 1, top, 3, 84, '#2a1c2a'); A.R(X - 1, top, 1, 84, '#5a4a5a'); A.R(X - 1, fy - 6, 3, 6, '#3a2a3a'); A.R(X - 1, top - 2, 9, 3, '#2a1c2a'); A.R(X + 6, top, 5, 3, '#ffe2a0'); A.R(X + 6, top + 3, 5, 1, '#c89040');
+            A.glow(X + 8, top + 3, 34, '#ffc870', 0.34 * fl); A.cone(X + 8, top + 4, 70, 26, '#ffd890', 0.1 * fl); A.glow(X + 8, fy - 1, 30, '#ffc870', 0.12 * fl); } }
+        for (const b of DD.bodies) if (b.kind === 'car3') drawCar(b, ctx, G); },
       drawFG(ctx, G) {   // Tim's cards, and where he is when he is off screen
         const t = tim(), VW = DD.VW, VH = DD.VH, f = G.frame;
         DD.art.motes(G, '#ffe6b0', 18, 0.4); DD.art.vignette(0.3);

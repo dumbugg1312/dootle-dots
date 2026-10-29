@@ -147,19 +147,20 @@
     if (IN.back || IN.store) return 'back';
   }
 
-  function header(tt) {   // back, the two tabs, the balance
-    rect('#2a0e1a', 0, 0, VW, 14); rect('#c98f22', 0, 14, VW, 1);
-    rect('#3a1420', 2, 2, 54, 11); text('< ' + label, 29, 5, '#ffd27a', 1, null, 'center');
-    TABS.forEach((b, i) => {   // the tabs: the one you're on is lit
+  function header(tt) {   // back, the two tabs as hanging signs (the one you're on lit), the balance in a sunken box
+    const UI = window.DDUI;
+    for (let y = 0; y < 20; y++) rect('rgba(6,2,8,' + (0.6 * (1 - y / 20)).toFixed(3) + ')', 0, y, VW, 1);
+    UI.button(4, 3, 52, '< ' + label, false);
+    TABS.forEach((b, i) => {
       const on = i === tab, nw = i === 1 && window.DDCasino && !window.DDCasino.stats.seen;
-      rect(on ? '#4a1a24' : '#1a0810', b.x, 1, b.w, 13); if (on) rect('#c98f22', b.x, 1, b.w, 1);
-      text(b.label, b.x + b.w / 2, 3, on ? '#ffe680' : '#8a6a70', 2, on ? '#7a2a10' : null, 'center');
-      if (nw && Math.floor(tt / 12) % 2) text('NEW', b.x + b.w - 2, 1, '#ff6a4a', 1, '#000', 'right');
+      UI.sign(b.x, b.w, b.label, tt, on);
+      if (nw && Math.floor(tt / 12) % 2) text('NEW', b.x + b.w - 2, 16, '#ff6a4a', 1, '#000', 'right');
     });
     const jig = poorT ? Math.round(Math.sin(poorT * 1.6) * 2) : 0;
-    rect(poorT ? '#5a1420' : '#3a1420', VW - 66 + jig, 2, 64, 11); icon('rewards', VW - 63 + jig, 3, 1);
-    if (UNL) text('UNLIMITED', VW - 5 + jig, 5, rainbow(0, tt), 1, null, 'right');
-    else text(String(Math.round(shown)), VW - 5 + jig, 5, poorT ? '#ff8080' : '#fff6d4', 1, null, 'right');
+    UI.inset(VW - 66 + jig, 2, 62, 13); if (poorT) rect('rgba(200,40,50,0.35)', VW - 65 + jig, 3, 60, 11);
+    icon('rewards', VW - 63 + jig, 4, 1);
+    if (UNL) text('UNLIMITED', VW - 6 + jig, 6, rainbow(0, tt), 1, null, 'right');
+    else text(String(Math.round(shown)), VW - 6 + jig, 6, poorT ? '#ff8080' : '#fff6d4', 1, null, 'right');
   }
   function draw() {
     const tt = t, CURT = 174;
@@ -175,7 +176,7 @@
     if (rv) { const g = reveal > 0 && reveal < 60 ? (reveal % 8 < 4 ? '#fffbd0' : '#d8202c') : '#d8202c'; text('SECRET', 8, 132, g, 1, null); rect('#7a1a20', 34, 134, 142, 1); }
     L.forEach((u, i) => {
       const y = rowY(i), on = i === cur, o = own(u.id), a = act(u.id), hl = rv ? 10 : 11;
-      if (on) { rect(u.kind === 2 ? '#4a1018' : '#3a1420', 4, y - 3, 172, hl); rect(u.kind === 2 ? '#e8302a' : '#c98f22', 4, y - 3, 2, hl); }
+      if (on) window.DDUI.hilite(4, y - 3, 172, hl - 1, u.kind === 2 ? '#e8302a' : null);
       if (u.kind === 2 && reveal > 0 && reveal < 40) rect(`rgba(255,240,200,${((40 - reveal) / 80).toFixed(2)})`, 4, y - 3, 172, hl);   // it flashes in
       icon(u.id, 8, y - 2, 1, tt, o ? 1 : 0.55);
       text(u.name, 20, y, u.kind === 2 ? (on ? '#ffe680' : '#ff8a6a') : on ? '#fffbd0' : o ? '#e8d0b0' : '#a08890', 1, null);
@@ -189,7 +190,7 @@
     });
     // the detail panel
     const u = L[Math.min(cur, L.length - 1)], o = own(u.id), a = act(u.id), mx = maxOf(u), lv = lvl(u.id), P = PAN;
-    rect('#000', P.x - 1, P.y - 1, P.w + 2, P.h + 2); rect(u.kind === 2 ? '#e8302a' : u.kind ? '#30c0b0' : '#c98f22', P.x, P.y, P.w, P.h); rect('#1a0a12', P.x + 1, P.y + 1, P.w - 2, P.h - 2);
+    window.DDUI.goldPanel(P.x, P.y, P.w, P.h, tt, u.kind === 2 ? '#e8302a' : u.kind ? '#30c0b0' : '#f0c84a');
     icon(u.id, P.x + 5, P.y + 5, 2, tt);
     text(u.name, P.x + 25, P.y + 6, '#ffe680', 1, '#000');
     if (u.kind === 2) text('SECRET   ' + (o ? (a ? 'ON' : 'OFF') : 'NOT BOUGHT'), P.x + 25, P.y + 14, '#ff8a6a', 1, null);
@@ -205,7 +206,10 @@
       for (const l of wrap(nx, 31)) { text(l, P.x + 6, y, o < mx ? '#cfc6bc' : '#a08890', 1, null); y += 8; }
     }
     const B = BUY, ok = canAfford(u.id), max = o >= mx, hb = ok && !max ? Math.round(Math.abs(Math.sin(tt / 10))) : 0;
-    rect('#000', B.x, B.y, B.w, B.h); rect(max ? '#3a2a30' : ok ? '#c98f22' : '#5a2430', B.x + 1, B.y + 1, B.w - 2, B.h - 2);
+    { const top = max ? '#4a3a40' : ok ? '#ffe27a' : '#7a2a3e', bot = max ? '#2a1e22' : ok ? '#d89a28' : '#3a0c1e';   // the buy button: gold when you can afford it, maroon when you can't, grey when maxed
+      rect('rgba(0,0,0,0.45)', B.x + 1, B.y + 2, B.w, B.h); rect('#000', B.x, B.y - 1, B.w, B.h + 2); rect('#000', B.x - 1, B.y, B.w + 2, B.h);
+      const g = ctx.createLinearGradient(0, B.y, 0, B.y + B.h); g.addColorStop(0, top); g.addColorStop(1, bot); ctx.fillStyle = g; ctx.fillRect(B.x, B.y, B.w, B.h);
+      rect(max ? '#6a5a60' : ok ? '#fff6c0' : '#9a4a5e', B.x, B.y, B.w, 1); rect(max ? '#1a1214' : ok ? '#8a5a1c' : '#2a0a16', B.x, B.y + B.h - 1, B.w, 1); }
     if (max) text(u.kind === 2 ? "TIM'S CALL" : 'MAXED OUT', B.x + B.w / 2, B.y + 5, '#c8b8c0', 1, null, 'center');
     else {
       const cost = UNL ? 'FREE' : String(priceOf(u, o)), ink = ok ? '#2a0e1a' : '#d8a0a0';
@@ -216,10 +220,10 @@
     // coins in flight
     for (const f of fly) { if (f.t < 0) continue; const k = f.t / f.d, e = k * k * (3 - 2 * k), arc = Math.sin(k * Math.PI) * 14; rect('#000', f.x0 + (f.x1 - f.x0) * e - 1, f.y0 + (f.y1 - f.y0) * e - arc - 1, 4, 4); rect('#ffd27a', f.x0 + (f.x1 - f.x0) * e, f.y0 + (f.y1 - f.y0) * e - arc, 2, 2); }
     // footer
-    rect('#0a0408', 0, 149, VW, 11);
+    rect('#000', 6, 148, VW - 12, 13); rect('#000', 5, 149, VW - 10, 11); rect('#1a0810', 6, 149, VW - 12, 11); rect('#3a1a24', 6, 149, VW - 12, 1);
     if (msgT > 0) text(msg, VW / 2, 152, msg.startsWith('NEED') || msg.endsWith('MAXED OUT') ? '#ff8080' : '#ffe680', 1, null, 'center');
     else text(TIPS[tip], VW / 2, 152, '#9a8a90', 1, null, 'center');
-    text(DD.padUsed ? 'CROSS: BUY   LEFT/RIGHT: DOWN/UP   R1: CASINO   CIRCLE: ' + label : 'JUMP: BUY   LEFT/RIGHT: DOWN/UP   C: CASINO   X: ' + label, VW / 2, 167, '#ffd27a', 1, '#000', 'center');
+    window.DDUI.keycaps(DD.padUsed ? [['CROSS', 'BUY'], ['LEFT/RIGHT', 'DOWN/UP'], ['R1', 'CASINO'], ['CIRCLE', label]] : [['JUMP', 'BUY'], ['LEFT/RIGHT', 'DOWN/UP'], ['C', 'CASINO'], ['X', label]]);
   }
 
   window.DDStore = {

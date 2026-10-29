@@ -71,6 +71,33 @@ DD.defineEntity('w82secret', {   // a Dot secret: a sparkling star on a gold hal
         ctx.fillStyle = 'rgba(120,80,56,0.5)'; for (let k = 0; k < h; k += 8) ctx.fillRect(X - 1, top + k, 5, 1);
         if ((f >> 5) % 2) { ctx.fillStyle = '#ff5a3a'; ctx.fillRect(X, top - 2, 3, 2); }
       }
+      { const A = DD.art;   // the looks pass: the sky's second depth, rays from the low sun, birds, a ranch windmill and a power line, all set back in the haze
+        { const sxs = Math.round(250 - cx * 0.03), sys = Math.round(HY - 78); ctx.save(); ctx.globalCompositeOperation = 'lighter';
+          for (let r = 0; r < 6; r++) { const an = 1.2 + r * 0.38 + Math.sin(f / 260 + r) * 0.04; ctx.fillStyle = 'rgba(255,196,130,' + (r % 2 ? 0.035 : 0.055) + ')'; ctx.beginPath(); ctx.moveTo(sxs, sys); ctx.lineTo(sxs + Math.cos(an) * 260 - 16, sys + Math.sin(an) * 260); ctx.lineTo(sxs + Math.cos(an) * 260 + 16, sys + Math.sin(an) * 260); ctx.closePath(); ctx.fill(); }
+          const hz = ctx.createLinearGradient(0, HY - 42, 0, HY + 6); hz.addColorStop(0, 'rgba(255,170,110,0)'); hz.addColorStop(1, 'rgba(255,190,120,0.3)'); ctx.fillStyle = hz; ctx.fillRect(0, HY - 42, VW, 48); ctx.restore(); }
+        for (let i = 0; i < 5; i++) {   // long cloud decks: a lit belly and a shadowed back, slow and high
+          const w = 130 + (i % 3) * 40, x0 = Math.round(((i * 211 + f * 0.03 - cx * 0.04) % 640 + 640) % 640 - 160), y0 = Math.round(46 + i * 11 - cy * 0.02);
+          A.R(x0, y0, w, 2, 'rgba(120,70,120,0.3)'); A.R(x0 + 10, y0 + 2, w - 24, 3, 'rgba(255,170,150,0.34)'); A.R(x0 + 24, y0 + 5, w - 60, 1, 'rgba(255,214,170,0.5)'); A.R(x0 + 4, y0 - 1, w - 30, 1, 'rgba(170,110,150,0.3)');
+        }
+        for (let i = 0; i < 7; i++) {   // a flock of birds, wings flapping
+          const bx = Math.round(((i * 17 + f * 0.32 - cx * 0.1) % 460 + 460) % 460 - 60), by = Math.round(26 + (i % 4) * 9 + (i >> 2) * 4 + Math.sin(f / 22 + i) * 2 - cy * 0.02), up = ((f >> 3) + i) & 1;
+          A.R(bx - 3, by + (up ? 0 : 1), 3, 1, 'rgba(48,22,52,0.8)'); A.R(bx, by + (up ? 1 : 0), 1, 1, 'rgba(48,22,52,0.8)'); A.R(bx + 1, by + (up ? 0 : 1), 3, 1, 'rgba(48,22,52,0.8)');
+        }
+        for (const wxp of [160, 760, 1330]) {   // a ranch windmill and its tank
+          const X = Math.round(wxp - cx * 0.34), Y = Math.round(HY - 11); if (X < -50 || X > 370) continue;
+          const top = Y - 52, col = 'rgba(86,44,66,0.9)'; ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X - 8, Y); ctx.lineTo(X, top); ctx.lineTo(X + 8, Y); ctx.moveTo(X - 6, Y - 14); ctx.lineTo(X + 6, Y - 14); ctx.moveTo(X - 4, Y - 30); ctx.lineTo(X + 4, Y - 30); ctx.moveTo(X - 8, Y); ctx.lineTo(X + 4, Y - 30); ctx.moveTo(X + 8, Y); ctx.lineTo(X - 4, Y - 30); ctx.stroke();
+          A.R(X + 12, Y - 14, 12, 14, 'rgba(96,52,70,0.9)'); A.R(X + 12, Y - 14, 12, 1, 'rgba(255,170,130,0.45)'); A.R(X + 14, Y - 16, 8, 2, 'rgba(96,52,70,0.9)');
+          ctx.save(); ctx.translate(X, top); ctx.rotate(f * 0.045 + wxp); ctx.strokeStyle = 'rgba(78,40,62,0.95)'; ctx.beginPath(); for (let b = 0; b < 8; b++) { const an = b * 0.785; ctx.moveTo(Math.cos(an) * 2, Math.sin(an) * 2); ctx.lineTo(Math.cos(an) * 13, Math.sin(an) * 13); } ctx.stroke(); ctx.restore(); A.R(X - 1, top - 1, 3, 3, 'rgba(255,190,130,0.7)');
+        }
+        { const PS = 240, p0 = Math.floor(cx * 0.5 / PS), py = Math.round(HY - 6);   // a power line marching across the lot, two wires between the poles
+          ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(64,32,58,0.72)';
+          for (let i = p0 - 1; i <= p0 + Math.ceil(VW / PS) + 1; i++) {
+            const X = Math.round(i * PS - cx * 0.5), top = py - 54; if (X < -PS - 10 || X > VW + 10) continue;
+            A.R(X, top, 3, 54, 'rgba(70,36,58,0.85)'); A.R(X - 9, top + 4, 21, 2, 'rgba(70,36,58,0.85)'); A.R(X - 6, top + 11, 15, 2, 'rgba(70,36,58,0.85)'); A.R(X, top, 1, 54, 'rgba(255,170,130,0.28)');
+            for (const [ox, oy] of [[-8, 4], [10, 4], [-5, 11], [7, 11]]) { ctx.beginPath(); ctx.moveTo(X + ox + 1, top + oy); ctx.quadraticCurveTo(X + ox + PS / 2, top + oy + 15, X + ox + PS, top + oy); ctx.stroke(); }
+            if (i % 2 === 0 && ((f >> 5) & 1)) A.R(X, top - 2, 3, 2, '#ff5a3a');
+          } }
+      }
       layer('w8_hills_near', 0.24, 8, 'brightness(0.85)');
       ctx.fillStyle = '#8a5030'; ctx.fillRect(0, Math.round(HY - 8), VW, VH);   // the far lot floor, so the chasms read as dropping into dust
       const dust = ctx.createLinearGradient(0, Math.round(HY - 8), 0, VH); dust.addColorStop(0, 'rgba(232,170,110,0.55)'); dust.addColorStop(1, 'rgba(60,24,14,0.7)'); ctx.fillStyle = dust; ctx.fillRect(0, Math.round(HY - 8), VW, VH);
@@ -117,10 +144,22 @@ DD.defineEntity('w82secret', {   // a Dot secret: a sparkling star on a gold hal
         if (k === 'sand' && top && h < 0.14) { const sc = I('w8_scrub'); if (sc && tx < 14) ctx.drawImage(sc, X, Y - 9); }
         return true;
       }
-      if (k === 'green') {
-        R(0, 0, 16, 16, (tx & 1) ? '#3a8a3a' : '#43964a'); if (top) { R(0, 0, 16, 3, '#7fd05a'); R(0, 3, 16, 1, '#2d6e2e'); for (let i = 0; i < 16; i += 3) R(i, -1, 1, 1, '#7fd05a'); }
-        else if (h < 0.3) R((tx * 7) % 12, 6, 3, 1, '#2d6e2e');
-        if (!solidK(lf)) R(0, 0, 1, 16, '#1f5a22'); return true;
+      if (k === 'green') {   // a mown golf green: two-tone mowing stripes, a bright blade-tipped lip, then turf thinning into topsoil with pebbles and roots as it goes down
+        const A = DD.art; let d = 0; while (d < 5 && K(tx, ty - 1 - d) === 'green') d++;
+        const st = (tx >> 1) & 1, base = st ? '#34853b' : '#54aa54';
+        R(0, 0, 16, 16, base); A.tex(X, Y, 16, 16, base, 0.08, 5);
+        if (d === 0) {
+          R(0, 0, 16, 2, st ? '#b4f088' : '#c8f89a'); R(0, 2, 16, 2, st ? '#7fd05a' : '#8fdc66'); R(0, 4, 16, 1, '#2d6e2e'); R(0, 14, 16, 2, 'rgba(20,70,24,0.35)');
+          for (let i = (tx * 5) % 3; i < 16; i += 3) R(i, -1, 1, 1, st ? '#8fdc66' : '#b4f088');
+        } else if (d === 1) { R(0, 0, 16, 1, '#2d6e2e'); R(0, 1, 16, 2, 'rgba(20,70,24,0.3)'); for (let i = 1 + (tx & 1); i < 16; i += 4) R(i, 4 + (i % 3) * 2, 1, 3, '#2d6e2e'); }
+        else {   // the mound's body: soil showing through, pebbles, a root
+          const m = Math.min(0.8, 0.28 * (d - 1)); ctx.fillStyle = 'rgba(112,78,44,' + m + ')'; ctx.fillRect(X, Y, 16, 16);
+          if (h < 0.35) { R(2 + (tx * 5) % 9, 4 + (ty % 3) * 3, 3, 2, '#a08a68'); R(2 + (tx * 5) % 9, 4 + (ty % 3) * 3, 3, 1, '#c8b48c'); }
+          if (h > 0.7) R((tx * 3) % 8, 9, 8, 1, '#5a3a1c');
+          ctx.fillStyle = 'rgba(40,16,8,' + Math.min(0.3, 0.05 * d) + ')'; ctx.fillRect(X, Y, 16, 16);
+        }
+        if (!solidK(lf)) { R(0, 0, 1, 16, '#1f5a22'); } if (!solidK(rt)) R(15, 0, 1, 16, '#1f5a22');
+        return true;
       }
       if (k === 'studio') {   // a corrugated sound stage: steel ribs, panel seams, a cap on the roof line
         R(0, 0, 16, 16, '#6f7a88'); for (let i = 0; i < 16; i += 4) { R(i, 0, 1, 16, '#5d6773'); R(i + 1, 0, 1, 16, '#8793a3'); }
@@ -249,6 +288,53 @@ DD.defineEntity('w82secret', {   // a Dot secret: a sparkling star on a gold hal
       const s = G.s, c = G.cam, cx = Math.round(c.x), cy = Math.round(c.y), VW = 320, VH = 180, f = G.frame, K = DD.kindAt;
       const on = (x0, x1) => x1 * TS - cx > -40 && x0 * TS - cx < VW + 40;
       const P = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(Math.round(x - cx), Math.round(y - cy), w, h); };
+      { const A = DD.art, ty = G.s;   // the looks pass: site clutter on every walkable top, sodium lamp poles with pennant strings, tumbleweeds blowing through
+        if (!ty.tops) {
+          const tp = []; for (let x = 0; x < 190; x++) { tp[x] = -1; for (let y = 0; y < 32; y++) if (solidK(K(x, y))) { tp[x] = y; break; } }
+          const pr = [], skip = x => (x >= 11 && x <= 20) || (x >= 35 && x <= 44) || (x >= 75 && x <= 89) || (x >= 99 && x <= 106) || (x >= 139 && x <= 148) || (x >= 2 && x <= 10) || x > 178; let last = -9;
+          for (let x = 1; x < 190; x++) {
+            if (tp[x] < 0 || x - last < 3 || skip(x) || tp[x] !== tp[x - 1] || K(x, tp[x]) === 'plot' || K(x, tp[x]) === 'cracked' || hash(x, 77) > 0.34) continue;
+            const q = hash(x, 78), t = q < 0.1 ? 0 : q < 0.25 ? 1 : q < 0.37 ? 2 : q < 0.47 ? 3 : q < 0.62 ? 4 : q < 0.72 ? 5 : q < 0.8 ? 6 : q < 0.88 ? 7 : q < 0.95 ? 8 : 9;
+            pr.push({ x, t, top: tp[x] }); last = x;
+          }
+          ty.tops = tp; ty.props = pr; ty.lamps = [10, 20, 34, 68, 75, 89, 122, 136, 171, 187].filter(x => tp[x] >= 0);
+        }
+        const gy = tx => ty.tops[tx] * TS - cy;
+        for (const p of ty.props) {
+          const X = Math.round(p.x * TS - cx + 2), Y = Math.round(gy(p.x)); if (X < -30 || X > VW + 10 || Y < -30 || Y > VH + 20) continue; if (solidK(K(p.x, p.top - 1))) continue;
+          A.R(X - 1, Y - 1, 14, 2, 'rgba(60,24,12,0.35)');   // contact shadow on the sand
+          if (p.t === 0) { const im = I(hash(p.x, 3) < 0.5 ? 'w8_cactus_b' : 'w8_cactus_a'); if (im) ctx.drawImage(im, X - 6, Y - im.height + 1); }
+          else if (p.t === 1) { A.box(X, Y - 11, 8, 11, '#e8742a'); A.R(X, Y - 8, 8, 2, '#f4f0e0'); A.R(X, Y - 4, 8, 2, '#f4f0e0'); A.R(X + 1, Y - 12, 6, 1, '#2a1a10'); if ((f >> 4) % 6 === p.x % 6) A.glow(X + 4, Y - 13, 7, '#ffb060', 0.5); }
+          else if (p.t === 2) { A.R(X, Y - 2, 9, 2, '#2a1a10'); A.R(X + 2, Y - 8, 5, 6, '#f2762a'); A.R(X + 3, Y - 10, 3, 2, '#f2762a'); A.R(X + 2, Y - 6, 5, 1, '#f4f0e0'); A.R(X + 2, Y - 8, 1, 6, '#ffa060'); }
+          else if (p.t === 3) { for (let k = 0; k < 3; k++) { const w = k === 2 ? 9 : 12; A.R(X + (12 - w) / 2 - 1, Y - 4 * (k + 1) - 1, w + 2, 5, '#120c0a'); A.R(X + (12 - w) / 2, Y - 4 * (k + 1), w, 4, '#2c2420'); A.R(X + (12 - w) / 2 + 1, Y - 4 * (k + 1), w - 2, 1, '#5a4a40'); } }
+          else if (p.t === 4) { A.box(X, Y - 7, 11, 7, '#b0784a'); A.R(X + 2, Y - 10, 6, 3, '#c98c58'); A.R(X + 2, Y - 10, 6, 1, '#e8b078'); A.R(X + 6, Y - 5, 3, 1, '#6a4020'); }
+          else if (p.t === 5) { A.box(X, Y - 8, 16, 8, '#d0a868'); A.planks(X, Y - 8, 16, 8, '#d0a868', 2, false); A.R(X + 3, Y - 8, 1, 8, '#7a5a30'); A.R(X + 12, Y - 8, 1, 8, '#7a5a30'); A.R(X, Y - 8, 16, 1, '#f0d094'); }
+          else if (p.t === 6) { A.box(X, Y - 5, 10, 5, '#c8b08a'); A.box(X + 8, Y - 5, 10, 5, '#bda47c'); A.box(X + 4, Y - 10, 10, 5, '#d4bc94'); A.R(X + 2, Y - 3, 6, 1, 'rgba(90,60,30,0.4)'); }
+          else if (p.t === 7) { A.box(X, Y - 10, 15, 10, '#d8b448'); for (let q = 3; q < 15; q += 5) A.R(X + q, Y - 10, 1, 10, '#8a6a1c'); A.R(X, Y - 10, 15, 1, '#f4d878'); A.tex(X, Y - 10, 15, 10, '#d8b448', 0.12, 3); }
+          else if (p.t === 8) { ctx.strokeStyle = '#4a3220'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X + 6, Y - 9); ctx.lineTo(X + 1, Y); ctx.moveTo(X + 6, Y - 9); ctx.lineTo(X + 11, Y); ctx.moveTo(X + 6, Y - 9); ctx.lineTo(X + 6, Y); ctx.stroke(); A.box(X + 2, Y - 15, 9, 6, '#e0a830'); A.R(X + 4, Y - 13, 3, 3, '#2a2a30'); A.R(X + 5, Y - 12, 1, 1, '#9ad8ff'); A.R(X + 6, Y - 17, 2, 2, '#4a4a52'); }
+          else { A.box(X, Y - 24, 15, 24, '#8ab4cc'); A.R(X + 1, Y - 22, 13, 1, '#d8ecf4'); A.R(X + 3, Y - 17, 9, 11, '#6a94ac'); A.R(X + 11, Y - 12, 1, 2, '#2a2a30'); A.R(X, Y - 26, 15, 2, '#c8d8e0'); A.R(X + 2, Y - 3, 1, 3, '#2a2a30'); }
+        }
+        const lampTop = tx => Math.round(gy(tx) - 62);
+        for (const tx of ty.lamps) {
+          const X = Math.round(tx * TS - cx + 7), Y0 = Math.round(gy(tx)), Yt = lampTop(tx); if (X < -60 || X > VW + 60 || Yt > VH + 10 || Y0 < -10) continue;
+          const fl = ((f + tx * 29) % 197) < 3 ? 0.55 : 1;
+          A.R(X, Yt, 2, Y0 - Yt, '#4a2e24'); A.R(X, Yt, 1, Y0 - Yt, '#8a5a40'); A.R(X - 3, Y0 - 3, 8, 3, '#3a2218'); A.R(X - 2, Y0 - 3, 6, 1, '#6a4a34');
+          A.box(X - 5, Yt - 3, 12, 5, '#3a2218', { outline: '#120a06' }); A.R(X - 4, Yt + 1, 10, 2, '#fff0c0'); A.R(X + 6, Yt - 4, 5, 2, '#3a2218');
+          A.cone(X + 1, Yt + 3, 78, 48, '#ffcf80', 0.14 * fl); A.glow(X + 1, Yt + 3, 30, '#ffd890', 0.3 * fl); A.glow(X + 1, Y0 - 2, 34, '#ffb060', 0.12 * fl);
+        }
+        for (const [a, b] of [[10, 20], [20, 34], [68, 75], [122, 136], [171, 187]]) {   // a string of pennants between lamp poles, rippling in the wind
+          if (ty.tops[a] < 0 || ty.tops[b] < 0 || ty.tops[a] !== ty.tops[b]) continue;
+          const X1 = Math.round(a * TS - cx + 8), X2 = Math.round(b * TS - cx + 8), Y1 = lampTop(a) + 6, Y2 = lampTop(b) + 6; if (X2 < -10 || X1 > VW + 10) continue;
+          const n = Math.round((X2 - X1) / 7), sag = 9 + (b - a) * 0.5; ctx.strokeStyle = '#4a2e24'; ctx.lineWidth = 1; ctx.beginPath();
+          for (let i = 0; i <= n; i++) { const u = i / n, x = X1 + (X2 - X1) * u, y = Y1 + (Y2 - Y1) * u + Math.sin(u * Math.PI) * sag; if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); } ctx.stroke();
+          for (let i = 1; i < n; i++) { const u = i / n, x = Math.round(X1 + (X2 - X1) * u), y = Math.round(Y1 + (Y2 - Y1) * u + Math.sin(u * Math.PI) * sag), w = 1 + Math.round(Math.sin(f / 9 + i) * 1), col = ['#e8742a', '#f4f0e0', '#2a60b0', '#f4f0e0'][i & 3]; A.R(x, y + 1, 5, 2, col); A.R(x + 1, y + 3, 3 + w * 0, 2, col); A.R(x + 2, y + 5, 1, 1, col); }
+        }
+        for (let k = 0; k < 2; k++) {   // tumbleweeds, blowing east along the ground
+          const wxp = ((f * 0.75 + k * 1500) % 3000), tx = Math.floor(wxp / TS); if (tx > 189 || ty.tops[tx] < 0) continue;
+          const X = Math.round(wxp - cx), Y = Math.round(gy(tx) - 5 - Math.abs(Math.sin(wxp / 14)) * 4); if (X < -12 || X > VW + 12) continue;
+          ctx.strokeStyle = 'rgba(120,80,40,0.9)'; ctx.lineWidth = 1; ctx.beginPath(); for (let q = 0; q < 5; q++) { const an = wxp / 9 + q * 0.63; ctx.moveTo(X + Math.cos(an) * 5, Y + Math.sin(an) * 5); ctx.lineTo(X - Math.cos(an) * 5, Y - Math.sin(an) * 5); } ctx.stroke(); ctx.beginPath(); ctx.arc(X, Y, 5, 0, 7); ctx.stroke();
+        }
+      }
       // the signs
       for (const g of s.signs) {
         const X = g.x - cx, Y = g.y - cy; if (X < -90 || X > VW + 40) continue;
@@ -347,6 +433,20 @@ DD.defineEntity('w82secret', {   // a Dot secret: a sparkling star on a gold hal
         for (let i = 0; i < 3; i++) { const sx = X0 + 60 + i * 110 + Math.sin(f / 40 + i * 2) * 40; const g = ctx.createLinearGradient(0, Y0 - 13 * TS, 0, Y0); g.addColorStop(0, 'rgba(255,240,170,0.28)'); g.addColorStop(1, 'rgba(255,240,170,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(X0 + 60 + i * 110, Y0 - 13 * TS); ctx.lineTo(sx - 26, Y0); ctx.lineTo(sx + 26, Y0); ctx.fill(); }
         ctx.restore();
       }
+      // the golf green: a sprinkler making its arc, a ball and its tee markers (the ball glints)
+      if (on(177, 185)) {
+        const gy = 17 * TS; P(180 * TS + 6, gy - 3, 4, 3, '#4a4e58'); P(180 * TS + 7, gy - 4, 2, 1, '#9aa4b0');
+        for (let i = 0; i < 12; i++) { const a = ((f * 0.9 + i * 5) % 30) / 30, ang = f * 0.015 + i * 0.09, dx = Math.cos(ang) * (4 + a * 26) * (i & 1 ? -1 : 1), dy = -Math.sin(a * Math.PI) * 14; P(180 * TS + 8 + dx, gy - 4 + dy, 1, 1, i % 3 ? '#cfeaff' : '#ffffff'); }
+        P(182 * TS + 4, gy - 2, 3, 3, '#f4f4f0'); P(182 * TS + 4, gy - 2, 1, 1, '#ffffff'); if (f % 90 < 6) P(182 * TS + 5, gy - 4, 1, 1, '#fffbe0');
+        for (const mx of [178 * TS + 2, 183 * TS + 12]) { P(mx, gy - 4, 1, 4, '#d8d8d0'); P(mx + 1, gy - 4, 3, 2, '#e8862a'); }
+      }
+      // terrace 2: the survey crew's kit, set along the lip of the bluff (a transit on its tripod, cones, a drum of water)
+      if (on(94, 100)) {
+        const ty2 = 13 * TS, ux = 96 * TS;
+        P(ux + 2, ty2 - 12, 1, 12, '#3a2a1c'); P(ux + 10, ty2 - 12, 1, 12, '#3a2a1c'); P(ux + 6, ty2 - 14, 1, 14, '#4a3624'); P(ux + 2, ty2 - 1, 3, 1, '#2a1a10'); P(ux + 10, ty2 - 1, 3, 1, '#2a1a10');   // the tripod
+        P(ux + 2, ty2 - 20, 9, 7, '#2a2a30'); P(ux + 2, ty2 - 20, 9, 1, '#6a6a78'); P(ux + 8, ty2 - 18, 4, 3, '#1a1a22'); P(ux + 11, ty2 - 17, 2, 1, f % 70 < 50 ? '#ffd890' : '#8a6a40'); P(ux + 4, ty2 - 17, 3, 2, '#c8302a');   // the transit and its lens glinting
+        for (const cxx of [98 * TS + 2, 99 * TS - 2]) { P(cxx, ty2 - 3, 8, 3, '#d8541a'); P(cxx + 1, ty2 - 7, 6, 4, '#ee6a22'); P(cxx + 2, ty2 - 10, 4, 3, '#ee6a22'); P(cxx + 1, ty2 - 5, 6, 1, '#f4f0e0'); P(cxx + 2, ty2 - 8, 1, 3, '#ffa060'); }
+      }
       // the golf green: a flag in the cup
       if (on(184, 190)) { P(186 * TS + 6, 21 * TS - 40, 2, 40, '#e8e8e8'); P(186 * TS + 8, 21 * TS - 40, 12, 8, '#d62a2a'); P(186 * TS + 2, 21 * TS - 1, 10, 1, '#1a1a1a'); }
       // gold chevrons over the Dot secrets
@@ -360,6 +460,8 @@ DD.defineEntity('w82secret', {   // a Dot secret: a sparkling star on a gold hal
       ctx.fillStyle = 'rgba(8,14,36,0.72)'; ctx.fillRect(4, 28, 92, 14);
       DD.text('PLAN ' + s.nDone + '/5', 8, 31, '#ffe680', 1, null);
       ORDER.forEach((id, i) => { const x = 50 + i * 9; ctx.fillStyle = s.done[id] ? '#9ae0a8' : s.built[id] ? '#ffe680' : '#3a4460'; ctx.fillRect(x, 31, 7, 7); ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(x, 37, 7, 1); });
+      const f_ = G.frame;
+      { const A = DD.art; for (let i = 0; i < 12; i++) { const x = ((i * 61 + f_ * 2.6 + (i % 3) * 40) % 380) - 30, y = 20 + hash(i, 9) * 150, w = 8 + (i % 4) * 5; A.R(Math.round(x), Math.round(y), w, 1, 'rgba(255,222,170,' + (0.14 + 0.1 * (i % 3)) + ')'); } }
       DD.art.motes(G, '#ffd8a0', 22, 0.35);
       const vg = ctx.createRadialGradient(160, 100, 90, 160, 100, 230); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(20,6,10,0.32)'); ctx.fillStyle = vg; ctx.fillRect(0, 0, 320, 180);
     },

@@ -148,9 +148,11 @@ window.LEVEL = {"id": "12-2", "name": "THE MICHAEL PHENOMENON", "sub": "THE NEW 
       // the audience: dark heads and shoulders in the rows behind the stage, a few with arms up when the answer is right
       const Yf = Math.round(DD.wy(21 * TS)), step = 14, ax = -((Math.round(c.x * 0.7)) % step + step) % step;
       for (let x = ax - step, i = Math.floor(c.x * 0.7 / step) - 1; x < VW + step; x += step, i++) {
-        const h = (i * 7) & 3, up = s && s.cheer > 0 && (i & 1);
-        ctx.fillStyle = '#0a0720'; ctx.fillRect(x - 5, Yf - 14 - h, 10, 14 + h); ctx.beginPath(); ctx.arc(x, Yf - 17 - h, 4, 0, 7); ctx.fill();
+        const h = (i * 7) & 3, up = s && s.cheer > 0 && (i & 1), A = DD.art, hurt = G.pl.inv > 0, hr = A.hash(i, 5);   // each head has its own idle: a bob now and then, a glance to one side; they duck when the Dot is hurt and clap on a right answer
+        const bob = ((f + ((hr * 170) | 0)) % 170) < 12 ? 1 : 0, duck = hurt ? 2 : 0, lx = hurt ? (i & 1 ? 1 : -1) : (((f + ((hr * 400) | 0)) % 400) < 50 ? (hr > 0.5 ? 1 : -1) : 0), yo = bob + duck;
+        ctx.fillStyle = '#0a0720'; ctx.fillRect(x - 5, Yf - 14 - h + yo, 10, 14 + h - yo); ctx.beginPath(); ctx.arc(x + lx, Yf - 17 - h + yo, 4, 0, 7); ctx.fill();
         if (up) ctx.fillRect(x + (i & 2 ? 5 : -7), Yf - 28 - h - ((f >> 3) & 1), 2, 12);
+        if (hr > 0.9) { const pa = ((f + i * 11) % 200) < 140; if (pa) { A.R(x + 3, Yf - 22 - h + yo, 3, 4, '#bfe4ff'); A.R(x + 2, Yf - 23 - h + yo, 5, 1, 'rgba(191,228,255,0.35)'); } }   // a phone held up
       }
       art122(ctx, G);
     },
@@ -162,7 +164,14 @@ window.LEVEL = {"id": "12-2", "name": "THE MICHAEL PHENOMENON", "sub": "THE NEW 
           ctx.fillStyle = '#f4c84a'; ctx.fillRect(X, Y, 16, 2); ctx.fillStyle = '#fff2a6'; ctx.fillRect(X, Y, 16, 1);
           const on = (tx + (f >> 4)) % 3; ctx.fillStyle = on === 0 ? '#ffe680' : on === 1 ? '#5ac8ff' : '#ff8ac8'; ctx.fillRect(X + 2, Y + 4, 12, 3); ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(X + 2, Y + 4, 12, 1);
           ctx.fillStyle = '#2a2450'; ctx.fillRect(X, Y + 8, 16, 8);
-        } else { ctx.fillStyle = '#241f48'; ctx.fillRect(X, Y, 16, 1); ctx.fillStyle = '#0c0a1e'; ctx.fillRect(X + ((tx + ty) & 1 ? 8 : 0), Y + 4, 1, 8); }
+        } else {   // the cut-away under the stage: a black skirt with a gold pinstripe and footlights, then the understage with road cases and taped cable runs, calmer with depth
+          const A = DD.art, R = A.R; let d = 1; while (d < 5 && K(tx, ty - d - 1) === k) d++;
+          if (d === 1) { R(X, Y, 16, 16, '#100c24'); for (let i = 1; i < 16; i += 4) R(X + i, Y, 2, 16, '#1c1638'); R(X + 7, Y, 1, 16, '#5a4410'); R(X, Y, 16, 2, '#c98f22'); R(X, Y + 2, 16, 1, 'rgba(0,0,0,0.5)');
+            for (let b = 0; b < 2; b++) { const on = ((f >> 3) + tx * 2 + b) % 4 !== 0; R(X + 3 + b * 8, Y + 4, 2, 2, on ? '#ffe680' : '#5a4a2a'); } R(X, Y + 11, 16, 5, 'rgba(0,0,0,0.3)'); }
+          else { const h = A.hash(tx, ty); R(X, Y, 16, 16, '#0e0a1c'); A.tex(X, Y, 16, 16, '#1e1838', 0.05, 8);
+            if (tx % 7 === 2) { R(X, Y + 1, 16, 14, '#1c1a28'); R(X, Y + 1, 16, 1, '#4a465a'); R(X + 1, Y + 3, 14, 1, '#0a0812'); R(X + 6, Y + 6, 4, 3, '#8a8a96'); R(X + 6, Y + 6, 4, 1, '#c0c0cc'); }   // a road case with a latch
+            else { R(X, Y + 6, 16, 3, '#06040c'); R(X, Y + 6, 16, 1, '#2a2640'); R(X, Y + 8, 16, 1, ['#e8c02a', '#d8202c', '#e8e8e8'][(tx >> 2) % 3]); if (h > 0.7) { R(X + 4, Y + 4, 7, 7, '#8a8a9a'); R(X + 4, Y + 4, 7, 1, '#b8b8c8'); } }
+            R(X, Y, 16, 16, 'rgba(0,0,0,' + (0.1 + 0.12 * d) + ')'); } }
         return true;
       }
       if (k === 'cracked' && ok('w12_cracked')) { ctx.drawImage(IM('w12_cracked'), X, Y); return true; }

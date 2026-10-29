@@ -215,6 +215,40 @@ window.LEVEL = {
         A.R(0, 14, VW, 1, '#c98f22'); A.fringe(0, 15, VW, '#b8861e');
         for (const lx of [36, 70]) { const X = Math.round(lx * 16 - c.x); A.R(X - 14, 14, 28, VH, 'rgba(0,0,0,0.0)'); A.R(X - 12, 0, 24, VH, '#12040a'); A.planks(X - 12, 0, 24, VH, '#12040a', 6, true); A.R(X - 12, 0, 1, VH, '#3a1220'); A.R(X + 11, 0, 1, VH, '#050204'); }   // black stage legs at each wing
       }
+      { const A = DD.art, fy0 = Math.round(21 * 16 - c.y), wallX = Math.round(36 * 16 - 12 - c.x), x1 = Math.min(wallX, VW), ox = -Math.round(c.x);
+        if (x1 > 0) {   // backstage, stage left: the run in from the wings is a painted-black cinderblock wall instead of curtain, with road cases, a dressing-room door and cool work lights
+          A.R(0, 15, x1, VH, '#0e060c');
+          if (!S.cb && typeof document !== 'undefined' && typeof document.createElement === 'function' && typeof ctx.createPattern === 'function') {   // a 32x16 cinderblock pattern, baked once
+            const cv = document.createElement('canvas'); cv.width = 32; cv.height = 16; const g = cv.getContext('2d'); g.fillStyle = '#140a12'; g.fillRect(0, 0, 32, 16); g.fillStyle = '#0a0408'; g.fillRect(0, 7, 32, 1); g.fillRect(0, 15, 32, 1); g.fillRect(15, 0, 1, 8); g.fillRect(31, 8, 1, 8);
+            g.fillStyle = '#1e1220'; g.fillRect(0, 0, 32, 1); g.fillRect(0, 8, 32, 1); g.fillStyle = '#18101a'; for (let i = 0; i < 14; i++) g.fillRect((i * 13 + 5) % 30, (i * 7 + 2) % 14, 2, 1); S.cb = ctx.createPattern(cv, 'repeat');
+          }
+          if (S.cb) { ctx.save(); ctx.beginPath(); ctx.rect(0, 15, x1, VH); ctx.clip(); ctx.translate(ox % 32, -Math.round(c.y) % 16); ctx.fillStyle = S.cb; ctx.fillRect(-32, 15 - 16, x1 + 64, VH + 32); ctx.restore(); }
+          { const wg = ctx.createLinearGradient(0, 15, 0, fy0); wg.addColorStop(0, 'rgba(0,0,0,0.55)'); wg.addColorStop(0.5, 'rgba(0,0,0,0)'); wg.addColorStop(1, 'rgba(0,0,0,0.3)'); ctx.fillStyle = wg; ctx.fillRect(0, 15, x1, fy0 - 15); }
+          A.R(0, fy0 - 5, x1, 5, '#05020a'); A.R(0, fy0 - 5, x1, 1, '#3a2a34');   // the black baseboard
+          // cool work lights hung from the truss: they pool white-blue on the wall, the stage itself stays warm
+          for (const lw of [110, 300, 470]) { const X = lw + ox; if (X < -30 || X > x1 + 30) continue; const lf = lw === 300 && f % 211 < 4 ? 0.3 : 1;
+            A.R(X, 15, 1, 28, '#05020a'); A.R(X - 4, 43, 9, 5, '#1a1a22'); A.R(X - 4, 43, 9, 1, '#5a5a6a'); A.R(X - 3, 48, 7, 1, lf > 0.5 ? '#e8f4ff' : '#506070');
+            A.cone(X, 48, 90, 34, '#bfe0ff', 0.1 * lf); A.glow(X, 49, 26, '#bfe0ff', 0.22 * lf); A.glow(X, fy0 - 20, 40, '#a8c8ff', 0.07 * lf); }
+          // the dressing-room door, lit by the work light beside it
+          { const X = 168 + ox; if (X > -40 && X < x1 + 10) { A.box(X - 3, fy0 - 62, 38, 62, '#1a1218', { outline: '#05020a' }); A.R(X, fy0 - 58, 32, 58, '#4a3a44'); A.planks(X, fy0 - 58, 32, 58, '#4a3a44', 8, true); A.R(X, fy0 - 58, 32, 1, '#7a6a74'); A.R(X, fy0 - 58, 1, 58, '#6a5a64'); A.R(X + 31, fy0 - 58, 1, 58, '#241a20');
+            A.R(X + 24, fy0 - 28, 4, 3, '#c9a050'); A.R(X + 24, fy0 - 28, 4, 1, '#fff0c0'); A.R(X, fy0 - 10, 32, 10, '#2a1e26'); A.R(X, fy0 - 10, 32, 1, '#6a5a64'); A.R(X + 8, fy0 - 50, 16, 11, '#e8e0c0'); A.R(X + 8, fy0 - 50, 16, 1, '#fffae8'); A.R(X + 10, fy0 - 47, 12, 1, '#2a2020'); A.R(X + 10, fy0 - 44, 9, 1, '#2a2020'); A.R(X + 10, fy0 - 41, 11, 1, '#2a2020'); A.R(X + 6, fy0 - 51, 3, 3, '#d8d0b0'); A.R(X + 23, fy0 - 51, 3, 3, '#d8d0b0'); } }   // (a taped call sheet)
+          // road cases (flight cases) stacked in the wings, with rails, studs, handles and gaffer-taped labels
+          const rc = (wx, w, h, col, lab) => { const X = Math.round(wx + ox), Y = fy0 - h; if (X > x1 + 4 || X + w < -4) return; A.box(X, Y, w, h, col, { outline: '#05020a' }); A.R(X + 2, Y + 5, w - 4, 1, '#8a8a96'); A.R(X + 2, Y + h - 6, w - 4, 1, '#8a8a96'); A.R(X + 2, Y + 6, w - 4, 1, '#2a2a30');
+            for (const [dx, dy] of [[1, 1], [w - 4, 1], [1, h - 4], [w - 4, h - 4]]) { A.R(X + dx, Y + dy, 3, 3, '#a8a8b2'); A.R(X + dx, Y + dy, 3, 1, '#e8e8f0'); }
+            A.R(X + (w >> 1) - 5, Y + (h >> 1), 10, 3, '#14141a'); A.R(X + (w >> 1) - 5, Y + (h >> 1), 10, 1, '#5a5a66'); if (lab) { A.R(X + 4, Y + 9, 12, 6, '#d8d0b0'); A.R(X + 4, Y + 9, 12, 1, '#fffae8'); A.R(X + 6, Y + 12, 8, 1, '#3a2a2a'); } A.R(X, Y + 2, w, 1, 'rgba(255,255,255,0.15)'); };
+          rc(30, 40, 34, '#2e2c36', true); rc(34, 32, 26, '#3a2c2c', false); rc(78, 36, 24, '#2a3238', true);
+          rc(228, 44, 30, '#32283a', false); rc(232, 38, 24, '#2c3030', true); rc(236, 30, 20, '#3a3030', false);
+          rc(372, 40, 40, '#2a2c34', true); rc(376, 32, 30, '#3a2e30', false); rc(520, 36, 26, '#2e3036', true);
+          // a stage-left monitor wedge and the cable runs: coiled XLR, a taped snake along the deck, tape flags
+          { const X = 420 + ox; if (X > -50 && X < x1 + 10) { ctx.fillStyle = '#05020a'; ctx.beginPath(); ctx.moveTo(X, fy0); ctx.lineTo(X + 34, fy0); ctx.lineTo(X + 34, fy0 - 7); ctx.lineTo(X + 4, fy0 - 16); ctx.lineTo(X, fy0 - 16); ctx.fill(); ctx.fillStyle = '#1a1a22'; ctx.beginPath(); ctx.moveTo(X + 2, fy0 - 1); ctx.lineTo(X + 32, fy0 - 1); ctx.lineTo(X + 32, fy0 - 7); ctx.lineTo(X + 4, fy0 - 15); ctx.fill(); ctx.fillStyle = '#5a5a66'; for (let i = 0; i < 6; i++) ctx.fillRect(X + 5 + i * 4, fy0 - 14 + i * 1, 2, 5 - (i >> 2)); A.R(X + 33, fy0 - 7, 1, 7, '#44444e'); } }
+          for (const cw of [140, 262, 346, 498]) { const X = cw + ox; if (X < -30 || X > x1 + 10) continue; ctx.strokeStyle = '#0a0608'; ctx.lineWidth = 2; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.ellipse(X + 8, fy0 - 3, 9 - i * 2, 3 - (i > 1 ? 1 : 0), 0, 0, 7); ctx.stroke(); } ctx.strokeStyle = '#2a2430'; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(X + 8, fy0 - 4, 9, 3, 0, 3.4, 5.9); ctx.stroke(); }
+          for (const [tw, tc] of [[188, '#e8c030'], [310, '#d8d8d8'], [442, '#c8302c'], [540, '#e8c030']]) { const X = tw + ox; if (X > -10 && X < x1) { A.R(X, fy0 - 1, 14, 1, tc); A.R(X + 3, fy0 - 3, 2, 2, tc); } }   // gaffer-tape marks on the deck
+          // a fly rail: manila lines down the wall to a belaying rack, sandbags hanging
+          { const X = 336 + ox; if (X > -30 && X < x1 + 10) { A.R(X - 2, fy0 - 40, 34, 4, '#1a0c10'); A.R(X - 2, fy0 - 40, 34, 1, '#5a4a52'); for (let i = 0; i < 5; i++) { const lx = X + i * 7, sw = Math.round(Math.sin(f / 60 + i) * 0.7); A.R(lx, 15, 1, fy0 - 55, '#8a7a5a'); A.R(lx + sw, fy0 - 55, 1, 15, '#8a7a5a'); A.R(lx + 1, fy0 - 52 + (i % 2) * 8, 1, 1, '#c8b890'); A.R(lx - 2 + sw, fy0 - 40 - 8, 5, 1, '#6a5a3a'); } } }
+          // an EXIT sign over the stage door at the far end, glowing green
+          { const X = 8 + ox; if (X > -30 && X < x1) { A.R(X, 66, 24, 10, '#05160a'); A.R(X + 1, 67, 22, 8, '#16803a'); A.R(X + 1, 67, 22, 1, '#60e090'); A.R(X + 5, 70, 2, 3, '#e8ffe8'); A.R(X + 9, 70, 6, 1, '#e8ffe8'); A.R(X + 9, 72, 6, 1, '#e8ffe8'); A.R(X + 17, 70, 3, 3, '#e8ffe8'); A.glow(X + 12, 71, 30, '#40ff90', 0.18); } }
+          A.R(x1 - 1 > 0 ? x1 - 1 : 0, 15, 1, VH, 'rgba(0,0,0,0.6)');
+        } }
       const mid = (36 + 70) / 2 * 16;
       const bannerX = Math.round(mid - c.x - 112), bannerY = Math.round(2 * 16 - c.y * 0.2 + 22);
       if (ok('w4_banner')) {   // DEKKAR across the back wall, two Ks around one spike, lit from below
@@ -226,7 +260,7 @@ window.LEVEL = {
       // the kit behind him, a half-stack at each end, a mic stand at the front
       const fy = Math.round(DD.wy(21 * 16));
       if (ok('w4_drums')) { ctx.save(); ctx.imageSmoothingEnabled = false; ctx.drawImage(shade('w4_drums', 0.8) || I.w4_drums, Math.round(mid - c.x + 24), fy - 60, 90, 60); ctx.restore(); }
-      if (ok('w4_amp')) for (const tx of [37.4, 66.6]) { ctx.save(); ctx.imageSmoothingEnabled = false; ctx.drawImage(I.w4_amp, Math.round(tx * 16 - c.x), fy - 69, 45, 69); ctx.restore(); }
+      if (ok('w4_amp')) for (const tx of [37.4, 66.6]) { ctx.save(); ctx.imageSmoothingEnabled = false; ctx.drawImage(I.w4_amp, Math.round(tx * 16 - c.x) + ((G.shake > 2 || G.frame - (G.dipAt ?? -999) < 20) ? (f & 2 ? 1 : -1) : 0), fy - 69, 45, 69); ctx.restore(); }
       if (ok('w4_mic')) ctx.drawImage(I.w4_mic, Math.round(mid - c.x - 130), fy - 38);
       // the lighting truss and its par cans; the beams sweep, and turn a sickly green for MUMMY TIM
       const ty = Math.round(8 - c.y * 0.1 + 6);
@@ -270,18 +304,19 @@ window.LEVEL = {
       const VW = DD.VW, VH = DD.VH, c = G.cam, f = G.frame, I = DD.IMG, ok = DD.ready, B = DD.boss, S = G.s;
       const fy = Math.round(DD.wy(21 * 16)), top = Math.min(VH - 24, fy + 34);
       ctx.fillStyle = '#06020a'; ctx.fillRect(0, top, VW, VH - top);
-      const hit = B && B.flash > 0 ? 1 : 0, up = S.cheer > 0 ? 1 : 0;
+      const hit = (B && B.flash > 0) || f - (G.flashAt ?? -999) < 30 ? 1 : 0, up = S.cheer > 0 ? 1 : 0, wince = G.pl && G.pl.inv > 0 ? 1 : 0, ph2 = B && B.phase > 0 ? 1 : 0;   // the house reacts: hands up when he is hit, heads dip when you are hurt
       for (let i = -2; i < 26; i++) {   // silhouettes: a head and, sometimes, a pair of horns held up
-        const wxp = i * 15 + hash(i, 3) * 6, X = Math.round(wxp - ((c.x * 1.2) % 15)), r = hash(i + Math.floor(c.x * 1.2 / 15), 5), Y = top + 8 + Math.round(r * 5);
-        const sway = Math.round(Math.sin(f / 18 + i) * 1.5);
+        const wxp = i * 15 + hash(i, 3) * 6, X = Math.round(wxp - ((c.x * 1.2) % 15)), r = hash(i + Math.floor(c.x * 1.2 / 15), 5), Y = top + 8 + Math.round(r * 5) + (wince ? 2 : 0);
+        const sway = Math.round(Math.sin(f / 18 + i) * 1.5) + (wince ? (i & 1 ? 1 : -1) : 0);
         ctx.fillStyle = '#0a0410'; ctx.beginPath(); ctx.ellipse(X + sway, Y, 6, 7, 0, 0, 7); ctx.fill(); ctx.fillRect(X - 7 + sway, Y + 4, 14, 20);
         ctx.fillStyle = '#1a0a18'; ctx.fillRect(X - 4 + sway, Y - 6, 5, 1);
+        if (r > 0.86 && !up && !hit && ph2 && !wince) { const fl = 1 + ((f >> 3) + i & 1); ctx.fillStyle = '#ffd060'; ctx.fillRect(X + 6 + sway, Y - 17 - fl, 2, 2 + fl); ctx.fillStyle = '#fff4c0'; ctx.fillRect(X + 6 + sway, Y - 16, 2, 1); ctx.fillStyle = '#0a0410'; ctx.fillRect(X + 5 + sway, Y - 14, 4, 10); DD.art.glow(X + 7 + sway, Y - 17, 14, '#ffc060', 0.2); }   // lighters come up for MUMMY TIM
         if (r > 0.62 || up || (hit && r > 0.3)) { const hy = Y - 12 - Math.round(Math.abs(Math.sin(f / 10 + i)) * (up ? 6 : 2)); ctx.fillStyle = '#0a0410'; ctx.fillRect(X + 5 + sway, hy, 3, 12); ctx.fillRect(X + 4 + sway, hy - 3, 2, 4); ctx.fillRect(X + 8 + sway, hy - 3, 2, 4); }
       }
       // Gregg, front row, with his tub, watching his friend
       const gx = Math.round(40 * 16 - c.x), gy = Math.min(VH - 30, fy + 38);
       if (ok('w4_seat') && ok('w4_gregg_bust') && gx > -40 && gx < VW + 10) {
-        ctx.drawImage(I.w4_gregg_bust, gx, gy - 12 - (up ? Math.round(Math.abs(Math.sin(f / 6)) * 4) : 0));
+        ctx.drawImage(I.w4_gregg_bust, gx + (wince ? (f >> 1 & 1) * 2 - 1 : 0), gy - 12 - (up || hit ? Math.round(Math.abs(Math.sin(f / 6)) * 4) : Math.round(Math.max(0, Math.sin(f / 40)) * 1)));
         ctx.drawImage(shade('w4_seat', 0.62) || I.w4_seat, gx + 4, gy + 6);
         if (hit || up) DD.text('!', gx + 14, gy - 22 - (up ? Math.round(Math.abs(Math.sin(f / 6)) * 4) : 0), '#ffe680', 2, '#000');
       }

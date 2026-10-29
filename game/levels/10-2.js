@@ -109,7 +109,10 @@ window.LEVEL = {"id": "10-2", "name": "RUNTIME RELAY", "sub": "THE FIRST GAME SH
             ctx.fillStyle = C.top; ctx.fillRect(X, Y, 16, 2); ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(X, Y + 2, 16, 1);
             ctx.fillStyle = C.line; ctx.globalAlpha = 0.55; ctx.fillRect(X, Y + 7, 16, 1); ctx.globalAlpha = 1;
             if (tx % 8 === 0) { ctx.fillStyle = C.line; ctx.fillRect(X, Y + 3, 1, 5); }
-          } else { ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(X, Y + 7, 16, 1); if (hash < 3) { ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(X + hash * 4, Y + 3, 5, 1); } }
+          } else { ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(X, Y + 7, 16, 1); if (hash < 3) { ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(X + hash * 4, Y + 3, 5, 1); }
+            if (ty >= 22) { const A = DD.art, d = ty - 21;   // looks 2: the track's cut-away: the rubber layer with a lane stencil line, then concrete with hazard tape and a drain, darker with depth
+              if (d === 1) { A.R(X, Y, 16, 16, '#14080c'); A.R(X, Y + 1, 16, 2, C.dark); A.R(X, Y + 4, 16, 1, 'rgba(255,255,255,0.12)'); for (let i = 0; i < 16; i += 4) A.R(X + i, Y + 6 + ((i >> 2) & 1), 2, 1, 'rgba(255,255,255,0.08)'); }
+              else { A.R(X, Y, 16, 16, 'rgba(8,3,8,0.5)'); if (d === 2) { A.R(X, Y + 6, 16, 3, '#1c1c24'); for (let i = 0; i < 16; i += 6) A.R(X + i, Y + 6, 3, 3, '#e8c030'); if (tx % 6 === 2) { A.R(X + 2, Y + 11, 12, 4, '#060306'); for (let q = 0; q < 12; q += 3) A.R(X + 2 + q, Y + 11, 1, 4, '#2a2a34'); } } else A.R(X, Y + 5, 16, 1, 'rgba(255,255,255,0.06)'); } } }
           return true;
         }
         if (k === 'hurdle') {

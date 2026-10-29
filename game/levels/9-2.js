@@ -108,7 +108,10 @@ DD.defineEntity('w92dancer', {   // a high-heeled dancer in sequins: every step 
       ctx.restore();
       // below the runway: the black glossy stage floor and the dark house, rows of seat backs
       const gb = ctx.createLinearGradient(0, FY, 0, VH); gb.addColorStop(0, '#0c0610'); gb.addColorStop(1, '#030206'); ctx.fillStyle = gb; ctx.fillRect(0, FY, VW, VH - FY);
-      for (let r = 0; r < 3; r++) { const Y = FY + 30 + r * 26, ox3 = -Math.round(cx * (0.3 + r * 0.15)) % 22; ctx.fillStyle = r === 0 ? '#1a0c1a' : '#22101e'; for (let x = ox3 - 22; x < VW + 22; x += 22) { ctx.fillRect(x + 2, Y, 16, 14); ctx.fillRect(x + 4, Y - 3, 12, 4); if (hash(Math.floor((x + cx * (0.3 + r * 0.15)) / 22), r) < 0.3) { ctx.fillStyle = '#0a0610'; ctx.fillRect(x + 7, Y - 9, 6, 7); ctx.fillStyle = r === 0 ? '#1a0c1a' : '#22101e'; } } }
+      for (let r = 0; r < 3; r++) { const Y = FY + 30 + r * 26, ox3 = -Math.round(cx * (0.3 + r * 0.15)) % 22; ctx.fillStyle = r === 0 ? '#1a0c1a' : '#22101e'; for (let x = ox3 - 22; x < VW + 22; x += 22) { ctx.fillRect(x + 2, Y, 16, 14); ctx.fillRect(x + 4, Y - 3, 12, 4); { const hk = Math.floor((x + cx * (0.3 + r * 0.15)) / 22), hv = hash(hk, r);
+            if (hv < 0.3) { const dy = ((f + hk * 37) % 150) < 8 ? 1 : 0, duck = G.pl && G.pl.inv > 0 ? 2 : 0, lean = ((f + hk * 53) % 400) < 60 ? ((hk & 1) ? 1 : -1) : 0;   // looks 2: the audience heads bob, lean to whisper, and duck when a Dot is hurt
+              ctx.fillStyle = '#0a0610'; ctx.fillRect(x + 7 + lean, Y - 9 + dy + duck, 6, 7); ctx.fillStyle = r === 0 ? '#1a0c1a' : '#22101e'; }
+            else if (hv > 0.93 && ((f + hk * 29) % 260) < 150) { ctx.fillStyle = '#9ac0ff'; ctx.fillRect(x + 8, Y - 3, 4, 2); ctx.fillStyle = 'rgba(154,192,255,0.25)'; ctx.fillRect(x + 6, Y - 5, 8, 6); ctx.fillStyle = r === 0 ? '#1a0c1a' : '#22101e'; } } } }   // (and a few phones held up, glowing)
       { const A = DD.art, ty = Math.round(-cy);   // art pass: step-and-repeat wall, proscenium rail and fringe, truss cans on the beams, paparazzi flashes in the dark house
         for (let i = -1; i < 3; i++) { const X = i * 420 - Math.round(cx * 0.4) % 420 + 200; if (X < -130 || X > VW + 10) continue; A.box(X, FY - 92, 120, 54, '#1a1020', { outline: '#08040a' }); A.trim(X, FY - 92, 120, '#c98f22');
           for (let r = 0; r < 4; r++) for (let q = 0; q < 3; q++) DD.text('VFA', X + 22 + q * 38 + (r & 1) * 10, FY - 84 + r * 11, 'rgba(232,184,56,0.28)', 1, null, 'center'); }
@@ -132,6 +135,10 @@ DD.defineEntity('w92dancer', {   // a high-heeled dancer in sequins: every step 
       }
       if (k === 'board') {   // stage boards: dark planks, a gold gaffer-tape line on the lip (a safe mark)
         R(0, 0, 16, 16, '#3a2a1e'); for (let i = 3; i < 16; i += 4) R(0, i, 16, 1, '#241810'); R((tx * 5 + ty * 3) % 12, 4 + (ty & 3) * 3, 1, 3, '#241810');
+        if (!top && ty >= 22) {   // looks 2: the stage front below the boards: a velvet skirt in pleats under a gold fringe, a row of footlights, darker and calmer with depth
+          const d = ty - 21; R(0, 0, 16, 16, '#2a0610'); for (let i = 0; i < 16; i += 4) { R(i, 0, 2, 16, '#4a0a1a'); R(i + 2, 0, 1, 16, '#14030a'); }
+          if (d === 1) { R(0, 0, 16, 2, '#c98f22'); R(0, 0, 16, 1, '#f0d070'); R(0, 2, 16, 1, '#5a3a10'); for (let i = 0; i < 16; i += 3) R(i, 3, 1, 2 + (i % 2), '#c98f22'); if (((DD.G.frame >> 3) + tx) % 4) { R(3, 8, 2, 2, '#fff2c0'); R(11, 8, 2, 2, '#fff2c0'); R(0, 7, 16, 4, 'rgba(255,200,120,0.12)'); } else R(3, 8, 2, 2, '#8a5a1c'); }
+          else R(0, 0, 16, 16, 'rgba(0,0,0,' + Math.min(0.6, 0.16 * d) + ')'); }
         if (top) { R(0, 0, 16, 3, '#d8b060'); R(0, 3, 16, 1, '#6a4a22'); if (tx % 6 === 0) { R(5, 0, 6, 1, '#fff0a0'); } if (tx % 6 === 2) R(0, 1, 16, 1, '#e8b838'); }
         if (!solid(DD.kindAt(tx - 1, ty))) R(0, 0, 1, 16, '#1a100a'); if (!solid(DD.kindAt(tx + 1, ty))) R(15, 0, 1, 16, '#1a100a');
         return true;

@@ -253,6 +253,15 @@
           const im = I('w8_f_wed'); if (!im) return false;
           ctx.drawImage(im, (tx % 2) * 16, kind(tx, ty - 1) ? 16 : 0, 16, 16, X, Y, 16, 16);
           if (!kind(tx, ty - 1)) { ctx.fillStyle = '#ffffff'; ctx.fillRect(X, Y, 16, 1); ctx.fillStyle = 'rgba(255,225,240,0.5)'; ctx.fillRect(X, Y + 1, 16, 1); } else if (!kind(tx, ty + 1)) { ctx.fillStyle = 'rgba(60,20,70,0.45)'; ctx.fillRect(X, Y + 13, 16, 3); }
+          if (kind(tx, ty - 1)) {   // the reception floor's cut-away below the lip: a brass-topped baseboard, a gaffer-taped cable run for the broadcast, a brass vent, darker and calmer with depth
+            const A = DD.art, d = ty - 21;
+            if (d === 1) {
+              A.R(X, Y, 16, 2, '#c98f22'); A.R(X, Y, 16, 1, '#ffe08a'); A.R(X, Y + 2, 16, 4, '#4a2444'); A.R(X, Y + 2, 16, 1, '#6a3a62');   // the baseboard
+              A.R(X, Y + 8, 16, 3, '#140a1a'); A.R(X, Y + 8, 16, 1, '#3a2a48'); A.R(X, Y + 10, 16, 1, '#05020a');
+              if (tx % 6 === 1) { A.R(X + 4, Y + 6, 6, 7, '#aaa296'); A.R(X + 4, Y + 6, 6, 1, '#d8d2c0'); A.R(X + 9, Y + 6, 1, 7, '#6a665a'); }
+            } else if (tx % 9 === 4) { A.box(X + 2, Y + 3, 12, 9, '#6a4a14', { outline: '#1a1008' }); for (let q = 0; q < 4; q++) A.R(X + 4, Y + 5 + q * 2, 8, 1, '#1a1008'); }
+            ctx.fillStyle = 'rgba(30,6,36,' + (0.14 * d) + ')'; ctx.fillRect(X, Y, 16, 16);
+          }
           return true;
         }
         if (k === 'tier') { const im = I('w8_t_wed'); if (!im) return false; ctx.drawImage(im, (tx % 2) * 16, 0, 16, 16, X, Y, 16, 16); return true; }
@@ -268,7 +277,10 @@
           for (let x = ox - S; x < 320 + S; x += S) for (const [dy, dim] of [[-38, 0.55], [-24, 0.75]]) {
             const hh = hash(Math.round((x - ox) / S) + kb, dy), y = FY + dy - 6;
             A.R(x + 6, y + 12, 22, 2, A.mix('#d8c8dc', -dim)); A.R(x + 6, y + 14, 2, 6, A.mix('#d8c8dc', -dim - 0.2)); A.R(x + 26, y + 14, 2, 6, A.mix('#d8c8dc', -dim - 0.2)); A.R(x + 6, y - 2, 22, 2, A.mix('#d8c8dc', -dim)); A.R(x + 6, y - 2, 2, 14, A.mix('#d8c8dc', -dim - 0.1));
-            if (hh < 0.7) { const hc = ['#1a0e1c', '#2a1626', '#3a2018', '#120a14'][Math.floor(hh * 10) % 4]; A.R(x + 13, y - 8, 8, 8, hc); A.R(x + 11, y, 12, 12, A.mix(['#3a2a52', '#52283a', '#2a3a52', '#3a4a3a'][Math.floor(hh * 7) % 4], -0.4)); }
+            if (hh < 0.7) { const hc = ['#1a0e1c', '#2a1626', '#3a2018', '#120a14'][Math.floor(hh * 10) % 4]; const bc = A.mix(['#3a2a52', '#52283a', '#2a3a52', '#3a4a3a'][Math.floor(hh * 7) % 4], -0.4);
+              const cheer = f - G.flashAt < 30, hurt = G.pl && G.pl.inv > 0, hop = cheer ? -Math.round(Math.abs(Math.sin((f + hh * 20) / 3)) * 2) : 0, nod = (f + Math.floor(hh * 500)) % 330 < 14 ? 1 : 0, rat = f - G.dipAt < 18 && (f + Math.floor(hh * 9)) % 2 ? 1 : 0;   // a guest idles: a slow nod, a hop and arms up when the boss is hit, a wince when the Dot is hurt, a rattle on a slam
+              A.R(x + 13 + rat + (hurt ? (hh < 0.35 ? -1 : 1) : 0), y - 8 + hop + (hurt ? 1 : nod), 8, 8, hc); A.R(x + 11 + rat, y + hop, 12, 12, bc);
+              if (cheer) { A.R(x + 9, y - 6 + hop, 2, 9, bc); A.R(x + 23, y - 6 + hop, 2, 9, bc); A.R(x + 9, y - 8 + hop, 2, 2, hc); A.R(x + 23, y - 8 + hop, 2, 2, hc); } }
           }
           ctx.fillStyle = 'rgba(30,6,36,0.38)'; ctx.fillRect(0, FY - 60, 320, 60);
           for (const wx of [18, 42]) { const X = wx * TS - cx; if (X < -50 || X > 370) continue;   // two crystal chandeliers on chains

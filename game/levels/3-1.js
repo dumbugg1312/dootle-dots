@@ -147,7 +147,7 @@ Object.assign(window.LEVEL, {
       Object.assign(s, { latches: 0, vault: false, vaultT: 0, zipOn: false, zipCool: 0, zipT: 0, seen: {}, cellar: false, bats: [], kington: { x: 100 * 16, hop: 0 } });
       const z = th.zip && th.zip[0];
       s.zip = z ? { x0: z.x, y0: z.y, x1: z.args[0] * 16, y1: z.args[1] * 16 } : null;
-      s.poles = [4, 36, 66, 98, 140, 172, 202].map(x => x * 16); s.rails = [[2, 6], [34, 8], [52, 6], [60, 6], [108, 14], [128, 6], [140, 12], [176, 4]];
+      s.poles = [4, 36, 66, 98, 140, 202].map(x => x * 16); s.rails = [[2, 6], [34, 8], [52, 6], [60, 6], [108, 14], [128, 6], [140, 12], [176, 4]];
       s.bushes = []; for (let x = 4; x < 212; x += 5 + (x * 7) % 6) { if (!(x > 30 && x < 33) && !(x > 154 && x < 176) && !(x > 185 && x < 189)) s.bushes.push([x * 16 + (x * 13) % 9, x % 3]); }
       for (let i = 0; i < 12; i++) s.bats.push({ x: Math.random() * 320, y: 20 + Math.random() * 60, ph: Math.random() * 6, sp: 0.5 + Math.random() * 0.6 });
     },
@@ -196,7 +196,12 @@ Object.assign(window.LEVEL, {
       // opening credits: DECKER in chrome, STARRING TIM HEIDECKER, and Decker's bike parked on the road
       if (c.x < 400 && ok('w3_decker_title')) {
         const X = -c.x, Y = 224 + 24 - c.y;   // laid out for the opening camera (floor at screen y 112)
-        ctx.drawImage(I.w3_decker_title, Math.round(X + 18), Math.round(Y)); ctx.drawImage(I.w3_starring, Math.round(X + 22), Math.round(Y + 35)); ctx.drawImage(I.w3_tim, Math.round(X + 22), Math.round(Y + 52));
+        // the billboard sits back in the dusk: tinted into the sky and faded, so the speech bubbles and the cast read in front of it
+        const calm = n => { const m = s.calm || (s.calm = {}); if (m[n]) return m[n]; if (!ok(n)) return null; const im = I[n]; if (typeof document === 'undefined' || typeof document.createElement !== 'function') return im;
+          const cv = document.createElement('canvas'); cv.width = im.width; cv.height = im.height; const g = cv.getContext('2d'); g.drawImage(im, 0, 0); g.globalCompositeOperation = 'source-atop'; g.fillStyle = 'rgba(92,44,84,0.5)'; g.fillRect(0, 0, cv.width, cv.height); return (m[n] = cv); };
+        ctx.globalAlpha = 0.74;
+        ctx.drawImage(calm('w3_decker_title') || I.w3_decker_title, Math.round(X + 18), Math.round(Y)); ctx.drawImage(calm('w3_starring') || I.w3_starring, Math.round(X + 22), Math.round(Y + 35)); ctx.drawImage(calm('w3_tim') || I.w3_tim, Math.round(X + 22), Math.round(Y + 52));
+        ctx.globalAlpha = 1;
         img('w3_bike_a', 13 * 16, road + 3);
       }
       // poles, rails, brush (the whole road is dressed so nothing is bare)
@@ -220,7 +225,7 @@ Object.assign(window.LEVEL, {
           ctx.fillStyle = (i + Math.floor(f / 24)) % 3 ? '#ff4a52' : '#ffd27a'; ctx.fillRect(X, Y, 2, 2);
           ctx.fillStyle = 'rgba(255,90,100,0.18)'; ctx.fillRect(X - 1, Y - 1, 4, 4);
         }
-        for (const tx of [148.5, 157.2]) if (ok('w3_torch')) {
+        for (const tx of [150.5, 157.2]) if (ok('w3_torch')) {
           const X = Math.round(tx * 16 - c.x), Y = Math.round(stageTop - c.y);
           ctx.drawImage(I.w3_torch, X - 5, Y - 34); const fl = 3 + Math.round(Math.sin(f / 3 + tx) * 1.2);
           const gl = ctx.createRadialGradient(X, Y - 36, 1, X, Y - 36, 26); gl.addColorStop(0, 'rgba(255,190,90,0.4)'); gl.addColorStop(1, 'rgba(255,190,90,0)'); ctx.fillStyle = gl; ctx.fillRect(X - 26, Y - 62, 52, 52);
@@ -261,6 +266,15 @@ Object.assign(window.LEVEL, {
     },
     drawMid(ctx, G) {   // props drawn whole, over the tiles: the briefcase vault, tombstone crosses, the cellar glow, TO BE CONTINUED
       const I = DD.IMG, ok = DD.ready, c = G.cam, VW = DD.VW, VH = DD.VH, s = G.s, f = G.frame;
+      { const A = DD.art, y0 = Math.round(22 * 16 - c.y), y1 = Math.round(24 * 16 - c.y);   // the floor band: the road's strata get darker and calmer with depth, with fixed stones and a buried conduit
+        if (y1 > 0 && y0 < VH) {
+          const gr = ctx.createLinearGradient(0, y0, 0, y1); gr.addColorStop(0, 'rgba(24,8,24,0.08)'); gr.addColorStop(1, 'rgba(24,8,24,0.7)'); ctx.fillStyle = gr; ctx.fillRect(0, y0, VW, y1 - y0);
+          const tx0 = Math.floor(c.x / 16);
+          for (let tx = tx0; tx < tx0 + 22; tx++) for (let ty = 22; ty < 26; ty++) { if (!DD.kindAt(tx, ty)) continue; const h = A.hash(tx * 7 + ty, 11), X = tx * 16 - Math.round(c.x), Y = ty * 16 - Math.round(c.y), d = 1 - (ty - 21) * 0.18;
+            if (h > 0.78) { A.R(X + 3 + Math.floor(h * 90) % 8, Y + 4 + Math.floor(h * 50) % 7, 4, 3, A.mix('#8a6a58', -0.1 * (ty - 21))); A.R(X + 3 + Math.floor(h * 90) % 8, Y + 4 + Math.floor(h * 50) % 7, 4, 1, 'rgba(255,224,180,' + 0.35 * d + ')'); }
+            else if (h < 0.1) { A.R(X, Y + 8, 16, 1, 'rgba(20,6,20,0.35)'); A.R(X + 4, Y + 9, 7, 1, 'rgba(20,6,20,0.25)'); } }
+          if (!(tx0 > 124 && tx0 < 130)) { const py = 22 * 16 + 4 - Math.round(c.y); if (py > 0 && py < VH) for (let tx = tx0; tx < tx0 + 22; tx++) { if (!DD.kindAt(tx, 22) || (tx >= 126 && tx <= 128)) continue; const X = tx * 16 - Math.round(c.x); A.R(X, py, 16, 5, '#3a3040'); A.R(X, py, 16, 1, '#6a5a70'); A.R(X, py + 4, 16, 1, '#1a1220'); if (tx % 6 === 0) { A.R(X + 6, py - 1, 3, 7, '#52465a'); A.R(X + 6, py - 1, 3, 1, '#8a7a90'); } } }   // buried conduit with a flange every six tiles
+        } }
       if (ok('w3_vault') && (!s.vault || s.vaultT < 60)) {   // the vault door: a giant leather briefcase with three gold latches
         const k = s.vault ? s.vaultT / 60 : 0, X = Math.round(104 * 16 - c.x), Y = Math.round(12 * 16 - c.y - k * 40 * k);
         if (X > -40 && X < VW + 10) {

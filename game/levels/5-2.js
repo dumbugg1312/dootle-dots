@@ -269,20 +269,84 @@ const say = (n, s) => { if (!s.said[n] && typeof DD.say === 'function') { s.said
     if (tx % 2 === 0) { const on = (tx / 2 + (f >> 4)) % 3 === 0; A.R(X + 6, Y + 3, 4, 1, on ? '#ffcf70' : '#6a3a20'); if (on) A.R(X + 5, Y + 4, 6, 1, 'rgba(255,190,90,0.25)'); }
   },
   bg(ctx, G, A, Q) {
-    const { c, VW, VH, f, lay } = Q, ay = 130 - c.y * 0.5;
-    A.R(0, ay + 30, VW, 1, 'rgba(208,72,176,0.5)'); A.R(0, ay + 31, VW, 2, 'rgba(208,72,176,0.14)'); A.R(0, ay + 29, VW, 1, 'rgba(0,0,0,0.35)');   // the magenta LED cove along the wall
-    lay(0.3, 520, (X, i) => {   // brass wall sconces that pool warm light, one on the blink; an exit sign over a far door
-      for (const o of [40,260,340,460]) {
-        const fl = A.hash(i * 7 + o, 5) < 0.22 ? 0.7 + 0.3 * Math.sin(f / 4 + o) : 1, x = X + o;
-        A.R(x + 1, ay - 2, 6, 3, '#2a1c22'); A.box(x + 2, ay - 12, 4, 10, '#c89a4a'); A.R(x + 3, ay - 11, 2, 2, '#ffe6b0');
-        A.glow(x + 4, ay - 6, 38, '#c8a0ff', 0.5 * fl); A.cone(x + 4, ay + 1, 60, 24, '#c8a0ff', 0.1 * fl);
-      }
-      const e = X + 100; A.box(e, ay + 6, 22, 9, '#10281c'); DD.text('EXIT', e + 11, ay + 7, '#8dffae', 1, null, 'center'); A.glow(e + 11, ay + 11, 24, '#40ff80', 0.25);
+    const ok = n => DD.ready(n), IM = n => DD.IMG[n], { c, VW, VH, f, lay } = Q, R = A.R, Wb = Math.round(250 - c.y * 0.4) - 44;   // Wb: the foot of the back wall, where the dim recliner rows begin
+    const flk = k => (A.hash(k, 9) < 0.2 ? 0.7 + 0.3 * Math.sin(f / 4 + k) : 1);
+    // ---- the back wall: acoustic fabric panels between slim brass battens, a dark wood dado, a magenta LED cove
+    lay(0.3, 48, (X, i) => {
+      const base = A.mix('#24142f', (A.hash(i, 3) - 0.5) * 0.12);
+      R(X, 0, 48, Wb, base); A.planks(X, 0, 48, Wb, base, 6, true);
+      R(X, 0, 1, Wb, '#0c0610'); R(X + 1, 0, 1, Wb, '#6a4a2c');   // the batten between panels
+      R(X + 4, 0, 40, Wb, 'rgba(0,0,0,0.12)'); R(X + 12, 0, 2, Wb, 'rgba(210,170,255,0.05)'); R(X + 30, 0, 2, Wb, 'rgba(210,170,255,0.05)');
+      R(X, Wb - 16, 48, 16, '#1a0f14'); A.planks(X, Wb - 16, 48, 16, '#1a0f14', 6, true);
     });
-    
-    lay(0.25, 400, (X, i) => { A.cone(X + 150, -6, 200, 64, '#bfe4ff', 0.06); });   // the projector beam through the haze
-    for (let i = 1; i <= 5; i++) { const Y = DD.wy(L.FLOORS[i] * 16) - 69, X0 = DD.wx(L.TIERX[i] * 16), X1 = DD.wx((L.TIERX[i + 1] || 200) * 16); if (X1 < 0 || X0 > VW) continue; const w = Math.min(VW, X1) - Math.max(0, X0); A.R(Math.max(0, X0), Y - 1, w, 3, 'rgba(208,72,176,0.12)'); }
-
+    R(0, Wb - 17, VW, 1, '#0a0508'); A.trim(0, Wb - 20, VW, '#a07a38');
+    R(0, Wb - 2, VW, 2, '#0a0508');
+    const cy = Wb - 78; R(0, cy, VW, 1, 'rgba(255,120,220,0.7)'); R(0, cy + 1, VW, 3, 'rgba(208,72,176,0.2)'); R(0, cy - 1, VW, 1, 'rgba(0,0,0,0.4)'); R(0, cy + 4, VW, 14, 'rgba(208,72,176,0.06)');
+    // ---- the big screen, far off, throwing cool light; an exit door
+    lay(0.3, 520, (X, i) => {
+      const sx = X + 120, sy = Wb - 70, fl = 0.8 + 0.2 * Math.sin(f / 9 + i * 3);
+      A.glow(sx + 48, sy + 26, 96, '#50b4d8', 0.3 * fl); A.cone(sx + 48, sy + 40, 90, 70, '#50b4d8', 0.06 * fl);
+      if (ok('w5_screen')) { A.box(sx - 3, sy - 3, 102, 58, '#120a18', { outline: '#050308' }); ctx.drawImage(IM('w5_screen'), sx, sy); R(sx, sy + 51, 96, 1, 'rgba(120,220,255,0.35)'); }
+      A.trim(sx - 3, sy - 6, 102, '#a07a38'); A.fringe(sx - 3, sy - 14, 102, '#7a1a3a');
+      const e = X + 400; A.box(e, Wb - 40, 22, 9, '#10281c', { outline: '#050a07' }); DD.text('EXIT', e + 11, Wb - 39, '#8dffae', 1, null, 'center'); A.glow(e + 11, Wb - 35, 26, '#40ff80', 0.28);
+    });
+    // ---- lightbox posters for the season's films (Kong, Belko, T2, Boss Baby)
+    lay(0.3, 260, (X, i) => {
+      const k = ((i % 4) + 4) % 4, pal = [['#2a5a30', '#f0a040', 'KONG'], ['#6a1018', '#f4ecdc', 'BELKO'], ['#c86a18', '#101018', 'T2'], ['#2a4a8a', '#f0d060', 'BOSS']][k], px = X + 230, py = Wb - 60;
+      A.box(px, py, 30, 40, '#0a060c', { outline: '#a07a38' }); R(px + 2, py + 2, 26, 32, pal[0]); R(px + 2, py + 2, 26, 12, A.mix(pal[0], 0.22)); R(px + 2, py + 22, 26, 12, A.mix(pal[0], -0.35));
+      R(px + 9, py + 14 + (k & 1) * 2, 12, 12, A.mix(pal[0], -0.6)); R(px + 12, py + 12 + (k & 1) * 2, 6, 5, A.mix(pal[0], -0.6)); R(px + 3, py + 3, 8, 1, pal[1]);
+      DD.text(pal[2], px + 15, py + 28, pal[1], 1, null, 'center'); R(px + 2, py + 34, 26, 4, '#0a060c'); R(px + 4, py + 35, 22, 1, A.mix(pal[1], -0.4));
+      A.glow(px + 15, py + 20, 34, pal[0], 0.22); R(px + 3, py - 3, 24, 1, 'rgba(255,230,160,0.5)'); A.glow(px + 15, py - 3, 10, '#ffe6b0', 0.25);
+    });
+    // ---- brass sconces that pool warm violet light; one on the blink
+    lay(0.3, 130, (X, i) => {
+      if (((i % 4) + 4) % 4 === 1) return;
+      const x = X + 60, fl = flk(i), y = Wb - 44;
+      R(x - 1, y + 8, 6, 3, '#2a1c22'); A.box(x, y, 4, 9, '#c89a4a'); R(x + 1, y + 1, 2, 2, '#ffe6b0');
+      A.glow(x + 2, y + 4, 34, '#c8a0ff', 0.5 * fl); A.cone(x + 2, y + 10, 36, 14, '#c8a0ff', 0.1 * fl);
+    });
+    // ---- the projector beam through the haze, from the booth
+    lay(0.25, 400, (X, i) => { A.cone(X + 150, -6, 200, 64, '#bfe4ff', 0.06); });
+    // ---- the dim back rows get patrons: head and shoulders, a slow shift; the screen rims them in blue
+    const yr = Math.round(250 - c.y * 0.4);
+    lay(0.4, 52, (X, i) => {
+      const h = A.hash(i, 21); if (h > 0.4) return;
+      const hx = X + 14 + Math.round(h * 8), hy = yr - 36 + Math.round(Math.sin(f / 50 + i * 2) * 0.8);
+      R(hx - 1, hy + 4, 14, 12, '#0a060e'); R(hx + 1, hy, 10, 9, '#0a060e'); R(hx + 1, hy, 10, 1, 'rgba(110,190,230,0.4)'); R(hx - 1, hy + 4, 1, 3, 'rgba(110,190,230,0.3)');
+    });
+    // ---- pillars with a lit edge, between the wall and the play layer
+    lay(0.55, 300, (X, i) => {
+      const x = X + 140; R(x, 0, 14, VH, '#140c1a'); R(x, 0, 14, 4, '#2a1c34'); R(x, 4, 1, VH, '#3a2a48'); R(x + 13, 0, 1, VH, '#07040a'); R(x + 11, 0, 1, VH, 'rgba(255,110,220,0.55)'); R(x + 9, 0, 2, VH, 'rgba(208,72,176,0.12)');
+      A.glow(x + 11, 70, 30, '#ff6edc', 0.12); R(x - 1, Wb - 20, 16, 3, '#a07a38'); R(x - 1, Wb - 20, 16, 1, '#e0c070');
+    });
+    // ---- the lighting truss at the top of the room, cans aimed down, three colours chasing
+    const ty = 26 - Math.round((c.y - 250) * 0.08);
+    R(0, ty, VW, 3, '#1a1220'); R(0, ty, VW, 1, '#5a4a70'); R(0, ty + 3, VW, 1, '#07040a');
+    lay(0.2, 88, (X, i) => {
+      const x = X + 40, col = ['#ffb040', '#d048b0', '#60b8ff'][((i % 3) + 3) % 3], on = (Math.floor(f / 90) + i) % 4 !== 0, fl = on ? flk(i + 40) : 0.15;
+      R(x, 0, 1, ty, '#2a2234'); R(x + 20, 0, 1, ty, '#2a2234'); R(x + 3, ty + 4, 14, 5, '#0a060e'); R(x + 3, ty + 4, 14, 1, '#4a3a58'); R(x + 5, ty + 8, 10, 2, col);
+      A.glow(x + 10, ty + 10, 18, col, 0.5 * fl); A.cone(x + 10, ty + 10, 90, 22, col, 0.09 * fl);
+    });
+    // ---- slow haze drifting through the lights
+    for (let i = 0; i < 3; i++) A.glow(((f * (0.2 + i * 0.07) + i * 170) % (VW + 200)) - 100, 60 + i * 22, 90, '#9070b8', 0.05);
+    const mx = DD.wx(3 * 16); if (mx > -100 && mx < VW) {   // the lobby menu board, redrawn over the new wall, now with a glow
+      const bx = DD.wx(2 * 16) + 44, by = DD.wy(22 * 16) - 10; A.glow(bx, by + 24, 70, '#f0c84a', 0.14);
+      if (ok('w5_menuboard')) ctx.drawImage(IM('w5_menuboard'), Math.round(DD.wx(2 * 16)), by);
+      DD.text('MENU', bx, by + 7, '#f0c84a', 1, null, 'center'); DD.text('LOBSTER MAC', bx, by + 17, '#f4ecdc', 1, null, 'center'); DD.text('TRUFFLE OIL POPCORN', bx, by + 27, '#c8922c', 1, null, 'center'); DD.text('NO OUTSIDE FOOD', bx, by + 40, '#ff8a80', 1, null, 'center');
+    }
+    // ---- the lobby: a brass stanchion and velvet rope line, at the start of the stage
+    const lx = DD.wx(5 * 16), ly = DD.wy(30 * 16);
+    if (lx > -80 && lx < VW) {
+      for (let k = 0; k < 3; k++) { const x = lx + k * 30; A.box(x, ly - 20, 3, 20, '#c89a4a'); R(x - 2, ly - 2, 7, 2, '#7a5a28'); R(x - 1, ly - 22, 5, 3, '#e0c070'); if (k < 2) { for (let s = 0; s < 27; s++) R(x + 4 + s, ly - 17 + Math.round(Math.sin(s / 27 * Math.PI) * 3), 1, 2, '#9a1428'); } }
+    }
+  },
+  mid(ctx, G, A) {   // brass row plates on the tier faces, and a glow on every warning sign
+    const L = window.LEVEL, VW = DD.VW;
+    for (let i = 1; i <= 5; i++) {
+      const x0 = L.TIERX[i], x1 = L.TIERX[i + 1] || 200, Y = DD.wy((L.FLOORS[i] + 1) * 16) + 4;
+      for (let t = x0 + 3; t < x1; t += 8) { const X = DD.wx(t * 16); if (X < -10 || X > VW) continue; A.R(X, Y, 8, 5, '#07060d'); A.R(X + 1, Y + 1, 6, 3, '#a07a38'); A.R(X + 1, Y + 1, 6, 1, '#e0c070'); DD.text('ABCDE'[(i - 1) % 5], X + 4, Y, '#07060d', 1, null, 'center'); }
+    }
+    for (const sg of (G.s && G.s.signs) || []) { const X = DD.wx(sg.x), Y = DD.wy(sg.y); if (X > -60 && X < VW + 60) A.glow(X, Y + 6, 38, '#ff60c8', 0.22); }
   },
 };
   const t0 = th.tile, b0 = th.bg, f0 = S.drawFG, m0 = S.drawMid;

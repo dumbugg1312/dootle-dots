@@ -71,7 +71,7 @@
     }
   }
 
-  // the rotation: each level starts on its own song, then moves through one shared order of every track on events
+  // the rotation: each level plays its own song start to finish; a boss fight moves once through one shared order of every track
   const ROT = (CUES.rotation || []).filter(Boolean), RKEY = 'dootledots.music.rot';
   let rotAt = 0; try { rotAt = (+localStorage.getItem(RKEY) || 0) % Math.max(1, ROT.length); } catch (e) {}
   let preview = null, carry = null;   // carry: the song the last level ended on   // the jukebox plays the highlighted song
@@ -101,7 +101,8 @@
     const cps = (DD.bodies || []).filter(b => b.kind === 'cp' && b.lit).length, B = G.boss;
     const event = cps > run.cps || (B && B.engaged && !run.engaged) || (B && B.phase > run.phase);
     run.cps = cps; if (B) { run.engaged = !!B.engaged; run.phase = B.phase || 0; }
-    if (event && !G.done && run.switches < (CUES.switchesPerLevel || 2) && now - run.last >= (CUES.minSeconds || 40)) {
+    const cap = isBoss ? (CUES.bossSwitches != null ? CUES.bossSwitches : 1) : (CUES.switchesPerLevel != null ? CUES.switchesPerLevel : 0);   // a stage keeps its song; a boss fight changes it once
+    if (event && !G.done && run.switches < cap && now - run.last >= (CUES.minSeconds || 40)) {
       run.name = nextSong(run.name); run.switches++; run.last = now; if (LOG) console.log('MUSIC rotates to ' + run.name);
     }
     if (run.upnext !== ROT[rotAt % ROT.length]) run.upnext = ROT[rotAt % ROT.length];

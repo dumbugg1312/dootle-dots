@@ -8,6 +8,13 @@ window.LEVEL = {"id": "10-1", "name": "THE LOBBY", "sub": "MOVIE HOUSE: COMING S
   const TS = 16, FL = 21 * TS, DOOR = 13 * TS, ATTIC = 160 * TS, COLLAPSE_X = 219 * TS;
   const im = (n) => DD.ready(n) ? DD.IMG[n] : null;
   const put = (ctx, n, x, y) => { const i = im(n); if (i) ctx.drawImage(i, Math.round(x), Math.round(y)); };           // top-left, screen px
+  // looks 2: a seated host's idle life: a head bob now and then, a blink (the eye pixels painted over in skin), a wince when a Dot is hurt, a hop when you stomp something near them
+  const live = (ctx, n, x, y, seed, o) => {
+    const i = im(n); if (!i) return; const G = DD.G, A = DD.art, f = G.frame, h = A.hash(seed, 7), wince = !!(G.pl && G.pl.inv > 0), nod = ((f + (h * 300 | 0)) % 150) < 8 ? 1 : 0, lean = wince ? 1 : 0, hh = o.headH;
+    const blink = o.eyes && (((f + (h * 400 | 0)) % (190 + (h * 120 | 0))) < 5 || wince), px = Math.round(x), py = Math.round(y);
+    ctx.drawImage(i, 0, hh, i.width, i.height - hh, px, py + hh, i.width, i.height - hh); ctx.drawImage(i, 0, 0, i.width, hh, px + lean, py + nod, i.width, hh);
+    if (blink) for (const e of o.eyes) A.R(px + lean + e[0], py + nod + e[1], e[2], 1, o.skin);
+  };
   const putW = (ctx, n, wx, wy) => put(ctx, n, DD.wx(wx), DD.wy(wy));                                                    // top-left, world px
   const slice = (ctx, n, sx, sy, sw, sh, dx, dy) => { const i = im(n); if (i) ctx.drawImage(i, sx, sy, sw, sh, Math.round(dx), Math.round(dy), sw, sh); };
   const glow = (ctx, x, y, r, rgb, a) => { const g = ctx.createRadialGradient(x, y, 1, x, y, r); g.addColorStop(0, `rgba(${rgb},${a})`); g.addColorStop(1, `rgba(${rgb},0)`); ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); };
@@ -242,7 +249,12 @@ window.LEVEL = {"id": "10-1", "name": "THE LOBBY", "sub": "MOVIE HOUSE: COMING S
       if (FLR[k] && ok(FLR[k])) {
         const i = I[FLR[k]], sx = (tx % 2) * 16;
         if (lip) ctx.drawImage(i, sx, 0, 16, 16, X, Y, 16, 16);
-        else { ctx.drawImage(i, sx, 6, 16, 5, X, Y, 16, 5); ctx.drawImage(i, sx, 6, 16, 5, X, Y + 5, 16, 5); ctx.drawImage(i, sx, 6, 16, 6, X, Y + 10, 16, 6); ctx.fillStyle = `rgba(14,4,10,${Math.min(0.7, 0.35 + 0.08 * (ty - 21))})`; ctx.fillRect(X, Y, 16, 16); }
+        else { ctx.drawImage(i, sx, 6, 16, 5, X, Y, 16, 5); ctx.drawImage(i, sx, 6, 16, 5, X, Y + 5, 16, 5); ctx.drawImage(i, sx, 6, 16, 6, X, Y + 10, 16, 6); ctx.fillStyle = `rgba(14,4,10,${Math.min(0.7, 0.35 + 0.08 * (ty - 21))})`; ctx.fillRect(X, Y, 16, 16);
+          if (ty >= 22) { const A = DD.art, d = ty - 21, h = A.hash(tx, ty);   // looks 2: the cut-away under the floor: a joist (or porch foundation stone), then a crawlspace with a sagging cord, a pipe and droppings, darker with depth
+            if (k === 'stone') { A.R(X, Y, 16, 16, '#3a3236'); A.R(X, Y + 7, 16, 1, '#161014'); A.R(X + 7 + (d & 1) * 3, Y, 1, 7, '#161014'); A.R(X + 3 + (d & 1) * 5, Y + 8, 1, 8, '#161014'); A.R(X, Y, 16, 1, 'rgba(255,240,220,0.08)'); A.R(X, Y, 16, 16, 'rgba(0,0,0,' + (0.12 * d) + ')'); }
+            else if (d === 1) { A.R(X, Y, 16, 16, '#1c0f12'); A.R(X, Y + 2, 16, 9, '#4a2c22'); A.R(X, Y + 2, 16, 1, '#7a5238'); A.R(X, Y + 10, 16, 1, '#241410'); A.R(X + 3, Y + 5, 1, 1, '#9a8a7a'); A.R(X + 12, Y + 5, 1, 1, '#9a8a7a'); A.R(X + 4 + (h * 6 | 0), Y + 7, 5, 1, '#3a2418'); }
+            else { A.R(X, Y, 16, 16, 'rgba(10,4,10,0.5)'); if (d === 2) { A.R(X, Y + 7, 16, 3, '#5a4a3c'); A.R(X, Y + 7, 16, 1, '#8a7a64'); A.R(X, Y + 9, 16, 1, '#2a2018'); if (tx % 5 === 0) A.R(X + 5, Y + 5, 5, 7, '#8a7a64'); } else { A.R(X, Y + 6 + Math.round(Math.sin((tx + 0.5) / 3) * 3), 16, 2, 'rgba(232,116,42,0.5)'); if (h < 0.3) { A.R(X + 3 + (h * 30 | 0), Y + 12, 2, 1, '#2a1a10'); A.R(X + 9, Y + 13, 1, 1, '#2a1a10'); } } } }
+        }
         return true;
       }
       if (k === 'stair' && ok('w10_stair')) {
@@ -340,10 +352,10 @@ window.LEVEL = {"id": "10-1", "name": "THE LOBBY", "sub": "MOVIE HOUSE: COMING S
         put(ctx, 'w10_standee_cow', X(21) + 6, Yb(FL) - 58);
         // tim and gregg in their tall director's chairs (Season 15: Tim in red, Gregg in the cap and DELIVERY MAN tee)
         const hostY = Yb(FL), tx0 = X(24), bob = Math.round(Math.sin(f / 50) * 0.6);
-        put(ctx, 'w10_chair', tx0, hostY - 34); put(ctx, 'w10_tim_seat', tx0 + 9, hostY - 36 + bob);
+        put(ctx, 'w10_chair', tx0, hostY - 34); live(ctx, 'w10_tim_seat', tx0 + 9, hostY - 36 + bob, 1, { headH: 13, eyes: [[10, 7, 2], [16, 7, 2]], skin: '#e8b890' });
         put(ctx, 'w10_table', X(26) + 4, hostY - 30);
         DD.art.cone(X(26) + 22, 0, hostY, 80, '#ffe6c0', 0.09); DD.art.glow(X(26) + 22, 8, 24, '#fff0d0', 0.2);   // the show's key light on the hosts
-        put(ctx, 'w10_chair', X(28), hostY - 34); put(ctx, 'w10_gregg_seat', X(28) + 9, hostY - 36 - bob);
+        put(ctx, 'w10_chair', X(28), hostY - 34); live(ctx, 'w10_gregg_seat', X(28) + 9, hostY - 36 - bob, 2, { headH: 13, eyes: [[10, 7, 2], [16, 7, 2]], skin: '#e8b890' });
         if (G.pl.x > 21 * TS && G.pl.x < 33 * TS && f % 120 < 50) DD.text('!', X(28) + 21, hostY - 52 - (f % 120) / 12, '#ffe680', 1, '#2a0a10', 'center');
         put(ctx, 'w10_standee_tux', X(37) + 4, Yb(FL) - 58);
         for (const t of [18, 36, 44]) if (vis(t * TS, t * TS + 20)) { put(ctx, 'w10_lamp', X(t), Yb(FL) - 26); glow(ctx, X(t) + 7, Yb(FL) - 22, 36, '255,200,120', 0.3); }
@@ -357,7 +369,7 @@ window.LEVEL = {"id": "10-1", "name": "THE LOBBY", "sub": "MOVIE HOUSE: COMING S
         ctx.fillStyle = '#4a2a20'; ctx.fillRect(X(46) + 6, Yb(FL) - 70, 150, 3);                                      // the shelf behind the counter
         for (let i = 0; i < 12; i++) put(ctx, 'w10_chili', X(46) + 12 + i * 12, Yb(FL) - 80);
         DD.text("CHAPLIN'S CHILI - 2 BUCKS", X(52) + 8, Yb(FL) - 64, '#ffe0a0', 1, '#2a1008', 'center');
-        put(ctx, 'w10_chair', X(57) + 2, Yb(FL) - 34); put(ctx, 'w10_santa_seat', X(57) + 11, Yb(FL) - 36 + Math.round(Math.sin(f / 44) * 0.6));
+        put(ctx, 'w10_chair', X(57) + 2, Yb(FL) - 34); live(ctx, 'w10_santa_seat', X(57) + 11, Yb(FL) - 36 + Math.round(Math.sin(f / 44) * 0.6), 3, { headH: 14 });
         for (let i = 0; i < 6; i++) put(ctx, 'w10_chili', X(47) + 8 + i * 12, Yb(19 * TS) - 10);   // the pouches on the counter top
       }
       // the stairs: the wall behind them, Newman Massage's purple chyron, the rail along each step

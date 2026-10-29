@@ -367,12 +367,27 @@
         const I = DD.IMG, ok = DD.ready, kind = (x, y) => DD.kindAt(x, y);
         const lip = kind(tx, ty - 1) !== k;
         if (k === 'carpet' && ok('w2_carpet')) {
+        if (!lip && ty > F) { const A = DD.art, d = ty - F, hh = A.hash(tx, ty);   // looks pass 2: the floor band, cut away: a panelled riser fascia with a moulding and brass step-lights, then dark joists, a cable run with gaffer tape
+          if (d === 1) { A.R(X, Y, 16, 16, '#2c120e'); A.R(X, Y, 16, 1, '#7a4a22'); A.R(X, Y + 1, 16, 1, '#140806'); A.R(X + 2, Y + 3, 12, 10, '#22100c'); A.R(X + 2, Y + 3, 12, 1, '#0e0604'); A.R(X + 2, Y + 12, 12, 1, '#5a3220'); A.R(X + 13, Y + 3, 1, 10, '#4a2818'); A.R(X, Y + 15, 16, 1, '#0e0604');
+            if (tx % 4 === 1) { A.R(X + 5, Y + 5, 6, 5, 'rgba(255,184,96,0.16)'); A.R(X + 6, Y + 6, 4, 3, '#ffc870'); A.R(X + 6, Y + 6, 4, 1, '#fff0c0'); } A.R(X, Y, 16, 16, 'rgba(6,0,4,0.18)'); }
+          else { A.R(X, Y, 16, 16, '#140608'); A.R(X, Y + 5, 16, 4, '#241010'); A.R(X, Y + 5, 16, 1, '#3a1c14'); A.R(X, Y + 9, 16, 1, '#0a0304'); if (tx % 4 === 0) { A.R(X + 6, Y, 4, 5, '#1e0c0c'); A.R(X + 6, Y, 1, 5, '#341a14'); }
+            A.R(X, Y + 11, 16, 2, '#07020a'); A.R(X, Y + 11, 16, 1, '#2a1c2a'); if (hh < 0.4) A.R(X + 3 + (tx & 3) * 2, Y + 11, 3, 2, (tx & 1) ? '#c8c8b0' : '#e8c84a'); A.R(X, Y, 16, 16, 'rgba(0,0,0,' + Math.min(0.4, (d - 2) * 0.16) + ')'); }
+          return true; }
           ctx.drawImage(I.w2_carpet, X, Y);
           { const A = DD.art; if (lip) { A.R(X, Y, 16, 1, '#d8a040'); A.R(X, Y + 1, 16, 1, '#8a5a1c'); A.R(X, Y + 2, 16, 1, 'rgba(0,0,0,0.3)'); } else if (ty > F + 1) { ctx.fillStyle = 'rgba(8,0,6,' + Math.min(0.45, (ty - F) * 0.12) + ')'; ctx.fillRect(X, Y, 16, 16); } }
           if (lip) { ctx.fillStyle = '#5a3418'; ctx.fillRect(X, Y, 16, 1); if (tx % 3 === 0) { ctx.fillStyle = '#fff2a6'; ctx.fillRect(X + 7, Y + 2, 2, 1); ctx.fillStyle = '#c98f22'; ctx.fillRect(X + 6, Y + 2, 1, 1); ctx.fillRect(X + 9, Y + 2, 1, 1); } }
           else if (ty > F + 1) { ctx.fillStyle = 'rgba(10,2,4,0.25)'; ctx.fillRect(X, Y, 16, 16); }
           return true;
         }
+        if (k === 'stage' && !lip && ty > F && ok('w2b_stage')) {   // looks pass 2: the stage front under the boards: a gilt lip rail with footlight bulbs, red velvet skirt pleats with fringe, then a crawlspace with a caged work lamp, joists and a taped cable run
+          const A = DD.art, d = ty - F, f = DD.G.frame, hh = A.hash(tx, ty);
+          if (d === 1) { A.R(X, Y, 16, 16, '#4a0a18'); for (let i = 0; i < 16; i++) A.R(X + i, Y, 1, 16, A.mix('#6a1024', [0.15, 0.05, -0.1, -0.25, -0.1, 0.05][i % 6]));
+            A.R(X, Y, 16, 3, '#b07a1c'); A.R(X, Y, 16, 1, '#f0d070'); A.R(X, Y + 3, 16, 1, '#2a0a10'); A.R(X + 3, Y + 1, 3, 1, ((f >> 4) + tx) & 1 ? '#fffbe0' : '#ffd860'); A.R(X + 10, Y + 1, 3, 1, ((f >> 4) + tx + 1) & 1 ? '#fffbe0' : '#ffd860');
+            A.R(X, Y + 4, 16, 1, 'rgba(255,200,100,0.16)'); A.fringe(X, Y + 12, 16, '#c98f22'); A.R(X, Y, 16, 16, 'rgba(8,2,6,0.2)'); }
+          else { A.R(X, Y, 16, 16, '#120608'); A.R(X, Y + 4, 16, 3, '#201010'); A.R(X, Y + 4, 16, 1, '#341a14'); A.R(X + (tx % 3) * 5, Y, 2, 16, '#1a0c0c'); A.R(X + 15, Y, 1, 16, '#0a0304');
+            if (tx % 5 === 2 && d === 2) { A.R(X + 6, Y + 2, 4, 5, '#3a3a46'); A.R(X + 6, Y + 2, 4, 1, '#6a6a78'); A.R(X + 7, Y + 7, 2, 2, '#ffe8a0'); A.R(X + 4, Y + 6, 8, 6, 'rgba(255,224,150,0.12)'); }
+            A.R(X, Y + 12, 16, 2, '#07020a'); A.R(X, Y + 12, 16, 1, '#2a1c2a'); if (hh < 0.4) A.R(X + 3 + (tx & 3) * 2, Y + 12, 3, 2, (tx & 1) ? '#c8c8b0' : '#e8c84a'); A.R(X, Y, 16, 16, 'rgba(0,0,0,' + Math.min(0.4, (d - 2) * 0.16) + ')'); }
+          return true; }
         if (k === 'stage' && ok('w2b_stage')) {
           ctx.drawImage(I.w2b_stage, (tx * 16) % 32, lip ? 0 : 16, 16, 16, X, Y, 16, 16);
           { const A = DD.art; if (lip) { A.R(X, Y, 16, 1, '#fbe0a0'); A.R(X, Y + 1, 16, 1, '#c98f22'); A.R(X, Y + 2, 16, 1, 'rgba(0,0,0,0.25)'); if (tx % 2 === 0) { A.R(X + 5, Y, 6, 3, 'rgba(255,240,170,0.28)'); A.R(X + 7, Y, 2, 1, '#fffbe0'); } } else { A.R(X, Y, 16, 1, 'rgba(255,255,255,0.08)'); A.R(X + 15, Y, 1, 16, 'rgba(0,0,0,0.25)'); A.R(X, Y + 15, 16, 1, 'rgba(0,0,0,0.3)'); } }
@@ -445,9 +460,12 @@
             lit(X0 + 42, Y0 - 24, 60, 0.12);
             ctx.save(); ctx.filter = 'brightness(0.85)';
             for (let i = 0; i < 3; i++) ctx.drawImage(I.seat, X0 + i * 28, Y0 - 32);
-            const bob = Math.round(Math.sin(s.hostT / 40));
-            if (!s.timOut) ctx.drawImage(I[s.react.tim > 0 ? 'w2b_tim_r' : 'w2b_tim'], X0 + 28, Y0 - 44 + bob);
-            ctx.drawImage(I[s.react.gregg > 0 ? 'w2b_gregg_r' : 'w2b_gregg'], X0 + 56, Y0 - 44 - bob);
+            // looks pass 2: the audience lives: a blink every few seconds, a hop with both hands up when Dr. San takes a hit, a flinch when the Dot is hurt, a rattle on Baxter's slam, a lean on a phase change
+            const fr = G.frame, bob = Math.round(Math.sin(s.hostT / 40)), cheer = fr - (G.flashAt ?? -999) < 30 ? -Math.round(Math.abs(Math.sin((fr - G.flashAt) / 3.2)) * 3) : 0,
+              wince = G.pl.inv > 0 ? 2 : 0, rat = fr - (G.dipAt ?? -999) < 14 ? ((fr >> 1) & 1 ? 1 : -1) : 0, lean = fr - (G.flareAt ?? -999) < 40 ? 1 : 0;
+            if (!s.timOut) { const tx0 = X0 + 28 + rat + lean, ty0 = Y0 - 44 + bob + cheer + wince; ctx.drawImage(I[s.react.tim > 0 ? 'w2b_tim_r' : 'w2b_tim'], tx0, ty0);
+              if (!(s.react.tim > 0) && (fr + 60) % 210 < 5) { ctx.fillStyle = '#3a2428'; ctx.fillRect(tx0 + 10, ty0 + 10, 3, 1); ctx.fillRect(tx0 + 15, ty0 + 10, 3, 1); } }
+            ctx.drawImage(I[s.react.gregg > 0 ? 'w2b_gregg_r' : 'w2b_gregg'], X0 + 56 - rat, Y0 - 44 - bob + (cheer ? cheer + 1 : 0) + wince);
             ctx.restore();
           }
         }

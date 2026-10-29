@@ -87,7 +87,7 @@ window.LEVEL = {"id": "7-2", "name": "MARKIVES", "sub": "ON CINEMA MARKIVES", "w
       const crt = (X, Y, w, h, k) => {   // a CRT monitor playing Mark's tape: a head-and-shoulders on blue, a tracking bar that rolls (fast while the tape winds)
         if (X > VW + 10 || X + w < -10) return;
         ctx.fillStyle = '#0a0c12'; ctx.fillRect(X, Y, w, h); ctx.fillStyle = '#14304a'; ctx.fillRect(X + 1, Y + 1, w - 2, h - 3);
-        ctx.fillStyle = '#6a8aa8'; ctx.fillRect(X + (w >> 1) - 1, Y + (h >> 1) - 2, 3, 3); ctx.fillRect(X + (w >> 1) - 3, Y + (h >> 1) + 1, 7, h - (h >> 1) - 4);
+        ctx.fillStyle = '#6a8aa8'; const sw = Math.round(Math.sin((glitch ? s.T * 0.02 : f / 50) + k * 2.1)); ctx.fillRect(X + (w >> 1) - 1 + sw, Y + (h >> 1) - 2, 3, 3); ctx.fillRect(X + (w >> 1) - 3, Y + (h >> 1) + 1, 7, h - (h >> 1) - 4);   // the talking head nods and sways a pixel
         const by = Y + 1 + Math.abs(((s.T * (glitch ? 0.4 : 0.05) + k * 17) % (2 * (h - 6))) - (h - 6)) | 0;
         ctx.fillStyle = glitch ? 'rgba(255,255,255,0.7)' : 'rgba(180,220,255,0.25)'; ctx.fillRect(X + 1, by, w - 2, glitch ? 2 : 1);
         if (glitch) { ctx.fillStyle = 'rgba(255,106,90,0.4)'; ctx.fillRect(X + 1 + ((f * 3 + k * 5) % (w - 8)), by + 2, 6, 1); }
@@ -109,6 +109,7 @@ window.LEVEL = {"id": "7-2", "name": "MARKIVES", "sub": "ON CINEMA MARKIVES", "w
         A.R(0, top - 44, VW, 4, '#10182a'); A.R(0, top - 44, VW, 1, '#2a3652');
         A.R(0, FL - 6, VW, 6, '#0a1020'); A.R(0, FL - 6, VW, 1, '#1a2640');   // the baseboard
         ctx.fillStyle = 'rgba(2,4,10,0.35)'; ctx.fillRect(0, 0, VW, VH); }
+      if (window.LEVEL.under) window.LEVEL.under(ctx, G, DD.art, { c, f, FL, UF, gx });   // looks pass: the lit set pieces that sit under the props below
       // lower set (the Blackreen audition): the casting office. Seamless paper backdrops, headshots on the wall, folding chairs, light stands, the monitor wall behind the casting table
       for (const tx of [74, 81, 88, 95]) { const X = gx(tx), W = 96; if (X > VW + 20 || X + W < -20) continue;
         ctx.fillStyle = '#1c2840'; ctx.fillRect(X, FL - 110, W, 110); ctx.fillStyle = '#243656'; ctx.fillRect(X + 3, FL - 107, W - 6, 107); ctx.fillStyle = '#05070c'; ctx.fillRect(X - 2, FL - 112, W + 4, 4); ctx.fillStyle = '#2a3446'; ctx.fillRect(X - 2, FL - 112, W + 4, 1); }
@@ -357,4 +358,102 @@ window.LEVEL = {"id": "7-2", "name": "MARKIVES", "sub": "ON CINEMA MARKIVES", "w
     g.addColorStop(0, CFG.bg[0]); g.addColorStop(1, CFG.bg[1]); ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH);
     ctx.fillStyle = CFG.bg[2]; for (let x = -((c.x * 0.4) % 32); x < VW; x += 32) ctx.fillRect(Math.round(x), 0, 1, VH); for (let y = -((c.y * 0.4) % 32); y < VH; y += 32) ctx.fillRect(0, Math.round(y), VW, 1);
   };
+})();
+
+// ==== LOOKS PASS (design/LOOKS-BRIEF.md): a lit studio behind the VHS framing. L.under runs inside theme.bg, right after the foam wall, so the
+// set pieces below sit under the original headshots, chairs and stands; the wrapper after it adds the light and life on top.
+;(function () {
+  const L = window.LEVEL, th = L.theme, S = L.script, VW = 320, VH = 180, TS = 16;
+  const A0 = () => DD.art;
+  // the VHS archive: a shelf of tapes with coloured spines
+  const shelf = (A, X, Y, w, rows) => {
+    const R = A.R, h = rows * 22 + 4;
+    A.box(X, Y, w, h, '#2a1c14');
+    for (let r = 0; r < rows; r++) {
+      const y = Y + 3 + r * 22; R(X + 2, y, w - 4, 19, '#0a0608'); R(X + 2, y + 19, w - 4, 1, '#6a4a2c');
+      for (let x = X + 3, k = 0; x < X + w - 7; x += 5, k++) {
+        const hh = A.hash(k + r * 40, X & 255), th2 = 14 + ((hh * 5) | 0) % 4;
+        R(x, y + 19 - th2, 4, th2, '#16161e'); R(x, y + 19 - th2, 1, th2, '#2a2a38');
+        R(x + 1, y + 21 - th2 + 2, 2, 5, ['#a8a090', '#a04a40', '#3a90a8', '#a08a48', '#5a9a68'][(hh * 977 | 0) % 5]);
+      }
+    }
+    R(X, Y + h - 2, w, 2, '#0a0608');
+  };
+  L.under = function (ctx, G, A, Q) {
+    const { c, f, FL, UF, gx } = Q, R = A.R, hsh = A.hash;
+    // light washes on the foam wall: slow gel colours falling from the grid
+    const ox = -Math.round(c.x * 0.25) % 110;
+    for (let x = ox - 110, k = 0; x < VW + 110; x += 110, k++) { A.cone(x + 40, FL - 150, 144, 46, ['#4a90ff', '#ff6aa0', '#40e0d0'][((k + Math.floor(c.x * 0.25 / 110)) % 3 + 3) % 3], 0.1); }
+    // seamless paper rolls hung on pipes, lit from above
+    for (const [t0, tw, col] of [[0, 14, '#27505c'], [28, 12, '#4a2a3c'], [62, 11, '#2a4a3c'], [102, 11, '#5a4a30']]) {
+      const X = gx(t0), W = tw * TS; if (X > VW + 8 || X + W < -8) continue;
+      const y0 = FL - 118, h = 112;
+      R(X, y0, W, h, col); R(X, y0, W, 20, A.mix(col, 0.18)); R(X, y0 + 20, W, 20, A.mix(col, 0.08)); R(X, y0 + h - 22, W, 22, A.mix(col, -0.2));
+      R(X, y0 + h - 8, W, 3, A.mix(col, 0.15)); R(X + 1, y0, 1, h, A.mix(col, 0.25)); R(X + W - 2, y0, 2, h, A.mix(col, -0.45));
+      A.box(X - 4, y0 - 5, W + 8, 5, '#8a98b0'); R(X - 4, y0 - 5, W + 8, 1, '#e8f0fa');
+      for (let i = 0; i < W; i += 4) R(X + i, y0, 1, 1, A.mix(col, -0.5));
+      A.glow(X + W / 2, y0 + 10, W * 0.7, '#cfe4ff', 0.12);
+    }
+    // the VHS archive, the shelf wall beside the first gap, a label lit over it
+    { const X = gx(15); if (X > -170 && X < VW + 10) { shelf(A, X, FL - 104, 160, 3); R(X + 54, FL - 32, 52, 9, '#0a0608'); R(X + 54, FL - 32, 52, 1, '#c98f22'); DD.text('THE ARCHIVE', X + 80, FL - 30, '#ffd060', 1, null, 'center'); A.glow(X + 80, FL - 28, 50, '#ffd060', 0.14); } }
+    // ---- the second stage: the Scrooge set behind the ghost deck (flats with a gilt valance and damask paper), the riser's scaffold below it
+    const x0 = gx(12), x1 = gx(108);
+    if (x1 > 0 && x0 < VW) {
+      const a = Math.max(x0, -16), b = Math.min(x1, VW + 16), top = UF - 120;
+      R(a, top, b - a, 120, '#3a1a32'); A.planks(a, top, b - a, 120, '#3a1a32', 12, true);
+      for (let y = top + 10, r = 0; y < UF - 30; y += 14, r++) for (let x = a - ((a - x0) % 24 + 24) % 24 + (r & 1) * 12; x < b; x += 24) { R(x + 4, y, 3, 3, '#5a2a48'); R(x + 5, y - 2, 1, 7, '#4a2240'); }
+      R(a, UF - 30, b - a, 30, '#26121c'); A.planks(a, UF - 30, b - a, 30, '#26121c', 10, true); A.trim(a, UF - 32, b - a, '#c98f22');
+      R(a, top, b - a, 8, '#6a1424'); A.fringe(a, top + 8, b - a, '#c98f22'); A.trim(a, top, b - a, '#e0b04a');
+      for (let x = a - ((a - x0) % 20 + 20) % 20; x < b; x += 20) { R(x + 2, top + 16, 3, 2, '#2a6a3a'); R(x + 4, top + 17, 2, 2, '#3a8a4a'); R(x + 8, top + 18, 3, 2, '#2a6a3a'); R(x + 6, top + 19, 2, 2, '#c8202c'); }   // a holly swag
+      R(x0, top, 3, 120, '#0a0608'); R(x1 - 3, top, 3, 120, '#0a0608');
+      for (let x = a; x < b; x += 160) A.glow(x + 80, top + 40, 110, '#ffb070', 0.1);
+      // the moon window, a gilt frame and the cold beam it throws
+      { const X = gx(43), Y = UF - 112; if (X > -60 && X < VW + 20) { A.box(X, Y, 44, 64, '#c98f22', { outline: '#0a0608' }); R(X + 3, Y + 3, 38, 58, '#9ab8e8'); R(X + 3, Y + 3, 38, 22, '#6a88c8'); R(X + 20, Y + 3, 3, 58, '#c98f22'); R(X + 3, Y + 30, 38, 3, '#c98f22'); R(X + 8, Y + 8, 7, 7, '#f4f0d8'); R(X + 10, Y + 8, 5, 5, '#9ab8e8'); A.glow(X + 22, Y + 32, 60, '#a8c8ff', 0.25); A.cone(X + 22, Y + 62, 90, 34, '#a8c8ff', 0.1); A.fringe(X - 6, Y - 2, 56, '#6a1424'); } }
+      // the fireplace's gilt frame
+      { const X = gx(76); if (X > -60 && X < VW + 20) { A.box(X + 4, UF - 106, 36, 44, '#c98f22', { outline: '#0a0608' }); R(X + 7, UF - 103, 30, 38, '#1a1226'); R(X + 14, UF - 98, 16, 14, '#8a6a58'); R(X + 11, UF - 82, 22, 18, '#2a2a4a'); } }
+      // the scaffold under the riser
+      const sb = FL - 150;
+      for (let x = a - ((a - x0) % 64 + 64) % 64; x < b; x += 64) { R(x, UF + 8, 3, sb - UF - 8, '#1c2638'); R(x, UF + 8, 1, sb - UF - 8, '#4a5a78'); for (let k = 0; k < 24; k++) { const yy = UF + 10 + k * 3; if (yy > sb - 6) break; R(x + 3 + k * 2, yy + (k * 2 % 5), 2, 1, '#243044'); R(x + 61 - k * 2, yy + (k * 2 % 5), 2, 1, '#243044'); } }
+      R(a, UF + 30, b - a, 2, '#2a3650'); R(a, UF + 8, b - a, 1, '#05070c');
+    }
+  };
+  const b0 = th.bg, t0 = th.tile, f0 = S.drawFG;
+  th.bg = function (ctx, G, DDx) {
+    b0.apply(this, arguments);
+    const A = DD.art, R = A.R, f = G.frame, FL = Math.round(DD.wy(21 * 16)), UF = Math.round(DD.wy(7 * 16)), gx = tx => Math.round(DD.wx(tx * 16));
+    const fl = k => (A.hash(k, 4) < 0.2 ? 0.6 + 0.4 * Math.sin(f / 3 + k) : 1);
+    // key lights on the stands pool on the floor and the wall
+    for (const tx of [11, 38, 72, 99, 113]) { const X = gx(tx); if (X > -60 && X < VW + 60) { A.glow(X, FL - 4, 44, '#ffe8a8', 0.16); A.glow(X, FL - 70, 30, '#ffe8a8', 0.1); } }
+    // softboxes on stands
+    for (const tx of [66, 106]) { const X = gx(tx); if (X < -30 || X > VW + 30) continue; R(X, FL - 40, 1, 40, '#2a3446'); R(X - 5, FL - 1, 11, 1, '#2a3446'); A.box(X - 11, FL - 56, 22, 16, '#3a4660'); R(X - 9, FL - 54, 18, 12, '#f4f0e0'); R(X - 9, FL - 54, 18, 2, '#ffffff'); A.glow(X, FL - 48, 50, '#fff0d0', 0.22); A.cone(X, FL - 40, 50, 24, '#fff0d0', 0.08); }
+    // apple boxes, a clapperboard and a coil of cable, low on the floor
+    for (const tx of [3, 36, 65, 100]) { const X = gx(tx); if (X < -20 || X > VW + 20) continue; A.box(X, FL - 7, 14, 7, '#8a6a3a', { outline: '#2a1e0e' }); R(X + 2, FL - 5, 10, 1, '#4a3a20'); if (tx === 65) { R(X + 1, FL - 14, 12, 7, '#0a0c12'); R(X + 1, FL - 17, 12, 3, '#e8f0fa'); for (let i = 0; i < 12; i += 4) R(X + 1 + i, FL - 17, 2, 3, '#0a0c12'); } }
+    for (const tx of [34, 77]) { const X = gx(tx); if (X < -20 || X > VW + 20) continue; for (let r = 0; r < 3; r++) R(X + r, FL - 5 + r, 12 - r * 2, 1, '#0a0c12'); R(X + 3, FL - 4, 6, 3, '#1a2230'); }
+    // a neon sign for the segment, and the REC lamp over the stage door
+    { const X = gx(41), on = fl(7); if (X > -90 && X < VW + 30) { R(X - 3, FL - 134, 86, 17, '#05070c'); R(X - 3, FL - 134, 86, 1, '#2a3446'); DD.text('MARKIVES', X + 40, FL - 131, '#ff8a9a', 2, null, 'center'); A.glow(X + 40, FL - 126, 56, '#ff4a6a', 0.3 * on); } }
+    { const X = gx(12), on = (f >> 5) & 1; if (X > -20 && X < VW + 20) { R(X, FL - 118, 14, 8, '#10060a'); R(X + 1, FL - 117, 12, 6, on ? '#ff3a3a' : '#5a1818'); if (on) A.glow(X + 7, FL - 114, 24, '#ff3a3a', 0.35); } }
+    // the ghost set: candle light and a dancing fire glow, motes drifting in the moon beam
+    for (const tx of [30, 60, 91]) { const X = gx(tx); if (X < -20 || X > VW + 20) continue; R(X, UF - 24, 1, 24, '#8a6a3a'); R(X - 4, UF - 1, 9, 1, '#8a6a3a'); for (const dx of [-3, 0, 3]) { R(X + dx, UF - 28 + (dx ? 2 : 0), 1, 4, '#e8e0c8'); R(X + dx, UF - 30 + (dx ? 2 : 0), 1, 2, '#ffd060'); } A.glow(X, UF - 28, 44, '#ffb060', 0.22 * (0.75 + 0.25 * Math.sin(f / 5 + tx))); }
+    // haze in the lights
+    for (let i = 0; i < 2; i++) A.glow(((f * (0.15 + i * 0.08) + i * 200) % (VW + 240)) - 120, 50 + i * 40, 100, '#8ab8ff', 0.04);
+  };
+  th.tile = function (ctx, k, X, Y, tx, ty) {
+    const r = t0 ? t0.apply(this, arguments) : false, A = DD.art;
+    if (k === 'stage' && !DD.kindAt(tx, ty - 1)) {   // spike tape, a gaffer-taped cable run and the sheen of the lights on the matte floor
+      A.R(X, Y, 16, 1, 'rgba(255,255,255,0.35)'); A.R(X, Y + 1, 16, 2, 'rgba(120,180,255,0.14)');
+      const h = A.hash(tx, 91); if (h < 0.1) { A.R(X + 5, Y + 3, 6, 1, '#ffd060'); A.R(X + 7, Y + 2, 2, 3, '#ffd060'); } else if (h < 0.17) { A.R(X + 5, Y + 3, 6, 1, '#ff6a5a'); A.R(X + 7, Y + 2, 2, 3, '#ff6a5a'); }
+      else if (h < 0.24) A.R(X, Y + 5, 16, 2, '#161a24');
+    }
+    if (k === 'stage' && DD.kindAt(tx, ty - 1) === 'stage') {   // the stage front below the lip: a gaffer-taped cable run, a vent grille, darker and calmer with depth
+      let d = 0; while (d < 4 && DD.kindAt(tx, ty - 1 - d) === 'stage') d++;
+      if (d === 1) {
+        A.R(X, Y + 6, 16, 4, '#06080d'); A.R(X, Y + 6, 16, 1, '#1c2436'); A.R(X, Y + 9, 16, 1, '#020308');
+        if (A.hash(tx, 61) < 0.5) { A.R(X, Y + 11, 16, 1, '#0a0e18'); A.R(X + 2, Y + 11, 5, 1, '#2a3a5a'); }
+        if (tx % 6 === 1) { A.R(X + 4, Y + 4, 6, 8, '#6a707c'); A.R(X + 4, Y + 4, 6, 1, '#9aa2b0'); A.R(X + 9, Y + 4, 1, 8, '#4a505c'); }
+      } else if (d === 2 && tx % 11 === 5) { A.box(X + 2, Y + 3, 12, 9, '#0a0e18', { outline: '#020308' }); for (let q = 0; q < 4; q++) A.R(X + 4, Y + 5 + q * 2, 8, 1, '#02030a'); }
+      ctx.fillStyle = 'rgba(2,3,8,' + (0.14 * d) + ')'; ctx.fillRect(X, Y, 16, 16);
+    }
+    return r;
+  };
+  S.drawFG = function (ctx, G) { if (f0) f0.apply(this, arguments); DD.art.vignette(0.12); };
 })();

@@ -207,13 +207,30 @@
         let g = ctx.createLinearGradient(0, VH * 0.3, 0, VH); g.addColorStop(0, 'rgba(150,40,140,0)'); g.addColorStop(1, 'rgba(150,40,140,0.28)'); ctx.fillStyle = g; ctx.fillRect(0, VH * 0.3, VW, VH);
         const sx = Math.round(500 - c.x * 0.25), sy = Math.round(36 - c.y * 0.5);
         glow(ctx, sx + 48, sy + 26, 100, '60,170,190', 0.22); if (ready('w5_screen')) ctx.drawImage(I.w5_screen, sx, sy);
-        const row = (par, dim, baseY, step) => {
-          const y = Math.round(baseY - c.y), xo = Math.round(c.x * par), i0 = Math.floor(xo / step) - 1;
-          ctx.fillStyle = '#07050a'; ctx.fillRect(0, y - 4, VW, VH); ctx.save(); ctx.filter = 'brightness(' + dim + ')';
-          for (let i = i0; i * step - xo < VW + step; i++) { const x = i * step - xo; if (ready('w5_recliner_bg')) ctx.drawImage(I.w5_recliner_bg, x, y - 42); const tn = (i & 1) ? 'w5_table_beer' : 'w5_table_pop'; if (ready(tn)) ctx.drawImage(I[tn], x + 37, y - 26); }
-          ctx.restore();
+        const patron = (x, y, i, rk, dm) => {   // an audience member sat in a back-row recliner, facing the fight: blinks, turns, winces when the Dot is hurt, throws up its arms when Tim is hit, rears back on a phase change
+          const A = DD.art, C = col => A.mix(col, dm - 1); if (A.hash(i, 40 + rk) > 0.6) return;
+          const hh = A.hash(i, 41 + rk), SK = ['#c89070', '#a87050', '#e0b090', '#8a5a40'], HR = ['#1a1018', '#3a2418', '#6a5a50', '#c8c0b0', '#7a3a20'], SH = ['#4a3a6a', '#2a4a5a', '#5a2a3a', '#3a3a44', '#6a5a2a'];
+          const f = G.frame, hurt = G.pl && G.pl.inv > 0, hit = f - (G.flashAt ?? -999) < 36, flare = f - (G.flareAt ?? -999) < 50;
+          const per = 190 + Math.floor(hh * 110), tt = (f + Math.floor(hh * 977)) % per, blink = tt < 6, turn = (f + Math.floor(hh * 613)) % (260 + Math.floor(hh * 90)) < 28 ? (hh < 0.5 ? 1 : -1) : 0;
+          const hop = hit ? -(1 + (((f >> 2) + i) & 1)) : 0, lean = hurt ? 1 : flare ? -1 : 0, X = x + 14 + turn, Y = y - 42 + 10 + hop;
+          const sk = SK[Math.floor(hh * 4) % 4], hr = HR[Math.floor(hh * 977) % 5], sh = SH[Math.floor(hh * 311) % 5];
+          ctx.fillStyle = C(sh); ctx.fillRect(x + 11, y - 42 + 19 + hop, 14, 8); ctx.fillStyle = C(A.mix(sh, 0.3)); ctx.fillRect(x + 11, y - 42 + 19 + hop, 14, 1);
+          if (hit) { ctx.fillStyle = C(sk); ctx.fillRect(x + 9, y - 42 + 9 + hop, 2, 11); ctx.fillRect(x + 25, y - 42 + 9 + hop, 2, 11); ctx.fillStyle = C(A.mix(sk, -0.3)); ctx.fillRect(x + 9, y - 42 + 9 + hop, 2, 1); ctx.fillRect(x + 25, y - 42 + 9 + hop, 2, 1); }
+          ctx.fillStyle = C(sk); ctx.fillRect(X, Y + lean, 8, 8); ctx.fillStyle = C(A.mix(sk, -0.28)); ctx.fillRect(X + 7, Y + lean, 1, 8); ctx.fillStyle = C(hr); ctx.fillRect(X, Y + lean, 8, 3); ctx.fillRect(X - 1, Y + lean + 1, 1, 3); ctx.fillRect(X + 8, Y + lean + 1, 1, 3);
+          ctx.fillStyle = blink ? C(A.mix(sk, -0.3)) : C('#f4f0e8'); ctx.fillRect(X + 1, Y + lean + 4, 2, 1); ctx.fillRect(X + 5, Y + lean + 4, 2, 1);
+          if (!blink) { ctx.fillStyle = C('#10080e'); ctx.fillRect(X + 2 + turn, Y + lean + 4, 1, 1); ctx.fillRect(X + 6 + turn, Y + lean + 4, 1, 1); if (hurt || flare) { ctx.fillStyle = C('#f4f0e8'); ctx.fillRect(X + 1, Y + lean + 3, 2, 1); ctx.fillRect(X + 5, Y + lean + 3, 2, 1); } }
+          ctx.fillStyle = hit || hurt ? C('#3a1018') : C(A.mix(sk, -0.4)); ctx.fillRect(X + 3, Y + lean + 6, 2, hit || hurt ? 2 : 1);
+          ctx.fillStyle = 'rgba(122,216,232,0.55)'; ctx.fillRect(X, Y + lean, 8, 1);   // the screen's cool rim light on the hair
         };
-        row(0.32, 0.22, 296, 58); row(0.55, 0.38, 330, 58);
+        const row = (par, dim, baseY, step) => {
+          const pat = [];
+          const y = Math.round(baseY - c.y), xo = Math.round(c.x * par), i0 = Math.floor(xo / step) - 1;
+          ctx.fillStyle = '#0c0912'; ctx.fillRect(0, y - 4, VW, VH); ctx.save(); ctx.filter = 'brightness(' + dim + ')';
+          for (let i = i0; i * step - xo < VW + step; i++) { const x = i * step - xo; if (ready('w5_recliner_bg')) { ctx.drawImage(I.w5_recliner_bg, x, y - 42); pat.push([x, y, i]); } const tn = (i & 1) ? 'w5_table_beer' : 'w5_table_pop'; if (ready(tn)) ctx.drawImage(I[tn], x + 37, y - 26); }
+          ctx.restore();
+          for (const q of pat) patron(q[0], q[1], q[2], dim < 0.5 ? 0 : 1, dim + 0.18);
+        };
+        row(0.32, 0.4, 296, 58); row(0.55, 0.62, 330, 58);
         const bx = DD.wx(32 * TS);   // the spot on the middle of the arena
         ctx.save(); ctx.globalCompositeOperation = 'lighter'; const gr = ctx.createLinearGradient(0, -20, 0, VH); gr.addColorStop(0, 'rgba(255,200,130,0.2)'); gr.addColorStop(1, 'rgba(255,200,130,0.04)');
         ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(bx - 10, -20); ctx.lineTo(bx + 10, -20); ctx.lineTo(bx + 120, VH); ctx.lineTo(bx - 120, VH); ctx.fill(); ctx.restore();
@@ -226,7 +243,14 @@
         if (k === 'carpet' && ok('w5_carpet')) {
           ctx.drawImage(I.w5_carpet, X, Y);
           if (lip) { ctx.fillStyle = '#6a3448'; ctx.fillRect(X, Y, 16, 1); ctx.fillStyle = '#4a2438'; ctx.fillRect(X, Y + 1, 16, 1); ctx.fillStyle = 'rgba(255,170,90,0.10)'; ctx.fillRect(X, Y + 2, 16, 3); }
-          else { ctx.fillStyle = ty > 21 ? 'rgba(6,2,6,0.5)' : 'rgba(6,2,6,0.25)'; ctx.fillRect(X, Y, 16, 16); }
+          else {
+            ctx.fillStyle = ty > 21 ? 'rgba(6,2,6,0.5)' : 'rgba(6,2,6,0.25)'; ctx.fillRect(X, Y, 16, 16);
+            if (ty === 22) {   // the cut-away below the aisle: a skirting board, a cable run taped to the floor, a row of step lights glowing from under the lip
+              ctx.fillStyle = '#1a1220'; ctx.fillRect(X, Y, 16, 3); ctx.fillStyle = '#34283a'; ctx.fillRect(X, Y, 16, 1); ctx.fillStyle = 'rgba(255,170,90,' + (tx % 2 ? 0.2 : 0.38) + ')'; ctx.fillRect(X + 5, Y + 3, 6, 1);
+              ctx.fillStyle = '#0c0810'; ctx.fillRect(X, Y + 7, 16, 4); ctx.fillStyle = '#241a2a'; ctx.fillRect(X, Y + 7, 16, 1); ctx.fillStyle = '#05030a'; ctx.fillRect(X, Y + 10, 16, 1);
+              if (tx % 5 === 2) { ctx.fillStyle = '#5a5866'; ctx.fillRect(X + 3, Y + 6, 7, 6); ctx.fillStyle = '#8a8896'; ctx.fillRect(X + 3, Y + 6, 7, 1); }
+            } else if (ty === 23) { ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(X, Y, 16, 16); ctx.fillStyle = '#2a1a30'; for (let k = 0; k < 16; k += 4) ctx.fillRect(X + k, Y + 5, 1, 1 + (tx + k) % 3); }
+          }
           return true;
         }
         if (k === 'pouf') {
@@ -245,7 +269,7 @@
       init(G) { G.s = {}; },
       drawFG(ctx, G) {   // the vignette
         const VW = DD.VW, VH = DD.VH;
-        const vg = ctx.createRadialGradient(VW / 2, VH * 0.5, VH * 0.35, VW / 2, VH * 0.5, VW * 0.65); vg.addColorStop(0, 'rgba(4,2,8,0)'); vg.addColorStop(1, 'rgba(4,2,8,0.55)');
+        const vg = ctx.createRadialGradient(VW / 2, VH * 0.5, VH * 0.35, VW / 2, VH * 0.5, VW * 0.65); vg.addColorStop(0, 'rgba(4,2,8,0)'); vg.addColorStop(1, 'rgba(4,2,8,0.4)');
         ctx.fillStyle = vg; ctx.fillRect(0, 0, VW, VH);
       },
     },
@@ -275,6 +299,19 @@
     const bx = DD.wx(32 * 16);   // three stage lights crossing the arena, slowly swinging
     for (const [dx, col, ph] of [[-80, '#d048b0', 0], [80, '#60b0d0', 2], [0, '#ffcf80', 4]]) { const sx = bx + dx + Math.sin(f / 70 + ph) * 16; A.cone(sx, -6, 200, 34, col, 0.11); A.glow(sx + (dx > 0 ? 24 : dx < 0 ? -24 : 0), DD.wy(336) - 2, 46, col, 0.22); }
     lay(0.55, 64, (X, i) => { if (A.hash(i, 9) < 0.5) A.R(X + 8, ay + 46, 10, 2, 'rgba(255,214,150,0.08)'); });
+    const scx = Math.round(500 - c.x * 0.25) + 48, scy = Math.round(36 - c.y * 0.5) + 26;   // the screen: it throws a cool wash across the room, flickering like a film
+    A.glow(scx, scy + 10, 150, '#58c8e0', 0.2 + 0.05 * Math.sin(f / 5) + 0.03 * Math.sin(f / 2.3)); A.glow(scx, scy, 54, '#c8f4ff', 0.18);
+    for (const bxp of [60, 170]) {   // the projection booth ports along the back wall, each with a beam running to the screen
+      const px = Math.round(bxp - c.x * 0.1), py = Math.round(16 - c.y * 0.5);
+      A.box(px, py, 14, 8, '#2a2030', { outline: '#07050a' }); A.R(px + 3, py + 2, 8, 4, '#d8f4ff'); A.glow(px + 7, py + 4, 30, '#bfeaff', 0.35);
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = 'rgba(190,235,255,' + (0.045 + 0.015 * Math.sin(f / 3 + bxp)) + ')'; ctx.beginPath(); ctx.moveTo(px + 6, py + 5); ctx.lineTo(px + 8, py + 5); ctx.lineTo(scx + 40, scy + 18); ctx.lineTo(scx - 40, scy + 18); ctx.fill(); ctx.restore();
+    }
+    lay(0.2, 74, (X, i) => { A.box(X + 20, 4, 12, 3, '#2a2030', { outline: '#07050a' }); A.glow(X + 26, 7, 16, '#ffd898', 0.3); });   // recessed ceiling cans down the room
+    lay(0.42, 116, (X, i) => {   // a framed one-sheet on the back wall between the sconces, lit by a picture light
+      if (A.hash(i, 77) < 0.35) return; const y = Math.round(ay - 4);
+      A.box(X + 40, y, 22, 30, '#1a1018', { outline: '#07050a' }); A.R(X + 42, y + 2, 18, 26, A.mix(['#5a2a3a', '#2a4a5a', '#4a3a6a', '#5a4a2a'][i & 3], -0.2)); A.R(X + 45, y + 6, 12, 5, 'rgba(255,230,190,0.5)'); A.R(X + 46, y + 14, 10, 1, 'rgba(255,230,190,0.3)'); A.R(X + 46, y + 17, 10, 1, 'rgba(255,230,190,0.3)');
+      A.R(X + 46, y - 3, 14, 2, '#c89a4a'); A.cone(X + 53, y - 2, 34, 18, '#ffd898', 0.12);
+    });
     for (const wxx of [0, 61 * 16]) { const X = DD.wx(wxx), Y = DD.wy(0); if (X > VW || X + 48 < 0) continue; A.bulbs(X, Math.max(4, Y + 6), 48, 8, f, '#fffbd0', '#8a5a1c', false); }
 
   },

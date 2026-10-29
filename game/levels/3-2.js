@@ -87,12 +87,36 @@ window.LEVEL = {"id": "3-2", "name": "EYES IN THE SKY", "sub": "I NEED EYES IN T
             A.R(X + 8, Y, w - 16, 5, '#f8d8c8'); A.R(X, Y + 5, w, 8, '#eec0b4'); A.R(X + 4, Y + 13, w - 8, 4, '#b890a4'); A.R(X + 8, Y, w - 16, 1, '#fff0e0'); A.R(X + 12, Y - 4, 20, 5, '#f8d8c8'); A.R(X + 12, Y - 4, 20, 1, '#fff0e0'); } }
         // the sea: its real height near the water, a horizon that holds near the bottom once you are high
         const hy = Math.min(SEA_Y - c.y, VH - 30), small = clamp(1 - alt * 0.75, 0.25, 1);
+        { const A = DD.art, ga = 1 - alt * 0.65, hz = hy, rp = Math.round(c.x * 0.02), rq = Math.round(c.x * 0.035);   // the far shore: a hazy crater-and-ridge range, a strip of beachfront towers with lit windows, far cloud wisps and other tourists' parasails
+          if (hz > 20 && hz < VH + 40) {
+            ctx.globalAlpha = Math.max(0.35, ga);
+            ctx.fillStyle = 'rgba(176,112,138,0.8)'; ctx.beginPath(); ctx.moveTo(0, hz); for (let x = 0; x <= VW; x += 8) { const xx = x + rp; ctx.lineTo(x, hz - (22 + 14 * Math.sin(xx * 0.019) + 8 * Math.sin(xx * 0.061 + 1.3) + ((xx + 400) % 360 < 60 ? 16 : 0)) * small); } ctx.lineTo(VW, hz); ctx.fill();   // the far ridge, hazed pink
+            ctx.fillStyle = 'rgba(96,78,118,0.9)'; ctx.beginPath(); ctx.moveTo(0, hz); for (let x = 0; x <= VW; x += 8) { const xx = x + rq; ctx.lineTo(x, hz - (11 + 8 * Math.sin(xx * 0.027 + 2) + 5 * Math.sin(xx * 0.09)) * small); } ctx.lineTo(VW, hz); ctx.fill();   // a nearer, darker spur
+            for (let x = -((rq * 1) % 12) - 12; x < VW + 12; x += 12) { const xx = x + rq, hh = A.hash(Math.floor(xx / 12) + 300, 1); if (hh < 0.35) continue;   // beachfront towers
+              const tw = 5 + Math.floor(hh * 4), th = Math.round((7 + hh * 15) * small), tx0 = x + 2; if (th < 3) continue;
+              A.R(tx0, hz - th, tw, th, '#4a3a62'); A.R(tx0, hz - th, tw, 1, '#8a6a88'); A.R(tx0 + tw - 1, hz - th, 1, th, '#2e2240');
+              if (small > 0.55) for (let wy = hz - th + 3; wy < hz - 2; wy += 4) for (let wx = tx0 + 1; wx < tx0 + tw - 1; wx += 2) if (A.hash(Math.floor(xx / 12) * 7 + wx, wy + ((f >> 6) & 1 ? 1 : 0)) > 0.45) A.R(wx, wy, 1, 1, '#ffd890'); }
+            ctx.globalAlpha = 1;
+            const hz2 = ctx.createLinearGradient(0, hz - 34, 0, hz); hz2.addColorStop(0, 'rgba(255,196,160,0)'); hz2.addColorStop(1, 'rgba(255,196,160,' + 0.3 * ga + ')'); ctx.fillStyle = hz2; ctx.fillRect(0, hz - 34, VW, 34);   // haze at the horizon
+          }
+          ctx.fillStyle = 'rgba(255,232,214,' + 0.2 * ga + ')'; for (let i = 0; i < 5; i++) { const cw = 50 + (i * 37) % 50, X = Math.round(((i * 130 - c.x * 0.03 - f * 0.02) % (VW + 160) + VW + 160) % (VW + 160) - 80), Y = Math.round(18 + i * 15 + Math.sin(i * 3.3) * 5); ctx.fillRect(X, Y, cw, 2); ctx.fillRect(X + 10, Y + 2, cw - 24, 1); }   // a far layer of cloud wisps, slower than the rest
+          for (let i = 0; i < 3; i++) { const X = Math.round(((i * 150 + 60 - c.x * 0.05 - f * 0.1) % (VW + 100) + VW + 100) % (VW + 100) - 50), Y = Math.round(hy - 62 - i * 17 - alt * 20), c1 = ['#e8483a', '#3ab0d8', '#f0c030'][i];   // other tourists on parasails, far off
+            if (Y > 8 && ga > 0.3) { A.R(X, Y, 11, 3, c1); A.R(X + 2, Y - 1, 7, 1, c1); A.R(X + 4, Y, 3, 3, '#fff0e0'); A.R(X + 1, Y + 3, 1, 5, 'rgba(255,255,255,0.45)'); A.R(X + 9, Y + 3, 1, 5, 'rgba(255,255,255,0.45)'); A.R(X + 5, Y + 8, 1, 2, '#2a1a30'); } }
+          for (let i = 0; i < 5; i++) { const X = Math.round(((i * 83 + f * (0.35 + i * 0.05) + 40) % (VW + 40)) - 20), Y = Math.round(34 + i * 17 + Math.sin(f / 18 + i * 2) * 4 - alt * 10), fl = ((f >> 3) + i) & 1;   // gulls
+            A.R(X, Y + fl, 2, 1, '#3a2438'); A.R(X + 2, Y + 1 - fl, 1, 1, '#3a2438'); A.R(X + 3, Y + fl, 2, 1, '#3a2438'); } }
         const isl = ((x0, w, h) => { ctx.fillStyle = '#2a4a3a'; ctx.beginPath(); ctx.ellipse(x0, hy, w, h, 0, Math.PI, 0); ctx.fill(); ctx.fillStyle = '#1a3228'; ctx.beginPath(); ctx.moveTo(x0 - w * 0.2, hy); ctx.lineTo(x0 + w * 0.05, hy - h * 1.35); ctx.lineTo(x0 + w * 0.5, hy); ctx.fill(); });
         if (hy < VH) {
           isl(110 - Math.round(c.x * 0.03), 70 * small, 26 * small); isl(250 - Math.round(c.x * 0.05), 40 * small, 14 * small);
           const sea = ctx.createLinearGradient(0, hy, 0, VH); sea.addColorStop(0, '#d89a78'); sea.addColorStop(0.15, '#3a6aa0'); sea.addColorStop(1, '#14305a'); ctx.fillStyle = sea; ctx.fillRect(0, hy, VW, VH - hy + 1);
           { const A = DD.art; for (const [ix, iw, ih] of [[110 - Math.round(c.x * 0.03), 70 * small, 26 * small], [250 - Math.round(c.x * 0.05), 40 * small, 14 * small]]) { A.R(ix - iw * 0.9, hy - 1, iw * 1.8, 1, '#5a3a2a'); for (let k = 0; k < 3; k++) { const px = ix - iw * 0.5 + k * iw * 0.45; A.R(px, hy - ih - 6 * small, 1, 6 * small, '#0e2018'); A.R(px - 3 * small, hy - ih - 7 * small, 7 * small, 1.5, '#1c4a30'); } }   // palms along the island, and a beach line
             A.glow(sx, hy + 10, 80, '#ffd890', 0.14 * (1 - alt)); }   // the sun's path on the water
+          { const A = DD.art, ga = 1 - alt * 0.7;   // sun glare on the water: a glittering column that widens toward you, and a cruise ship and sailboats out on the sea
+            for (let i = 0; i < 46; i++) { const yy = hy + 2 + i * ((VH - hy) / 46), wid = 5 + (yy - hy) * 0.7, hs = A.hash(i, (f >> 3) + (i % 5)), xx = sx + (A.hash(i, 9) - 0.5) * wid * 2; if (yy > VH || hs < 0.4) continue; A.R(xx, yy, 2 + Math.floor(hs * 6), 1, hs > 0.85 ? '#ffffff' : '#ffe6a8'); }
+            A.glow(sx, hy + 6, 46, '#fff0c0', 0.3 * ga);
+            const sp = Math.round(c.x * 0.05), sail = (X, Y, sc) => { A.R(X, Y + 4, 12 * sc, 2, '#2a1c30'); A.R(X + 2, Y + 6, 8 * sc, 1, '#14101c'); A.R(X + 5, Y - 7 * sc, 1, 11 * sc, '#2a1c30'); A.R(X + 6, Y - 7 * sc, 5 * sc, 10 * sc, '#fff0e0'); A.R(X + 6, Y - 7 * sc, 1, 10 * sc, '#ffffff'); A.R(X + 10 * sc, Y - 5 * sc, 1, 8 * sc, '#c89090'); A.R(X + 2, Y - 2, 3, 5, '#f0d0c0'); };
+            if (hy + 20 < VH) { sail(300 - sp, Math.round(hy + 10 * small + 4), 1); sail(130 - sp, Math.round(hy + 18 * small + 4), 1); }
+            const shX = Math.round(((470 - c.x * 0.05 - f * 0.04) % 640 + 640) % 640 - 160), shY = Math.round(hy + 2 - 1 * small);   // a cruise ship, the Port of Call
+            if (small > 0.4) { A.R(shX, shY - 5, 36, 5, '#f4ecec'); A.R(shX, shY - 5, 36, 1, '#ffffff'); A.R(shX, shY - 1, 36, 2, '#2a2a4a'); A.R(shX + 4, shY - 9, 22, 4, '#e0d4d8'); A.R(shX + 8, shY - 12, 10, 3, '#f4ecec'); A.R(shX + 20, shY - 14, 3, 5, '#c8202c'); for (let w = 2; w < 34; w += 3) A.R(shX + w, shY - 4, 1, 1, '#ffd890'); } }
           ctx.fillStyle = 'rgba(255,230,170,0.5)'; for (let i = 0; i < 18; i++) { const wy = hy + 2 + ((i * 7) % 24) * (VH - hy) / 24, wxp = ((i * 61 + f * 0.3 * (1 + i % 3)) % (VW + 20)); ctx.fillRect(wxp, wy, 4 + i % 4, 1); }
         }
         if (ok('w3_af1')) { const k = (f * 0.5) % 1700 - 120; if (k < VW + 40) { ctx.globalAlpha = 0.8 - alt * 0.5; ctx.drawImage(DD.IMG.w3_af1, Math.round(k), 18 + Math.round(alt * 6)); ctx.globalAlpha = 1; } }

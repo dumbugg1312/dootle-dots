@@ -262,14 +262,14 @@
               A.glow(X + 12, fy - 68, 50, '#9ad0ff', 0.16); A.cone(X + 12, fy - 62, 70, 36, '#9ad0ff', 0.08);
             } else {
               A.R(X + 12, fy - 28, 2, 28, '#262c40'); A.R(X + 4, fy - 2, 18, 2, '#1a1e30');
-              A.box(X, fy - 52, 28, 24, '#14182a', { outline: '#05060b' }); A.R(X + 2, fy - 50, 24, 18, (f + k * 7) % 140 < 4 ? '#3a78b8' : '#1d4a78'); A.R(X + 2, fy - 50, 24, 1, '#5a9ad8');
+              A.box(X, fy - 52, 28, 24, '#14182a', { outline: '#05060b' }); A.R(X + 2, fy - 50, 24, 18, ((f + k * 7) % 140 < 4 || f - G.flashAt < 10) ? '#3a78b8' : '#1d4a78'); A.R(X + 2, fy - 50, 24, 1, '#5a9ad8');
               A.R(X + 5, fy - 46, 8, 1, '#7ab8f0'); A.R(X + 5, fy - 43, 14, 1, '#2a5a90'); if (f % 60 < 40) A.R(X + 22, fy - 49, 2, 2, '#ff4a4a');
               A.glow(X + 14, fy - 40, 46, '#3fa0ff', 0.14);
             }
           }
           ctx.fillStyle = 'rgba(2,3,8,0.4)'; ctx.fillRect(0, fy - 90, VW, 90);
         }
-        const ty = Math.round(8 - c.y * 0.3 + 40), tx0 = -Math.round(c.x * 0.3) % 72;
+        const ty = Math.round(8 - c.y * 0.3 + 40) + (G.frame - G.dipAt < 20 ? (G.frame % 2 ? 1 : -1) : 0), tx0 = -Math.round(c.x * 0.3) % 72;
         ctx.fillStyle = '#10131c'; ctx.fillRect(0, ty, VW, 6); ctx.fillStyle = '#2a3046'; ctx.fillRect(0, ty, VW, 1);
         ctx.fillStyle = '#1c2236'; for (let x = tx0 - 72; x < VW + 72; x += 12) { ctx.fillRect(x, ty + 1, 1, 4); ctx.fillRect(x + 6, ty + 2, 6, 1); }
         ctx.fillStyle = '#3fd6ff'; for (let x = tx0 - 72; x < VW + 72; x += 24) ctx.fillRect(x + 3, ty + 2, 2, 2);
@@ -293,6 +293,15 @@
         if (k === 'stage' && ok('w7_floor')) {
           ctx.drawImage(I.w7_floor, (tx & 1) * 16, lip ? 0 : 16, 16, 16, X, Y, 16, 16);
           if (lip && tx % 9 === 4) { ctx.fillStyle = '#3fd6ff'; ctx.fillRect(X + 7, Y, 2, 1); }
+          if (!lip && ty >= 22) {   // the stage front below the lip: a gaffer-taped cable run, a vent grille, darker and calmer with depth
+            const A = DD.art, d = ty - 21;
+            if (d === 1) {
+              A.R(X, Y + 6, 16, 4, '#06080d'); A.R(X, Y + 6, 16, 1, '#1c2436'); A.R(X, Y + 9, 16, 1, '#020308');
+              if (A.hash(tx, 61) < 0.5) { A.R(X, Y + 11, 16, 1, '#0a0e18'); A.R(X + 2, Y + 11, 5, 1, '#2a3a5a'); }
+              if (tx % 6 === 1) { A.R(X + 4, Y + 4, 6, 8, '#6a707c'); A.R(X + 4, Y + 4, 6, 1, '#9aa2b0'); A.R(X + 9, Y + 4, 1, 8, '#4a505c'); }
+            } else if (tx % 11 === 5) { A.box(X + 2, Y + 3, 12, 9, '#0a0e18', { outline: '#020308' }); for (let q = 0; q < 4; q++) A.R(X + 4, Y + 5 + q * 2, 8, 1, '#02030a'); }
+            ctx.fillStyle = 'rgba(2,3,8,' + (0.16 * d) + ')'; ctx.fillRect(X, Y, 16, 16);
+          }
           return true;
         }
         if (k === 'plinth' && ok('w7_plinth')) {

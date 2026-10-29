@@ -358,9 +358,14 @@ window.LEVEL = {"id": "5-1", "name": "THE RECLINER ROOM", "sub": "STARRING SIX B
         if (ok('w5_tim_seat')) {
           const fy = 21 * TS;
           glow(ctx, DD.wx(7.5 * TS), DD.wy(fy - 24), 60, '255,190,110', 0.14);
-          ctx.drawImage(I.w5_tim_seat, Math.round(DD.wx(3.2 * TS)), Math.round(DD.wy(fy - 42)));
+          const seat = (img, X, Y, id, eyes, skin, lid) => {   // a host in his recliner with a little life: blinks on his own clock, nods his head now and then, leans in when the Dot is hurt
+            const f = G.frame, nod = (f + id * 71) % (250 + id * 40) < 20 ? 1 : 0, dy = nod + (G.pl && G.pl.inv > 0 ? 1 : 0);
+            ctx.drawImage(img, 0, 20, 36, 22, X, Y + 20, 36, 22); ctx.drawImage(img, 0, 0, 36, 20, X, Y + dy, 36, 20);
+            if ((f + id * 53) % (170 + id * 50) < 6) { for (const [ex, ey, ew] of eyes) { ctx.fillStyle = skin; ctx.fillRect(X + ex, Y + ey + dy, ew, 1); ctx.fillStyle = lid; ctx.fillRect(X + ex, Y + ey + dy + (ew > 1 ? 0 : 0), ew, 1); } }
+          };
+          if (ok('w5_tim_seat')) seat(I.w5_tim_seat, Math.round(DD.wx(3.2 * TS)), Math.round(DD.wy(fy - 42)), 1, [[14, 11, 2], [19, 11, 2]], '#8a5446', '#8a5446');
           if (ok('w5_table_pop')) ctx.drawImage(I.w5_table_pop, Math.round(DD.wx(5.7 * TS + 8)), Math.round(DD.wy(fy - 26)));
-          if (ok('w5_gregg_seat')) ctx.drawImage(I.w5_gregg_seat, Math.round(DD.wx(7.4 * TS)), Math.round(DD.wy(fy - 42)));
+          if (ok('w5_gregg_seat')) seat(I.w5_gregg_seat, Math.round(DD.wx(7.4 * TS)), Math.round(DD.wy(fy - 42)), 2, [[15, 9, 1], [20, 9, 1]], '#8a5446', '#8a5446');
         }
         // the goal landing: curtain and bulbs behind the exit door
         tileCur(208 * TS, 0, 12 * TS, 9 * TS);

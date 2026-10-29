@@ -226,7 +226,12 @@
         if (!ok('w9_tiles')) return false;
         const K = DD.kindAt, lip = K(tx, ty - 1) !== k, v = ((tx * 5 + ty * 3) % 4 + 4) % 4, T = IMG.w9_tiles, put = c => ctx.drawImage(T, c * 16, 0, 16, 16, X, Y, 16, 16);
         const edge = lit => { const A = DD.art; if (lip) { A.R(X, Y, 16, 1, 'rgba(255,255,255,' + lit + ')'); A.R(X, Y + 1, 16, 1, 'rgba(255,255,255,0.12)'); } if (K(tx - 1, ty) !== k) A.R(X, Y, 1, 16, 'rgba(255,255,255,0.16)'); if (K(tx + 1, ty) !== k) A.R(X + 15, Y, 1, 16, 'rgba(0,0,0,0.3)'); if (K(tx, ty + 1) !== k) A.R(X, Y + 15, 16, 1, 'rgba(0,0,0,0.35)'); };
-        if (k === 'slate') { put(lip ? 8 + v : 12 + v); if (!lip) { let d = 1; while (K(tx, ty - d) === k) d++; ctx.fillStyle = 'rgba(8,4,18,' + Math.min(0.55, 0.12 * d) + ')'; ctx.fillRect(X, Y, 16, 16); } edge(0.4); return true; }
+        if (k === 'slate') { put(lip ? 8 + v : 12 + v); if (!lip) { let d = 1; while (K(tx, ty - d) === k) d++; ctx.fillStyle = 'rgba(8,4,18,' + Math.min(0.55, 0.12 * d) + ')'; ctx.fillRect(X, Y, 16, 16);
+            const A = DD.art;   // art pass: the studio floor's cut-away: a kick plate, then cable runs with gaffer tape, then service vents, darker and calmer with depth
+            if (d === 1) { A.R(X, Y + 1, 16, 3, 'rgba(110,140,220,0.16)'); A.R(X, Y + 4, 16, 1, 'rgba(0,0,0,0.35)'); }
+            else if (d === 2) { A.R(X, Y + 5, 16, 3, '#06080f'); A.R(X, Y + 5, 16, 1, '#2a3458'); A.R(X, Y + 10, 16, 1, tx % 3 === 0 ? '#7a1a22' : '#1a3a7a'); if (tx % 7 === 3) { A.R(X + 3, Y + 1, 9, 13, 'rgba(160,170,190,0.5)'); for (let q = 3; q < 14; q += 3) A.R(X + 3, Y + q, 9, 1, 'rgba(0,0,0,0.25)'); } }
+            else if (tx % 9 === 4) { A.R(X + 1, Y + 3, 14, 10, '#04050a'); for (let q = 0; q < 5; q++) A.R(X + 2, Y + 4 + q * 2, 12, 1, '#161c34'); } }
+          edge(0.4); return true; }
         if (k === 'desk') { put(lip ? 32 : (tx % 2 ? 34 : 35)); edge(0.35); return true; }
         if (k === 'ledge') { put(36); edge(0.5); return true; }
         return false;
@@ -255,6 +260,14 @@
     },
   };
 
+  // art pass: a background person's idle life: a head bob now and then, a blink (the eyes painted over in skin), a hop when the boss is hit, a wince when a Dot is hurt, a rattle at a slam
+  function live(ctx, G, im, X, Y, seed, o) {
+    const A = DD.art, f = G.frame, h = A.hash(seed, 5), cheer = G.flashAt != null && f - G.flashAt < 30, wince = !!(G.pl && G.pl.inv > 0), rat = G.dipAt != null && f - G.dipAt < 14 ? (f >> 1) & 1 : 0;
+    const nod = ((f + (h * 300 | 0)) % 150) < 8 ? 1 : 0, hop = cheer ? -(Math.abs(Math.sin((f - G.flashAt) / 4)) * 2 | 0) : 0, lean = wince ? 1 : 0, blink = ((f + (h * 400 | 0)) % (190 + (h * 120 | 0))) < 5 || wince, hh = o.headH;
+    ctx.drawImage(im, 0, hh, im.width, im.height - hh, Math.round(X) + rat, Math.round(Y) + hh + hop, im.width, im.height - hh);
+    ctx.drawImage(im, 0, 0, im.width, hh, Math.round(X) + lean + rat, Math.round(Y) + nod + hop, im.width, hh);
+    if (blink) for (const e of o.eyes) A.R(Math.round(X) + lean + rat + e[0], Math.round(Y) + nod + hop + e[1], e[2], 1, o.skin);
+  }
   // the navy On Demand studio: LED panels, the wall TV, shelves, boom mics, the host desk, spot beams
   function studio(ctx, G, c, fy, a) {
     if (a <= 0) return;
@@ -272,16 +285,25 @@
     ctx.restore();
     { const A = DD.art, f = G.frame, o5 = Math.round(c.x * 0.5);   // art pass: studio cameras deep in the room with blinking tally lights, a lit stage foot, truss lamps with glow
       for (let i = Math.floor(o5 / 240) - 1; i < Math.floor(o5 / 240) + 4; i++) { if (A.hash(i, 21) < 0.3) continue; const X = i * 240 - o5 + 30, Y = fy - 46, col = '#10183a';
-        A.R(X + 9, Y + 22, 3, 24, '#0a1030'); A.R(X + 3, Y + 44, 15, 2, '#0a1030'); A.box(X, Y + 6, 22, 16, col, { outline: '#060a1c' }); A.R(X + 22, Y + 10, 6, 8, '#0a1030'); A.R(X + 23, Y + 12, 2, 4, '#7ab0ff'); A.R(X + 3, Y + 2, 5, 3, ((i + Math.floor(f / 45)) % 3 === 0) ? '#ff3030' : '#4a1010'); }
+        A.R(X + 9, Y + 22, 3, 24, '#0a1030'); A.R(X + 3, Y + 44, 15, 2, '#0a1030'); A.box(X, Y + 6, 22, 16, col, { outline: '#060a1c' }); A.R(X + 22, Y + 10, 6, 8, '#0a1030'); A.R(X + 23, Y + 12, 2, 4, '#7ab0ff'); A.R(X + 3, Y + 2, 5, 3, ((i + Math.floor(f / 45)) % 3 === 0) ? '#ff3030' : '#4a1010');
+        { const ox = X - 11, cheer = G.flashAt != null && f - G.flashAt < 30, hop = cheer ? -(Math.abs(Math.sin((f - G.flashAt) / 3)) * 2 | 0) : 0, lk = G.pl && G.pl.inv > 0 ? 1 : 0, nd = ((f + i * 53) % 170) < 6 ? 1 : 0;   // a camera operator behind each camera
+          A.R(ox + 1, fy - 14, 3, 14, '#070c24'); A.R(ox + 5, fy - 14, 3, 14, '#070c24'); A.R(ox, fy - 31 + hop, 9, 17, '#0e1634'); A.R(ox, fy - 31 + hop, 9, 1, '#24306a');
+          A.R(ox + 2 + lk, fy - 38 + hop + nd, 6, 6, '#5a4a40'); A.R(ox + 1 + lk, fy - 39 + hop + nd, 7, 3, '#10142a'); A.R(ox + lk, fy - 37 + hop + nd, 2, 3, '#1a2040'); if (cheer) A.R(ox - 2, fy - 38 + hop, 2, 9, '#0e1634'); } }
       A.R(0, fy - 5, VW, 5, 'rgba(90,150,255,0.16)'); A.R(0, fy - 1, VW, 1, 'rgba(160,200,255,0.45)');
       for (let x = 0; x < 64 * TS; x += 112) { const X = DD.wx(x + 40); if (X < -80 || X > VW + 80) continue; A.glow(X + 4, Math.round(-c.y) + 16, 18, '#fff2c0', 0.3); } }
+    { const A = DD.art, f = G.frame;   // art pass: softbox lights on stands that bathe the desk, and an ON AIR sign that flickers when the set is slammed
+      for (const tx of [19.5, 38.5, 58]) { const X = Math.round(DD.wx(tx * TS)); if (X < -30 || X > VW + 30) continue;
+        A.R(X, fy - 64, 2, 64, '#0a1030'); A.R(X - 8, fy - 3, 18, 2, '#0a1030'); A.R(X - 4, fy - 6, 2, 4, '#0a1030'); A.R(X + 4, fy - 6, 2, 4, '#0a1030');
+        A.box(X - 11, fy - 90, 24, 26, '#141c40', { outline: '#060a1c' }); A.R(X - 9, fy - 88, 20, 22, '#bcd0ff'); A.R(X - 9, fy - 88, 20, 2, '#e8f0ff'); for (let q = 0; q < 20; q += 5) A.R(X - 9 + q, fy - 88, 1, 22, 'rgba(60,90,160,0.3)'); A.glow(X + 1, fy - 77, 46, '#9ac0ff', 0.16); }
+      const sx = Math.round(DD.wx(3 * TS)), on = !(G.dipAt != null && f - G.dipAt < 14 && f % 4 < 2); if (sx > -60 && sx < VW + 20) { const sy = fy - 130;
+        A.R(sx + 8, sy - 20, 1, 20, '#0a1030'); A.R(sx + 36, sy - 20, 1, 20, '#0a1030'); A.box(sx, sy, 46, 14, '#2a0a12', { outline: '#0a0408' }); A.R(sx + 2, sy + 2, 42, 10, on ? '#7a1018' : '#3a0a10'); DD.text('ON AIR', sx + 23, sy + 4, on ? '#ff5a4a' : '#7a3a3a', 1, null, 'center'); if (on) A.glow(sx + 23, sy + 7, 40, '#ff3a2a', 0.2); } }
     const at = (n, tx, dy) => { if (ok(n)) ctx.drawImage(IMG[n], Math.round(DD.wx(tx * TS)), Math.round(fy - IMG[n].height + dy)); };
     at('w9_tvlogo', 28, -92); at('w9_shelf_a', 14, -64); at('w9_shelf_b', 44, -64); at('w9_shelf_c', 8, -96); at('w9_shelf_c', 52, -96); at('w9_boom', 22, -154); at('w9_boom', 38, -154);
     // the host desk at the back, with the three of them behind it
     const X0 = DD.wx(24 * TS);
     if (X0 > -140 && X0 < VW + 20 && ok('w9_tiles')) {
-      if (ok('w9_seat_gregg14')) ctx.drawImage(IMG.w9_seat_gregg14, 0, 0, 24, 22, Math.round(X0 + 22), Math.round(fy - 32 - 14), 24, 22);
-      if (ok('w9_joey_0')) ctx.drawImage(IMG.w9_joey_0, 0, 0, 32, 34, Math.round(X0 + 94), Math.round(fy - 32 - 26), 32, 34);
+      if (ok('w9_seat_gregg14')) live(ctx, G, IMG.w9_seat_gregg14, X0 + 22, fy - 32 - 14, 1, { headH: 9, eyes: [[9, 6, 2], [14, 6, 2]], skin: '#e4b890' });
+      if (ok('w9_joey_0')) live(ctx, G, IMG.w9_joey_0, X0 + 94, fy - 32 - 26, 2, { headH: 15, eyes: [[11, 10, 2], [19, 10, 2]], skin: '#e2a276' });
       for (let i = 0; i < 8; i++) { imgR(ctx, 'w9_tiles', 32 * 16, 0, 16, 16, X0 + i * 16, fy - 32); imgR(ctx, 'w9_tiles', (i === 0 ? 35 : i === 7 ? 34 : 33) * 16, 0, 16, 16, X0 + i * 16, fy - 16); }
       img(ctx, 'w9_deskprops', X0 + 4, fy - 32 - 22); DD.text('HEI NETWORK', Math.round(X0 + 64), Math.round(fy - 11), '#cfe0ff', 1, '#0a1020', 'center');
       const A = DD.art; A.trim(X0, fy - 33, 128, '#6aa0ff'); A.bulbs(X0 + 2, fy - 36, 124, 12, G.frame, '#cfe4ff', '#2a4a8a'); A.glow(X0 + 64, fy - 40, 90, '#6aa0ff', 0.12);

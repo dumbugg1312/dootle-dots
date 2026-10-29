@@ -9,6 +9,78 @@ window.LEVEL = {"id": "10-3", "name": "THE MUSEUM OF MOVIE HOUSES", "sub": "MOVI
   const put = (ctx, n, x, y) => { const i = im(n); if (i) ctx.drawImage(i, Math.round(x), Math.round(y)); };
   const glow = (ctx, x, y, r, rgb, a) => { const g = ctx.createRadialGradient(x, y, 1, x, y, r); g.addColorStop(0, `rgba(${rgb},${a})`); g.addColorStop(1, `rgba(${rgb},0)`); ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); };
   const NAMES = { card: 'LOBBY CARD', house: 'MINI HOUSE', corn: 'POPCORN' };
+  // ---- art pass (looks 2): the atrium's tall windows and chandelier, peeled wallpaper patches over lath (the house is mid-renovation), panel doors, popcorn machines, a booth projector
+  const dressFar = (ctx, G, cx, cy, f) => {
+    const A = DD.art, VW = DD.VW, VH = DD.VH, T = DD.T;
+    const ax = 48 * TS - cx, aw = 20 * TS;
+    if (ax < VW && ax + aw > 0) {   // the atrium: a darker recess with pilasters, three tiers of tall windows with velvet drapes and cool moonlight, one grand chandelier
+      const y0 = 2 * TS - cy, y1 = 39 * TS - cy;
+      A.R(ax, y0, aw, y1 - y0, 'rgba(8,2,10,0.42)');
+      for (const px of [ax, ax + aw - 10]) { A.R(px, y0, 10, y1 - y0, '#2a1824'); A.R(px, y0, 1, y1 - y0, '#6a4458'); A.R(px + 9, y0, 1, y1 - y0, '#120810'); }
+      for (const wt of [51, 63]) for (const r0 of [4, 17, 30]) {
+        const X = wt * TS - cx, Y = r0 * TS - cy; if (X < -80 || X > VW + 20 || Y < -140 || Y > VH + 10) continue;
+        const gl = ctx.createLinearGradient(0, Y, 0, Y + 112); gl.addColorStop(0, '#1c2c5a'); gl.addColorStop(1, '#6a5a88'); ctx.fillStyle = gl; ctx.fillRect(X, Y, 48, 112);
+        for (let i = 0; i < 7; i++) { const h = A.hash(wt + i, r0); A.R(X + 3 + (h * 42 | 0), Y + 3 + ((h * 977) % 60 | 0), 1, 1, 'rgba(255,255,240,0.7)'); }
+        A.R(X + 23, Y, 2, 112, '#d8d0c0'); A.R(X, Y + 37, 48, 2, '#d8d0c0'); A.R(X, Y + 74, 48, 2, '#d8d0c0');
+        A.R(X - 3, Y - 3, 54, 3, '#e8e0d0'); A.R(X - 3, Y - 3, 3, 118, '#e8e0d0'); A.R(X + 48, Y - 3, 3, 118, '#b8aa90'); A.R(X - 5, Y + 112, 58, 4, '#c8b890'); A.R(X - 5, Y + 112, 58, 1, '#f0e4c0');
+        for (const dx of [-14, 50]) { A.R(X + dx, Y - 8, 12, 124, '#5a1424'); for (let q = 1; q < 12; q += 3) A.R(X + dx + q, Y - 8, 1, 124, '#7a2034'); A.R(X + dx, Y - 8, 12, 1, '#9a3048'); A.R(X + dx, Y + 62, 12, 3, '#c9a24a'); }
+        A.fringe(X - 14, Y - 14, 76, '#c98f22'); A.cone(X + 24, Y + 116, 130, 50, '#9ab4ff', 0.06);
+      }
+      { const X = Math.round(58 * TS - cx), Y = Math.round(13 * TS - cy), sw = Math.round(Math.sin(f / 90) * 2);
+        if (X > -60 && X < VW + 60 && Y > -200 && Y < VH + 60) {
+          for (let y = y0; y < Y; y += 6) { A.R(X, y, 2, 4, '#7a5a2a'); A.R(X, y + 4, 2, 2, '#4a3418'); }
+          A.box(X - 5 + sw, Y - 2, 12, 10, '#c9a24a'); A.box(X - 26 + sw, Y + 8, 54, 4, '#c9a24a'); A.box(X - 16 + sw, Y + 1, 34, 3, '#a8842c');
+          for (let i = 0; i < 7; i++) { const bx = X - 24 + i * 8 + sw, on = ((f + i * 7) % 90) > 3; A.R(bx, Y + 2, 2, 6, on ? '#fff2c0' : '#a8862a'); A.R(bx, Y + 12, 1, 5 + (i % 3) * 2, 'rgba(255,255,240,0.55)'); A.R(bx + 4, Y + 12, 1, 3 + (i % 2) * 2, 'rgba(255,255,240,0.4)'); }
+          A.glow(X, Y + 8, 76, '#ffd890', 0.26 + 0.03 * Math.sin(f / 7));
+        } }
+    }
+    for (const [x0, x1, fr] of FLOORS) {
+      for (let tx = x0 + 3; tx < x1; tx += 11) {   // wallpaper peeled back to the lath
+        if (tx > 46 && tx < 69 && x0 === 2 && x1 === 127) continue;
+        const h = A.hash(tx, fr); if (h < 0.55) continue;
+        const w = 22 + (h * 14 | 0), X = tx * TS - cx, Y = Math.round(fr * TS - 56 - 22 - h * 60 - cy); if (X < -40 || X > VW + 10 || Y < -40 || Y > VH) continue;
+        A.R(X, Y, w, 30, '#58443c'); for (let q = 3; q < 30; q += 4) A.R(X, Y + q, w, 1, '#3a2a24'); A.R(X, Y, w, 1, '#7a6458'); A.R(X, Y - 2, (w >> 1) + 3, 3, '#5a2438'); A.R(X + w - 5, Y + 28, 5, 4, '#5a2438'); A.R(X + 3, Y + 5, 1, 24, '#2a1c18');
+      }
+      for (let tx = x0 + 14; tx < x1 - 2; tx += 18) {   // panel doors in the hall
+        if (tx > 44 && tx < 70 && x0 === 2 && x1 === 127) continue;
+        let blocked = false; for (let i = 0; i < 2; i++) for (let j = 1; j <= 3; j++) if (T(tx + i, fr - j)) blocked = true; if (blocked) continue;
+        const X = tx * TS - cx, Y = fr * TS - 58 - cy; if (X < -40 || X > VW + 10 || Y < -60 || Y > VH) continue;
+        A.box(X - 3, Y - 3, 38, 61, '#e0d8c8'); A.R(X + 1, Y + 1, 30, 57, '#5a3a2a'); A.R(X + 1, Y + 1, 2, 57, '#7a5238'); A.R(X + 29, Y + 1, 2, 57, '#3a2218');
+        A.box(X + 5, Y + 5, 22, 20, '#6a4632'); A.box(X + 5, Y + 30, 22, 22, '#6a4632'); A.R(X + 24, Y + 29, 4, 4, '#d8b060'); A.R(X + 24, Y + 29, 4, 1, '#fff0b0'); A.R(X + 1, Y + 56, 30, 1, 'rgba(255,220,150,0.55)');
+      }
+    }
+  };
+  const dressMid = (ctx, G, cx, cy, f) => {
+    const A = DD.art, VW = DD.VW, VH = DD.VH, on = x => x > -70 && x < VW + 30;
+    // a popcorn machine on every floor ("every floor has a popcorn machine")
+    for (const [tx, fr] of [[30, 39], [41, 27], [22, 12], [110, 15], [70, 39]]) {
+      const X = tx * TS - cx, Y = fr * TS - cy; if (!on(X)) continue;
+      A.box(X, Y - 11, 26, 11, '#7a1018', { outline: '#2a0408' }); A.R(X + 3, Y - 9, 20, 7, '#4a0a10'); A.R(X + 11, Y - 8, 4, 2, '#d8b060');
+      A.box(X + 1, Y - 38, 24, 28, '#c8202c', { outline: '#2a0408' }); A.R(X + 4, Y - 35, 18, 20, '#f6edd0'); for (let i = 0; i < 9; i++) A.R(X + 5 + (i * 5) % 14, Y - 33 + ((i * 7) % 15), 3, 2, i % 2 ? '#fff8d8' : '#f0d890');
+      A.box(X + 8, Y - 46, 10, 9, '#f0c040'); A.R(X + 1, Y - 38, 24, 2, '#f0c040'); A.glow(X + 13, Y - 26, 34, '#ffe0a0', 0.2 + 0.03 * Math.sin((f + tx * 9) / 8));
+    }
+    // balcony rails where the floors end on the atrium
+    for (const [tx0, fr] of [[43, 27], [43, 12], [69, 27], [69, 15]]) {
+      const X = tx0 * TS - cx, Y = fr * TS - cy; if (!on(X)) continue;
+      A.R(X, Y - 13, 58, 1, '#e0bc60'); A.R(X, Y - 12, 58, 1, '#7a5a1a'); A.R(X, Y - 1, 58, 2, '#7a5a1a'); for (let i = 0; i < 58; i += 4) A.R(X + i, Y - 11, 1, 10, 'rgba(201,162,74,0.65)'); for (const p of [0, 28, 56]) { A.R(X + p, Y - 16, 3, 16, '#c9a24a'); A.R(X + p, Y - 16, 3, 1, '#fff0b0'); }
+    }
+    // the atrium floor, mid-renovation: a stepladder, a sawhorse with a plank, a paint bucket, a drop cloth
+    { const X = 52 * TS - cx, Y = 39 * TS - cy; if (on(X) || on(X + 160)) {
+        for (const dx of [0, 22]) { A.R(X + dx + 4, Y - 40, 2, 40, '#c8c0a8'); A.R(X + dx + 2 + (dx ? 6 : 0), Y - 40, 2, 40, '#a09880'); } for (let r = 4; r < 36; r += 8) A.R(X + 6, Y - r, 20, 2, '#d8d0b8'); A.R(X, Y - 42, 34, 4, '#e0d8c0'); A.R(X + 6, Y - 52, 10, 10, '#d02820'); A.R(X + 6, Y - 52, 10, 2, '#ff7a6a');
+        const q = X + 120; A.R(q, Y - 18, 3, 18, '#8a5a2a'); A.R(q + 26, Y - 18, 3, 18, '#8a5a2a'); A.box(q - 6, Y - 22, 42, 5, '#c89860'); A.R(q + 30, Y - 14, 18, 3, '#b88850');
+        A.box(X + 64, Y - 12, 12, 12, '#b0b4c0'); A.R(X + 65, Y - 10, 10, 2, '#e8362a');
+        A.R(X + 88, Y - 6, 22, 6, '#cfc8b8'); A.R(X + 92, Y - 9, 14, 4, '#d8d2c4'); A.R(X + 98, Y - 11, 6, 3, '#e4ded0'); } }
+    // the projection booth: a projector throwing a beam, reels turning, stacks of film cans
+    { const X = 112 * TS - cx, Y = 27 * TS - cy; if (on(X)) {
+        A.box(X - 2, Y - 14, 38, 14, '#3a2a22'); A.box(X + 2, Y - 30, 30, 16, '#2a2e38', { outline: '#0c0e14' });
+        for (const [rx, ph] of [[X + 8, 0], [X + 24, 2]]) { const ry = Y - 40; ctx.fillStyle = '#0c0e14'; ctx.beginPath(); ctx.arc(rx, ry, 10, 0, 7); ctx.fill(); ctx.fillStyle = '#8a90a0'; ctx.beginPath(); ctx.arc(rx, ry, 8, 0, 7); ctx.fill(); ctx.fillStyle = '#2a2e38'; for (let i = 0; i < 3; i++) { const a = f / 12 + ph + i * 2.09; ctx.beginPath(); ctx.arc(rx + Math.cos(a) * 5, ry + Math.sin(a) * 5, 2, 0, 7); ctx.fill(); } }
+        A.R(X + 32, Y - 24, 7, 6, '#9aa0ac'); A.R(X + 38, Y - 23, 2, 4, '#fff2c0');
+        ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = 'rgba(255,240,200,' + (0.06 + 0.02 * Math.sin(f / 3)) + ')'; ctx.beginPath(); ctx.moveTo(X + 40, Y - 22); ctx.lineTo(X + 40 + 150, Y - 70); ctx.lineTo(X + 40 + 150, Y + 20); ctx.fill(); ctx.restore(); A.glow(X + 40, Y - 22, 22, '#fff2c0', 0.4);
+        for (const [bx, n] of [[X - 40, 3], [X + 80, 4]]) for (let i = 0; i < n; i++) { A.box(bx, Y - 8 * (i + 1), 22, 8, '#a8a090', { outline: '#3a342c' }); A.R(bx + 8, Y - 8 * (i + 1) + 3, 6, 2, '#c8202c'); } } }
+    // the screening room: EXIT signs and aisle lights
+    for (const tx of [70, 126]) { const X = tx * TS - cx, Y = 39 * TS - 62 - cy; if (!on(X)) continue; A.box(X, Y, 22, 9, '#0c3a1c', { outline: '#04140a' }); DD.text('EXIT', X + 11, Y + 2, '#7aff9a', 1, null, 'center'); A.glow(X + 11, Y + 5, 28, '#4aff7a', 0.16); }
+    for (let tx = 72; tx < 118; tx += 3) { const X = tx * TS - cx; if (X < -4 || X > VW + 4) continue; A.R(X, 39 * TS - cy - 3, 3, 2, ((f >> 4) + tx) % 7 ? '#ffd060' : '#8a6a20'); }
+  };
 
   Object.assign(window.LEVEL, {
     portraits: { tim: 'w10_portrait_tim', gregg: 'w10_portrait_gregg' },
@@ -46,6 +118,7 @@ window.LEVEL = {"id": "10-3", "name": "THE MUSEUM OF MOVIE HOUSES", "sub": "MOVI
           for (let x = Math.floor((x0 * TS - cx) / 40) * 40; x < (x1 + 1) * TS - cx; x += 40) if (x + 40 > x0 * TS - cx && x < VW) put(ctx, 'w10_wainscot', x, Y);
         }
         for (const cr of [2, 15, 30]) { const Y = cr * TS - cy - 2; if (Y > -10 && Y < VH) for (let x = wo - 32; x < VW + 32; x += 32) put(ctx, 'w10_crown', x, Y); }
+        dressFar(ctx, G, cx, cy, f);
         // set dressing: posters, standees, lamps with warm pools of light
         const dress = [['w10_poster', 22, 9], ['w10_carposter', 40, 8], ['w10_standee_cow', 14, 8], ['w10_poster', 6, 3.2], ['w10_poster', 72, 20.5], ['w10_standee_tux', 90, 20.5], ['w10_poster', 100, 33.5], ['w10_poster', 28, 34.8],
           ['w10_carposter', 56, 33], ['w10_standee_tux', 46, 33.4], ['w10_poster', 30, 2.4]];
@@ -133,6 +206,7 @@ window.LEVEL = {"id": "10-3", "name": "THE MUSEUM OF MOVIE HOUSES", "sub": "MOVI
       },
       drawMid(ctx, G) {
         const s = G.s, p = G.pl, wx = DD.wx, wy = DD.wy, f = G.frame, VW = DD.VW, VH = DD.VH;
+        dressMid(ctx, G, Math.round(G.cam.x), Math.round(G.cam.y), f);
         const sign = (tx, row, txt, col = '#fff0c8') => { const X = wx(tx * TS), Y = wy(row * TS); if (X < -160 || X > VW + 160 || Y < -30 || Y > VH + 20) return; const w = txt.length * 4 + 10; ctx.fillStyle = '#2a1018'; ctx.fillRect(X - w / 2, Y, w, 11); ctx.fillStyle = '#e8c060'; ctx.fillRect(X - w / 2, Y, w, 1); ctx.fillRect(X - w / 2, Y + 10, w, 1); DD.text(txt, X, Y + 3, col, 1, null, 'center'); };
         sign(44, 31.2, 'POPCORN ROOM'); sign(12, 31.2, 'NOT OPEN TO THE PUBLIC YET', '#b8a898');
         sign(6, 18.5, 'MUSEUM OF MOVIE HOUSES'); sign(25, 18.5, 'UP'); sign(18, 8, 'THIRD FLOOR'); sign(72, 11, 'OH, HEAVENLY DOG'); sign(78, 12.2, 'ORIGINAL MEXICAN LOBBY CARD', '#b8a898');
@@ -178,6 +252,11 @@ window.LEVEL = {"id": "10-3", "name": "THE MUSEUM OF MOVIE HOUSES", "sub": "MOVI
     if (!t0.call(this, ctx, k, X, Y, tx, ty)) return false;
     const A = DD.art, T = DD.T;
     if (!T(tx, ty - 1)) { A.R(X, Y, 16, 1, 'rgba(255,240,210,0.42)'); A.R(X, Y + 1, 16, 1, 'rgba(255,240,210,0.1)'); }
+    if ((k === 'floor' || k === 'slab') && T(tx, ty - 1)) {   // the cut-away below a floor: joists under a slab, foundation stone under the ground floor, darker and calmer with depth
+      let d = 1; while (DD.kindAt(tx, ty - d) === k) d++;
+      if (k === 'floor') { const o = ((ty + 1) & 1) * 4, h = A.hash(tx, ty); A.R(X, Y, 16, 13, h < 0.5 ? '#2c1a20' : '#321e24'); A.R(X, Y + 6, 16, 1, '#12080c'); A.R(X + 7 + o % 8, Y, 1, 6, '#12080c'); A.R(X + 3 + o, Y + 7, 1, 6, '#12080c'); A.R(X + 11 + o % 8, Y + 7, 1, 6, '#12080c'); A.R(X, Y, 16, 1, 'rgba(255,220,180,0.07)'); A.R(X, Y + 7, 16, 1, 'rgba(255,220,180,0.05)'); A.R(X, Y, 16, 13, 'rgba(0,0,0,' + (0.1 * d) + ')'); }
+      else if (d === 1) { A.R(X, Y + 1, 16, 10, '#4a3022'); A.R(X, Y + 1, 16, 1, '#6a4a32'); A.R(X, Y + 10, 16, 1, '#241410'); A.R(X + 3, Y + 5, 1, 1, '#9a8a7a'); A.R(X + 12, Y + 5, 1, 1, '#9a8a7a'); A.R(X + 5 + (A.hash(tx, ty) * 4 | 0), Y + 7, 5, 1, '#3a2418'); }
+    }
     if (!T(tx - 1, ty)) A.R(X, Y, 1, 16, 'rgba(255,240,210,0.14)'); if (!T(tx + 1, ty)) A.R(X + 15, Y, 1, 16, 'rgba(0,0,0,0.3)'); if (!T(tx, ty + 1)) A.R(X, Y + 15, 16, 1, 'rgba(0,0,0,0.38)');
     return true;
   };

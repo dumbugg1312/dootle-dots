@@ -105,8 +105,12 @@ window.LEVEL = {"id": "11-3", "name": "FOUR EPISODES, ONE MOVIE", "sub": "CUT OU
       },
       tile(ctx, k, X, Y, tx, ty) {
         const r = window.LEVEL.theme.tile0(ctx, k, X, Y, tx, ty);
-        if (r) { const A = DD.art, K = DD.kindAt, solid = (x, y) => !!K(x, y), up = !solid(tx, ty - 1), lf = !solid(tx - 1, ty), rt = !solid(tx + 1, ty), dn = !solid(tx, ty + 1), s3 = sec(tx);   // the third tone and the outline
-          if (k === 'floor') { if (up) { A.R(X, Y + 2, 16, 1, 'rgba(0,0,0,0.3)'); } else A.tex(X, Y, 16, 16, '#3a3a46', 0.05, 3 + s3); if (lf) A.R(X, Y, 1, 16, 'rgba(255,255,255,0.14)'); if (rt) A.R(X + 15, Y, 1, 16, 'rgba(0,0,0,0.4)'); }
+        if (r) { const A = DD.art, f3 = DD.G.frame, K = DD.kindAt, solid = (x, y) => !!K(x, y), up = !solid(tx, ty - 1), lf = !solid(tx - 1, ty), rt = !solid(tx + 1, ty), dn = !solid(tx, ty + 1), s3 = sec(tx);   // the third tone and the outline
+          if (k === 'floor') { if (up) { A.R(X, Y + 2, 16, 1, 'rgba(0,0,0,0.3)'); } else { A.tex(X, Y, 16, 16, '#3a3a46', 0.05, 3 + s3);
+              const d = ty - 21, hh = A.hash(tx, ty);   // under the carpet: cable runs of the A/V looms, taped down with gaffer tape; a floor box and conduit lower down; darker with depth
+              if (d === 1) { A.R(X, Y + 5, 16, 4, '#0c0c10'); A.R(X, Y + 5, 16, 1, '#3a3a46'); A.R(X, Y + 7, 16, 1, ['#e8c02a', '#e8e8e8', '#d8202c'][(tx >> 2) % 3]); if (hh > 0.66) { A.R(X + 3, Y + 3, 7, 8, '#8a8a94'); A.R(X + 3, Y + 3, 7, 1, '#b8b8c4'); A.R(X + 3, Y + 10, 7, 1, '#4a4a54'); } }
+              else { A.R(X, Y + 9, 16, 2, '#2a2a34'); A.R(X, Y + 9, 16, 1, '#4a4a56'); if (tx % 12 === 5) { A.R(X + 2, Y + 3, 12, 9, '#16161c'); A.R(X + 3, Y + 4, 10, 1, '#4a4a56'); A.R(X + 11, Y + 6, 2, 1, (f3 >> 4) % 5 ? '#3ad868' : '#e83a3a'); } }
+              A.R(X, Y, 16, 16, 'rgba(6,4,12,' + (0.1 + 0.25 * d) + ')'); } if (lf) A.R(X, Y, 1, 16, 'rgba(255,255,255,0.14)'); if (rt) A.R(X + 15, Y, 1, 16, 'rgba(0,0,0,0.4)'); }
           else if (k === 'block') { if (up) A.R(X, Y, 16, 1, 'rgba(255,255,255,0.4)'); if (lf) A.R(X, Y, 1, 16, 'rgba(255,255,255,0.2)'); if (rt) A.R(X + 15, Y, 1, 16, 'rgba(0,0,0,0.45)'); if (dn) A.R(X, Y + 15, 16, 1, 'rgba(0,0,0,0.5)'); }
           else if (k === 'plank') { A.R(X, Y + 7, 16, 1, 'rgba(0,0,0,0.4)'); if (lf) A.R(X, Y, 1, 7, 'rgba(255,255,255,0.4)'); if (rt) A.R(X + 15, Y, 1, 7, 'rgba(0,0,0,0.35)'); }
           else if (k === 'ledge') { A.R(X, Y, 16, 1, '#fff0d0'); if (rt) A.R(X + 15, Y, 1, 10, 'rgba(0,0,0,0.4)'); A.R(X, Y + 10, 16, 1, 'rgba(0,0,0,0.4)'); } }
@@ -253,12 +257,22 @@ window.LEVEL = {"id": "11-3", "name": "FOUR EPISODES, ONE MOVIE", "sub": "CUT OU
           const bars = ['#e8e8e8', '#e8e800', '#00e8e8', '#00e800', '#e800e8', '#e80000', '#0000e8'];
           const bw = 24; for (let i = 0; i < Math.ceil((x1 - x0) / bw) + 1; i++) { const gx = Math.floor((x0 - a) / bw) + i; ctx.fillStyle = bars[((gx % 7) + 7) % 7]; ctx.fillRect(a + gx * bw, 0, bw, VH * 0.7); ctx.fillStyle = bars[(6 - ((gx % 7) + 7) % 7)]; ctx.fillRect(a + gx * bw, VH * 0.7, bw, VH * 0.1); }
           ctx.fillStyle = '#10101a'; ctx.fillRect(x0, VH * 0.8, x1 - x0, VH * 0.2);
+          { const A = DD.art, pw = (b - a) / 6, py = Math.round(VH * 0.8), ph = VH - py;   // the bottom of the test card (SMPTE): -I, white, +Q, black and the PLUGE strips
+            ['#00214c', '#ebebeb', '#32006a', '#050505'].forEach((col, i) => A.R(a + i * pw, py, pw + 1, ph, col)); A.R(a + 4 * pw, py, pw / 3, ph, '#030303'); A.R(a + 4 * pw + pw / 3, py, pw / 3, ph, '#050505'); A.R(a + 4 * pw + 2 * pw / 3, py, pw / 3, ph, '#1a1a1a'); A.R(a + 5 * pw, py, pw, ph, '#0a0a0a'); A.R(a, py, b - a, 1, 'rgba(0,0,0,0.5)');
+            const by = (f * 1.4 + k * 61) % (VH + 30) - 15;   // a tracking band rolling up the picture, and the VCR's on-screen display
+            A.R(x0, by, x1 - x0, 9, 'rgba(255,255,255,0.1)'); A.R(x0, by + 9, x1 - x0, 1, 'rgba(255,255,255,0.22)'); for (let i = 0; i < 14; i++) A.R(x0 + ((i * 53 + f * 17) % Math.max(1, x1 - x0)), by + (i % 5) * 2, 6 + (i % 3) * 4, 1, 'rgba(255,255,255,0.5)');
+            { const m2 = Math.max(x0, Math.min(x1, (a + b) / 2)); if (b - a > 0 && m2 > x0 + 40 && m2 < x1 - 40) A.R(m2 - 54, py + 2, 108, ph - 4, 'rgba(8,8,20,0.9)'); }
+            const gl = ctx.createLinearGradient(0, 0, 0, VH); gl.addColorStop(0, 'rgba(0,0,0,0.3)'); gl.addColorStop(0.25, 'rgba(0,0,0,0)'); gl.addColorStop(0.75, 'rgba(0,0,0,0)'); gl.addColorStop(1, 'rgba(0,0,0,0.35)'); ctx.fillStyle = gl; ctx.fillRect(x0, 0, x1 - x0, VH);   // the CRT's darker top and bottom
+            for (const [ex, dir] of [[Math.max(x0, a), 1], [Math.min(x1, b), -1]]) { const ge = ctx.createLinearGradient(ex, 0, ex + dir * 28, 0); ge.addColorStop(0, 'rgba(0,0,0,0.55)'); ge.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = ge; ctx.fillRect(Math.min(ex, ex + dir * 28), 0, 28, VH); } }
+            const ox = Math.max(x0, a) + 10; if (ox < x1 - 90) { DD.text('STOP', ox, 8, '#9aff9a', 1, '#000'); DD.text('SP', ox + 2, 18, '#9aff9a', 1, '#000'); if ((f >> 5) & 1) DD.art.R(ox + 28, 9, 4, 5, '#ff4a4a'); }
+            const bx = Math.min(x1, b) - 10; if (bx > x0 + 100) DD.text('CH 3', bx, 8, '#9aff9a', 1, '#000', 'right');
           ctx.fillStyle = 'rgba(0,0,0,0.25)'; for (let y = 0; y < VH; y += 3) ctx.fillRect(x0, y, x1 - x0, 1);
           ctx.fillStyle = 'rgba(255,255,255,0.18)'; for (let i = 0; i < 40; i++) { const nx = x0 + ((i * 97 + f * 13) % Math.max(1, x1 - x0)), ny = (i * 53 + f * 7) % VH; ctx.fillRect(nx, ny, 3, 1); }
           const mid = Math.max(x0, Math.min(x1, (a + b) / 2)); if (b - a > 0 && mid > x0 + 40 && mid < x1 - 40 && b > 0) DD.text('EPISODE ' + (k + 1), mid, VH * 0.84, '#ffe680', 2, '#000', 'center');
           if (rev === 0 && mid > x0 + 40 && mid < x1 - 40) DD.text('PLEASE STAND BY', mid, VH * 0.93, '#a8a8b8', 1, null, 'center');
           ctx.restore();
           if (rev > 0 && rev < 1) { ctx.fillStyle = '#ffffff'; ctx.fillRect(x0 - 1, 0, 2, VH); }
+          if (x0 > 6) { const sl = ctx.createLinearGradient(x0, 0, x0 - 46, 0); sl.addColorStop(0, 'rgba(150,190,255,0.3)'); sl.addColorStop(1, 'rgba(150,190,255,0)'); ctx.fillStyle = sl; ctx.fillRect(Math.max(0, x0 - 46), 0, Math.min(46, x0), VH * 0.8); }   // the test card spills its light onto the room beside it
         }
         // the HUD: which episode and which have been stopped
         const ep = sec(Math.floor(DD.cx(p) / TS));

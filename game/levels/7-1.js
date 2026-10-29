@@ -117,6 +117,17 @@ Object.assign(window.LEVEL, {
           if (!K(tx - 1, ty) && tx > 0) { ctx.fillStyle = lip ? '#9fb6d0' : '#26324a'; ctx.fillRect(X, Y, 1, 16); }   // the lit edge where the board ends (a pit, the riser)
           if (!K(tx + 1, ty) && tx < 223) { ctx.fillStyle = '#10141f'; ctx.fillRect(X + 15, Y, 1, 16); }
           if (lip && tx % 9 === 4) { ctx.fillStyle = '#3fd6ff'; ctx.fillRect(X + 7, Y, 2, 1); }   // a taped mark on the stage
+          if (!lip && ty >= 22) {   // the stage front below the lip: a gaffer-taped cable run, a vent grille, getting darker and calmer with depth
+            const A = DD.art, d = ty - 21;
+            if (d === 1) {
+              A.R(X, Y + 6, 16, 4, '#06080d'); A.R(X, Y + 6, 16, 1, '#1c2436'); A.R(X, Y + 9, 16, 1, '#020308');   // the cable bundle
+              if (A.hash(tx, 61) < 0.5) { A.R(X, Y + 11, 16, 1, '#0a0e18'); A.R(X + 2, Y + 11, 5, 1, '#2a3a5a'); }   // a second, thinner run with a sheen
+              if (tx % 6 === 1) { A.R(X + 4, Y + 4, 6, 8, '#6a707c'); A.R(X + 4, Y + 4, 6, 1, '#9aa2b0'); A.R(X + 9, Y + 4, 1, 8, '#4a505c'); }   // gaffer tape across the bundle
+            } else if (tx % 11 === 5) {   // a floor vent
+              A.box(X + 2, Y + 3, 12, 9, '#0a0e18', { outline: '#020308' }); for (let q = 0; q < 4; q++) A.R(X + 4, Y + 5 + q * 2, 8, 1, '#02030a');
+            }
+            ctx.fillStyle = 'rgba(2,3,8,' + (0.16 * d) + ')'; ctx.fillRect(X, Y, 16, 16);
+          }
         } else {   // the trapdoor: pale plywood boards with a crack through them and nails, so it cannot be missed on a black floor
           ctx.fillStyle = '#6a4a30'; ctx.fillRect(X, Y, 16, 16); ctx.fillStyle = '#8a6644'; ctx.fillRect(X, Y, 16, 2); ctx.fillRect(X + 1, Y + 4, 14, 3); ctx.fillRect(X + 1, Y + 9, 14, 3);
           ctx.fillStyle = '#b08a5c'; ctx.fillRect(X, Y, 16, 1); ctx.fillStyle = '#3a2414'; ctx.fillRect(X, Y + 7, 16, 1); ctx.fillRect(X, Y + 13, 16, 3); ctx.fillRect(X, Y, 1, 16);
@@ -188,6 +199,12 @@ Object.assign(window.LEVEL, {
         if (hosts === 1) {   // S10E1's two-shot: Tim and Gregg in director's chairs either side of the X
           if (ok('w7_tim_seat')) ctx.drawImage(I.w7_tim_seat, X0 - 100, Y0 - 52);
           if (ok('w7_gregg_seat')) ctx.drawImage(I.w7_gregg_seat, X0 + 66, Y0 - 52);
+          { const f = G.frame, A = DD.art, hurt = G.pl && G.pl.inv > 0;   // idle life: each host blinks on his own beat, glances aside now and then, and winces when the Dot is hurt
+            for (const [bx, ex, ey, wp, seed, lid] of [[X0 - 100, 14, 8, [[14, 15], [19, 18]], 3, '#6a3a28'], [X0 + 66, 13, 7, [[13, 14], [20, 19]], 8, '#6a3a28']]) {
+              const by = Y0 - 52, per = 170 + Math.floor(A.hash(seed, 5) * 190), ph = (f + Math.floor(A.hash(seed, 9) * per)) % per, shut = ph < 6 || hurt, gl = (f + seed * 131) % 430 < 44;
+              if (shut) { ctx.fillStyle = lid; for (const [w, p] of wp) ctx.fillRect(bx + Math.min(w, p), by + ey, 2, 1); }
+              else if (gl) for (const [w, p] of wp) { ctx.fillStyle = '#f0eae4'; ctx.fillRect(bx + p, by + ey, 1, 1); ctx.fillStyle = '#1a0e16'; ctx.fillRect(bx + w, by + ey, 1, 1); }
+            } }
           if (G.greggAlert) DD.text('!', X0 + 82, Y0 - 66, '#ffe680', 2);
         }
       }

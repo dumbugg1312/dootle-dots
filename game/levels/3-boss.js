@@ -192,12 +192,14 @@ window.LEVEL = {
       { const A = DD.art; A.trim(0, floorY - 140, VW, '#d8b050'); A.R(0, floorY - 137, VW, 2, 'rgba(60,40,10,0.35)'); A.trim(0, floorY - 37, VW, '#c9a050'); A.trim(0, floorY - 6, VW, '#a8802c');   // crown moulding, chair rail and a gilt baseboard
         for (const sx of [12.5, 25.5]) { const X = wxs(sx), Y = floorY - 96; if (X < -20 || X > VW + 20) continue; A.R(X - 2, Y, 4, 9, '#c8a040'); A.R(X - 2, Y, 1, 9, '#f0d878'); A.R(X + 1, Y, 1, 9, '#7a5a18'); A.R(X - 4, Y - 3, 8, 3, '#e8d090'); A.R(X - 4, Y - 3, 8, 1, '#fffae0'); A.glow(X, Y - 2, 40, '#ffd890', 0.2 + 0.03 * Math.sin(G.frame / 11 + sx)); A.cone(X, Y + 9, 36, 14, '#ffe8b0', 0.07); }   // brass sconces
       }
-      if (ok('w3_ojackson')) { const X = wxs(15) - 17, Y = floorY - 144 + 40; if (X < VW && X > -40) { ctx.drawImage(I.w3_ojackson, X, Y); DD.art.trim(X - 2, Y - 6, I.w3_ojackson.width + 4, '#d8b050'); DD.art.cone(X + I.w3_ojackson.width / 2, Y - 4, 56, 22, '#ffe8b0', 0.1); } }
-      for (const [fx, n] of [[3.2, 'w3_ouflag'], [5.4, 'w3_opflag'], [36.4, 'w3_opflag'], [38.4, 'w3_ouflag']]) if (ok(n)) { const X = wxs(fx) - 13, Y = floorY - I[n].height + 2; if (X < VW && X > -40) ctx.drawImage(I[n], X, Y); }
+      if (ok('w3_ojackson')) { const X = wxs(15) - 17, Y = floorY - 144 + 40; if (X < VW && X > -40) { const dp = G.frame - (G.dipAt ?? -999), rat = dp >= 0 && dp < 24 ? (dp % 4 < 2 ? 1 : -1) : 0, tilt = dp >= 0 && dp < 24 ? 1 : 0; ctx.drawImage(I.w3_ojackson, X + rat, Y + tilt); DD.art.trim(X - 2, Y - 6, I.w3_ojackson.width + 4, '#d8b050'); DD.art.cone(X + I.w3_ojackson.width / 2, Y - 4, 56, 22, '#ffe8b0', 0.1); } }
+      for (const [fx, n] of [[3.2, 'w3_ouflag'], [5.4, 'w3_opflag'], [36.4, 'w3_opflag'], [38.4, 'w3_ouflag']]) if (ok(n)) { const X = wxs(fx) - 13, Y = floorY - I[n].height + 2; if (X < VW && X > -40) { const sw = Math.round(Math.sin(G.frame / 45 + fx) * 0.8 + (G.frame - (G.flashAt ?? -999) < 20 ? Math.sin(G.frame) : 0)); ctx.drawImage(I[n], X + sw, Y); } }
     },
     tile(ctx, k, X, Y, tx, ty) {
       const I = DD.IMG, ok = DD.ready, kd = DD.kindAt;
-      if (k === 'oak' && ok('w3_ooak')) { ctx.drawImage(I.w3_ooak, 0, kd(tx, ty - 1) === 'oak' ? 16 : 0, 16, 16, X, Y, 16, 16); { const A = DD.art; if (kd(tx, ty - 1) !== 'oak') { A.R(X, Y, 16, 1, 'rgba(255,236,190,0.6)'); A.R(X, Y + 1, 16, 1, 'rgba(255,210,140,0.2)'); } if (!kd(tx + 1, ty)) A.R(X + 15, Y, 1, 16, 'rgba(20,8,10,0.4)'); if (!kd(tx - 1, ty)) A.R(X, Y, 1, 16, 'rgba(255,226,170,0.25)'); } if (ty > 22) { ctx.fillStyle = 'rgba(30,10,20,' + (0.25 + (ty - 22) * 0.1) + ')'; ctx.fillRect(X, Y, 16, 16); } return true; }
+      if (k === 'oak' && ok('w3_ooak')) { ctx.drawImage(I.w3_ooak, 0, kd(tx, ty - 1) === 'oak' ? 16 : 0, 16, 16, X, Y, 16, 16); { const A = DD.art; if (kd(tx, ty - 1) !== 'oak') { A.R(X, Y, 16, 1, 'rgba(255,236,190,0.6)'); A.R(X, Y + 1, 16, 1, 'rgba(255,210,140,0.2)'); } if (!kd(tx + 1, ty)) A.R(X + 15, Y, 1, 16, 'rgba(20,8,10,0.4)'); if (!kd(tx - 1, ty)) A.R(X, Y, 1, 16, 'rgba(255,226,170,0.25)'); } if (ty >= 22) { const A = DD.art, ev = ty % 2 ? 4 : 12; A.R(X + ev, Y, 1, 16, 'rgba(24,8,10,0.4)'); A.R(X, Y + 15, 16, 1, 'rgba(24,8,10,0.45)'); A.R(X, Y + 8, 16, 1, 'rgba(24,8,10,0.2)'); A.R(X + ev + 1, Y, 1, 16, 'rgba(255,214,150,0.12)');
+          if (ty === 22 && tx % 9 === 5) { A.R(X + 2, Y + 4, 12, 8, '#2a1a10'); A.R(X + 3, Y + 5, 10, 6, '#b8902c'); for (let i = 0; i < 4; i++) A.R(X + 3, Y + 6 + i * 2, 10, 1, '#3a2410'); A.R(X + 3, Y + 5, 10, 1, '#f0d070'); } }
+        if (ty > 22) { ctx.fillStyle = 'rgba(30,10,20,' + (0.25 + (ty - 22) * 0.1) + ')'; ctx.fillRect(X, Y, 16, 16); } return true; }
       if (k === 'shelf' && ok('w3_oshelf')) { ctx.drawImage(I.w3_oshelf, X, Y); return true; }
       return false;
     },
@@ -210,7 +212,9 @@ window.LEVEL = {
       if (ok('w3_odesk')) ctx.drawImage(I.w3_odesk, X - 40, floorY - 40);
       DD.art.glow(X - 4, floorY - 62, 46, '#8ae0ff', 0.14 + 0.03 * Math.sin(f / 7));   // the video phone's blue glow on the desk
       if (ok('w3_odvd')) { const hit = B && B.flash > 0 ? Math.sin(f) : 0; ctx.drawImage(I.w3_odvd, X - 15 + Math.round(hit), floorY - 40 - 20); }
-      if (B && B.engaged && f % 120 < 50 && !B.dead) DD.text('GO ' + (B.hp > 3 ? 'DECKER' : 'ON'), X, floorY - 74, '#9ee8ff', 1, '#102030', 'center');   // Kington cheering from the screen
+      const cheer = G.frame - (G.flashAt ?? -999) < 30, wince = G.pl && G.pl.inv > 0;
+      if (B && B.engaged && !B.dead && (f % 120 < 50 || cheer)) DD.text('GO ' + (B.hp > 3 ? 'DECKER' : 'ON') + (cheer ? '!' : ''), X, floorY - 74 - (cheer ? Math.round(Math.abs(Math.sin(f / 3)) * 3) : 0), '#9ee8ff', 1, '#102030', 'center');   // Kington cheering from the screen, hopping when Abdul is hit
+      else if (B && B.engaged && !B.dead && wince) DD.text('OH NO', X, floorY - 74, '#ffb0a0', 1, '#301010', 'center');   // and wincing when you are
     },
     drawMid(ctx, G) {   // the presidential rug, light shafts from the windows, a few motes
       const I = DD.IMG, ok = DD.ready, c = G.cam, VW = DD.VW, VH = DD.VH, floorY = 21 * 16 - Math.round(c.y), f = G.frame;

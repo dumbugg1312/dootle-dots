@@ -30,7 +30,15 @@ window.LEVEL = {"id": "1-1", "name": "WELCOME TO DOT CITY", "sub": "FIND THE MAY
     let f = (Math.floor(G.frame / 22 + e.ph * 9) & 1), hop = 0;
     const near = Math.abs(DD.cx(G.pl) - e.x) < 70, party = (G.s.cheer || 0) > 0;
     if (e.cheer !== false && (near || party)) { f = 2; hop = Math.abs(Math.sin(G.frame / 5 + e.ph * 20)) * (party ? 4 : 2.5); }
-    ctx.drawImage(I()[n], f * 16, 0, 16, 24, X, Math.round(DD.wy(e.y) - 23 - hop), 16, 24);
+    let lean = 0;   // looks pass 2: the crowd winces when the Dot is hurt (hunkers down and leans away)
+    if (G.pl.inv > 0 && Math.abs(DD.cx(G.pl) - e.x) < 150) { f = 1; hop = 0; lean = (e.x >= DD.cx(G.pl) ? 1 : -1); }
+    ctx.drawImage(I()[n], f * 16, 0, 16, 24, X + lean, Math.round(DD.wy(e.y) - 23 - hop), 16, 24);
+  }
+  // looks pass 2: a blink for the faced citizens, every few seconds on its own offset (the eye's white pixel takes the body colour from the pixel above it)
+  function blink(ctx, G, im, f, X, Y, ph) {
+    if ((G.frame + Math.floor(ph * 997)) % (190 + Math.floor(ph * 150)) > 4) return;
+    const by = [2, 3, 0, 2][f];
+    for (const ex of [5, 9]) ctx.drawImage(im, f * 16 + ex, by + 5, 1, 1, X + ex, Y + by + 6, 1, 1);
   }
   function bubble(ctx, X, Y, text, a) {   // a cream speech board centred above (X, Y), with a little tail
     if (!text) return;
@@ -65,8 +73,9 @@ window.LEVEL = {"id": "1-1", "name": "WELCOME TO DOT CITY", "sub": "FIND THE MAY
     draw(e, ctx, G) {
       const n = 'w1_citf_' + CITS[e.c]; if (!ok(n)) return;
       const X = DD.wx(e.x + 6), Y = DD.wy(e.y + e.h);
-      const talk = e.a > 0.5 && (G.frame >> 3) % 3 === 0;
-      ctx.drawImage(I()[n], (talk ? 3 : (G.frame / 22 + e.ph * 9 | 0) & 1) * 16, 0, 16, 24, X - 8, Y - 24, 16, 24);
+      const talk = e.a > 0.5 && (G.frame >> 3) % 3 === 0, hurt = G.pl.inv > 0 && Math.abs(DD.cx(G.pl) - e.x) < 150, fr = talk ? 3 : hurt ? 1 : (G.frame / 22 + e.ph * 9 | 0) & 1;
+      ctx.drawImage(I()[n], fr * 16, 0, 16, 24, X - 8, Y - 24, 16, 24);
+      if (!talk) blink(ctx, G, I()[n], fr, X - 8, Y - 24, e.ph);
       if (e.a > 0.05 && !DD.hush) bubble(ctx, X, Y - 26, e.text, Math.min(1, e.a * 1.5));
     },
   });
@@ -101,11 +110,11 @@ window.LEVEL = {"id": "1-1", "name": "WELCOME TO DOT CITY", "sub": "FIND THE MAY
     ['w1_shop_spaghetti', 160], ['w1_shop_fish', 186],
   ];
   const TREES = [[24, 'a'], [27.5, 'c'], [34, 'b'], [37, 'a'], [75.5, 'b'], [78.5, 'a'], [83, 'c'], [108.5, 'a'], [112, 'b'], [131, 'a'], [135, 'c'], [139, 'b'], [143, 'a'],
-    [150, 'c'], [155, 'b'], [176.5, 'a'], [181, 'b'], [196, 'c'], [198, 'a'], [207, 'b'], [210, 'a']];
+    [155, 'b'], [176.5, 'a'], [181, 'b'], [196, 'c'], [198, 'a'], [207, 'b'], [210, 'a']];
   const BUSHES = [[10.5, 'b'], [23, 'a'], [31, 'b'], [43, 'b'], [66, 'a'], [73, 'b'], [87, 'b'], [97, 'a'], [109, 'b'], [117, 'b'], [129, 'a'], [147, 'b'], [175, 'a'], [195, 'a'], [205, 'b'], [216, 'b'], [213.5, 'a']];
   const LAMPS = [22, 36, 54, 78, 130, 148, 178, 196, 209, 220];
   const CROWD = [   // [x0 tile, x1 tile, n, base y offset]
-    [3, 14, 7, 0], [49, 57, 4, 0], [76, 80, 3, 0], [150, 160, 5, 0], [172, 176, 3, 0], [153, 175, 9, -6], [189, 197, 4, 0], [207, 224, 8, 0], [209, 222, 6, -6],
+    [3, 14, 7, 0], [49, 57, 4, 0], [76, 80, 3, 0], [153, 160, 5, 0], [172, 176, 3, 0], [153, 175, 9, -6], [189, 197, 4, 0], [207, 224, 8, 0], [209, 222, 6, -6],
   ];
   const CROWD_NPC = [];
   CROWD.forEach(([x0, x1, n, dy], gi) => { for (let i = 0; i < n; i++) CROWD_NPC.push({ x: (x0 + (x1 - x0) * (i + hash(gi * 31 + i) * 0.7) / n) * 16, y: FLOOR_Y - 1 + dy, c: Math.floor(hash(gi * 17 + i * 5) * 7), ph: hash(gi * 7 + i) }); });
@@ -254,6 +263,10 @@ window.LEVEL = {"id": "1-1", "name": "WELCOME TO DOT CITY", "sub": "FIND THE MAY
           case 'road':
             if (!slice('w1_road', lip ? 0 : 16)) return false;
             { const A = DD.art; if (lip) { A.R(X, Y, 16, 1, '#f6f8ff'); A.R(X, Y + 3, 16, 1, 'rgba(40,44,90,0.18)'); if (!(tx & 1)) { A.R(X, Y + 4, 1, 12, 'rgba(30,34,80,0.22)'); A.R(X + 1, Y + 4, 1, 12, 'rgba(255,255,255,0.14)'); } } else { const o = (ty & 1) ? 8 : 0; A.R(X, Y, 16, 1, 'rgba(255,255,255,0.13)'); A.R(X, Y + 15, 16, 1, 'rgba(10,10,40,0.30)'); A.R(X + o, Y + 1, 1, 14, 'rgba(10,10,40,0.28)'); A.R(X + o + 1, Y + 1, 1, 14, 'rgba(255,255,255,0.10)'); if (A.hash(tx, ty) < 0.07) A.R(X + o + 3, Y + 5, 5, 3, 'rgba(255,255,255,0.07)'); } }
+            { const A = DD.art;   // looks pass 2: the cut-away under the pavement: a buried drain pipe with flanges, then foundation gravel, calmer and darker with depth
+              if (ty === 22) { A.R(X, Y, 16, 16, 'rgba(14,12,40,0.22)'); A.R(X, Y + 5, 16, 6, '#3c4272'); A.R(X, Y + 5, 16, 1, '#7a82bc'); A.R(X, Y + 6, 16, 1, '#5a6298'); A.R(X, Y + 10, 16, 1, '#20244a');
+                if ((tx & 7) === 2) { A.R(X + 6, Y + 3, 4, 10, '#4a5086'); A.R(X + 6, Y + 3, 4, 1, '#98a0d8'); A.R(X + 6, Y + 12, 4, 1, '#1a1e40'); A.R(X + 7, Y + 6, 1, 1, '#c8d0ff'); A.R(X + 7, Y + 9, 1, 1, '#c8d0ff'); } }
+              else if (ty >= 23) { A.R(X, Y, 16, 16, 'rgba(10,8,30,0.14)'); for (let q = 0; q < 3; q++) { const hh = A.hash(tx * 7 + q, ty); A.R(X + Math.floor(hh * 13), Y + 3 + q * 4, 2, 1, 'rgba(120,124,170,0.35)'); } } }
             if (kind(tx - 1, ty) !== k) { ctx.fillStyle = 'rgba(12,10,30,0.5)'; ctx.fillRect(X, Y, 2, 16); }
             if (kind(tx + 1, ty) !== k) { ctx.fillStyle = 'rgba(12,10,30,0.5)'; ctx.fillRect(X + 14, Y, 2, 16); }
             if (ty >= 23) { ctx.fillStyle = 'rgba(12,10,30,0.3)'; ctx.fillRect(X, Y, 16, 16); }

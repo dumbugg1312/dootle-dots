@@ -67,7 +67,13 @@ window.LEVEL = {"id": "7-3", "name": "PACKS OF EIGHT", "sub": "ON CINEMA ON LOCA
       if (k === 'floor') {   // vinyl store tile: a chequer of pale squares with grout, a bright lip with a reflected streak, dull and shaded below
         const A = DD.art, a = ((tx + ty) & 1) ? '#b0bcc8' : '#cad6e0'; A.R(X, Y, 16, 16, a);
         if (top) { A.R(X, Y, 16, 1, '#ffffff'); A.R(X, Y + 1, 16, 2, A.mix(a, 0.3)); A.R(X + 3 + (tx % 3) * 4, Y + 2, 6, 1, '#ffffff'); A.R(X, Y + 3, 16, 1, '#6a7a8a'); A.R(X, Y + 8, 16, 1, A.mix(a, -0.12)); }
-        else { A.R(X, Y, 16, 16, A.mix(a, -0.3)); A.R(X, Y, 16, 1, '#4a5a6a'); A.tex(X, Y, 16, 16, a, 0.08, 4); }
+        else {   // below the lip: the subfloor is a poured concrete slab with an expansion joint, a floor drain and a conduit, darker and calmer with depth
+          let d = 0; while (d < 4 && K(tx, ty - 1 - d) === k) d++;
+          const cb = A.mix('#6a7480', -0.16 * (d - 1)); A.R(X, Y, 16, 16, cb); A.R(X, Y, 16, 1, d === 1 ? '#8a98a8' : A.mix(cb, -0.2)); A.tex(X, Y, 16, 16, cb, 0.09, 4);
+          if (tx % 8 === 3) { A.R(X + 6, Y, 2, 16, '#1c2430'); A.R(X + 8, Y, 1, 16, A.mix(cb, 0.15)); }
+          if (d === 1) { A.R(X, Y + 11, 16, 3, '#2a323c'); A.R(X, Y + 11, 16, 1, '#5a6672'); if (tx % 7 === 2) { A.R(X + 3, Y + 10, 3, 5, '#7a8490'); A.R(X + 10, Y + 10, 3, 5, '#7a8490'); } }   // a conduit with clamps
+          else if (d === 2 && tx % 13 === 6) { A.box(X + 2, Y + 4, 12, 9, '#1c242e', { outline: '#0a0e14' }); for (let q = 0; q < 3; q++) A.R(X + 4 + q * 3, Y + 6, 1, 5, '#05080c'); }   // a drain grate
+        }
         A.R(X + 15, Y, 1, 16, A.mix(a, -0.35)); if (!top && ty % 2) A.R(X, Y + 15, 16, 1, '#2a3a4a');
         return true;
       }

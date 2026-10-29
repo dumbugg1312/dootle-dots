@@ -104,6 +104,13 @@ window.LEVEL = {"id": "1-3", "name": "INTRODUCING THE DOOTLE DOTS", "sub": "SAM.
       },
       tile(ctx, k, X, Y, tx, ty) {
         const kd = DD.kindAt, up = kd(tx, ty - 1), h = (tx * 73 + ty * 37) & 15;
+        if (k === 'stage' && up === 'stage' && ty >= 22) {   // looks pass 2: the stage front under the boards: a wood apron with a gilt edge and fringe, black velvet pleats, a gaffer-taped cable run along the base
+          const A = DD.art;
+          A.R(X, Y, 16, 16, '#1c1230'); for (let i = 0; i < 16; i++) A.R(X + i, Y, 1, 16, A.mix('#2a1c48', [0.1, 0.0, -0.2, -0.3, -0.2, 0.0, 0.1, 0.2][i & 7] - (ty - 22) * 0.12));
+          if (ty === 22) { A.R(X, Y, 16, 4, '#7a4c24'); A.R(X, Y, 16, 1, '#a0683a'); A.R(X, Y + 3, 16, 1, '#3a2010'); A.R(X + 15, Y, 1, 4, '#4a2c14'); A.R(X, Y + 4, 16, 1, '#e8c860'); A.fringe(X, Y + 5, 16, '#c8982a'); }
+          else { A.R(X, Y, 16, 16, 'rgba(6,4,16,0.25)'); A.R(X, Y + 11, 16, 3, '#0a0814'); A.R(X, Y + 11, 16, 1, '#3a3a56'); if (h < 7) { ctx.fillStyle = COL[ORDER[(tx / 3 | 0) & 3]]; ctx.fillRect(X + 3 + (h & 3), Y + 11, 5, 3); A.R(X + 3 + (h & 3), Y + 11, 5, 1, 'rgba(255,255,255,0.35)'); } }
+          return true;
+        }
         if (k === 'stage') {   // stage boards: planks with grain, a lit lip, a shaded underside, spike marks in the Dots' colours
           const A = DD.art, lip = up !== 'stage' && up !== 'cracked'; A.R(X, Y, 16, 16, '#a8743a'); A.planks(X, Y, 16, 16, '#a8743a', 8, false); A.R(X + 15, Y, 1, 16, '#6a4220'); A.tex(X, Y, 16, 16, '#a8743a', 0.08, 3);
           if (h < 4) A.R(X + 4 + h, Y + 4, 3, 1, '#7a4a22');

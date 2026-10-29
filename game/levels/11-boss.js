@@ -242,7 +242,12 @@ window.LEVEL = {
       if (k === 'lino' && DD.ready('w11_lino')) {
         ctx.drawImage(I.w11_lino, X, Y);
         if (DD.kindAt(tx, ty - 1) !== 'lino') { ctx.fillStyle = '#fff8e4'; ctx.fillRect(X, Y, 16, 1); ctx.fillStyle = '#a89878'; ctx.fillRect(X, Y + 1, 16, 1); }
-        if (ty > 21) { ctx.fillStyle = 'rgba(10,6,4,' + (0.35 + 0.2 * (ty - 22)) + ')'; ctx.fillRect(X, Y, 16, 16); }
+        if (ty > 21) {   // the cut-away under the lino: a concrete slab with an expansion joint, a copper pipe on clamps and a floor drain, darker with depth
+          const A = DD.art, R = A.R, d = ty - 21, h = A.hash(tx, ty);
+          if (d === 1) { R(X, Y, 16, 16, '#6a665c'); A.tex(X, Y, 16, 16, '#8a8576', 0.07, 6); R(X, Y, 16, 1, '#3a362e'); if (tx % 6 === 0) R(X, Y, 1, 16, '#34302a'); }
+          else { R(X, Y, 16, 16, '#34302a'); A.tex(X, Y, 16, 16, '#4a443a', 0.05, 7); R(X, Y + 5, 16, 3, '#b86a3a'); R(X, Y + 5, 16, 1, '#e89a5a'); R(X, Y + 7, 16, 1, '#6a3414'); if (tx % 4 === 0) R(X + 6, Y + 3, 4, 7, '#8a8a96'); if (tx % 9 === 4) { R(X + 3, Y + 11, 10, 4, '#14120e'); for (let i = 4; i < 13; i += 3) R(X + i, Y + 11, 1, 4, '#5a5a66'); } }
+          R(X, Y, 16, 16, 'rgba(8,4,2,' + (0.12 + 0.2 * d) + ')');
+        }
         else DD.art.tex(X, Y + 2, 16, 14, '#d8cdb0', 0.07, 13);   // speckled lino
         if (!DD.kindAt(tx + 1, ty)) DD.art.R(X + 15, Y, 1, 16, 'rgba(0,0,0,0.35)');
         return true;
@@ -263,10 +268,26 @@ window.LEVEL = {
       prop(ctx, c, 'w11_door', 1, FLOOR, 1); prop(ctx, c, 'w11_door', 62.5, FLOOR, 1);
       if (bright) { prop(ctx, c, 'w11_showtime', 40, 152, 0.92); const gl = ctx.createRadialGradient(VW / 2, 150 - c.y, 6, VW / 2, 150 - c.y, 90); gl.addColorStop(0, 'rgba(255,60,50,0.18)'); gl.addColorStop(1, 'rgba(255,60,50,0)'); }
       else prop(ctx, c, 'w11_bingosign', 40, 156, 0.92);
+      { const A = DD.art, sxx = (t, q) => Math.round(160 + (t * 16 + 8 - 160 - c.x) * q);   // night windows with blinds between the cork boards, and the wooden handrail along the wall
+        for (const t of [11, 35, 59]) { const X = sxx(t, 0.92) - 18, Y = 210 - c.y; if (X < -40 || X > 330) continue;
+          A.R(X - 2, Y - 2, 40, 52, '#6a4a22'); A.R(X - 2, Y - 2, 40, 1, '#b88a50'); A.R(X, Y, 36, 48, '#16264a'); A.R(X, Y + 24, 36, 24, '#0e1a38'); A.R(X + 24, Y + 6, 3, 3, '#e8f0ff'); A.R(X + 6, Y + 14, 1, 1, '#a8b8e8'); A.R(X + 14, Y + 30, 1, 1, '#a8b8e8');
+          for (let y = 3; y < 48; y += 4) { A.R(X, Y + y, 36, 2, 'rgba(216,200,164,0.55)'); A.R(X, Y + y + 2, 36, 1, 'rgba(60,44,20,0.5)'); } A.R(X + 17, Y, 1, 48, 'rgba(60,44,20,0.5)'); A.R(X - 4, Y + 49, 44, 3, '#b88a50'); A.R(X - 4, Y + 49, 44, 1, '#e8c890'); }
+        const hy = FLOOR - 40 - c.y; A.R(0, hy, VW, 3, bright ? '#c8d4c4' : '#d8a45a'); A.R(0, hy, VW, 1, bright ? '#eef4ea' : '#f4cc8a'); A.R(0, hy + 3, VW, 1, 'rgba(0,0,0,0.28)');
+        for (let t = 1; t < 64; t += 3) A.R(sxx(t, 0.97), hy + 3, 2, 7, bright ? '#8a9a86' : '#8a5a2c'); }
       prop(ctx, c, 'w11_tvcart', 31.5, FLOOR, 0.95); prop(ctx, c, 'w11_dchair', 28, FLOOR, 0.95); prop(ctx, c, 'w11_dchair', 35, FLOOR, 0.95, true);
       prop(ctx, c, 'w11_popcart', 60, FLOOR, 0.95);
       const si = img('w11_seniors');
-      if (si) for (const [t, k] of SENIORS) { const X = Math.round(160 + (t * 16 - 160 - c.x) * 0.97 - 11); if (X > -24 && X < 320) ctx.drawImage(si, k * 22, 0, 22, 30, X, Math.round(FLOOR - 58 - c.y), 22, 30); }
+      if (si) for (const [t, k] of SENIORS) {   // the residents: a blink every few seconds, a slow nod; they wince and lean in when the Dot is hurt, hop and cheer on a stomp, and rattle on a slam
+        const X0 = Math.round(160 + (t * 16 - 160 - c.x) * 0.97 - 11); if (X0 < -24 || X0 > 320) continue;
+        const A = DD.art, fr = G.frame, id = Math.floor(t * 7 + k), per = 180 + ((A.hash(id, 3) * 150) | 0), ph = (fr + ((A.hash(id, 1) * per) | 0)) % per;
+        const hurt = G.pl.inv > 0, cheer = fr - (G.flashAt ?? -999) < 30, rat = fr - (G.dipAt ?? -999) < 14, nod = ((fr + id * 41) % 420) < 40 ? 1 : 0;
+        const hop = cheer ? -((fr + id) % 8 < 4 ? 2 : 0) : 0, lean = hurt ? (G.pl.x < t * 16 ? -1 : 1) : 0, jit = rat ? ((fr >> 1) & 1 ? 1 : -1) : 0;
+        const Y0 = Math.round(FLOOR - 58 - c.y) + hop, hy = Y0 + nod + (hurt ? 1 : 0);
+        ctx.drawImage(si, k * 22, 15, 22, 15, X0 + jit, Y0 + 15, 22, 15);
+        ctx.drawImage(si, k * 22, 0, 22, 15, X0 + jit + lean, hy, 22, 15);
+        if (!cheer && (hurt || ph < 6)) { A.R(X0 + jit + lean + 8, hy + 9, 2, 1, '#b27458'); A.R(X0 + jit + lean + 12, hy + 9, 2, 1, '#b27458'); }
+        if (cheer) { A.R(X0 + jit + 1, hy + 18, 3, 2, '#e0aa84'); A.R(X0 + jit + 18, hy + 18, 3, 2, '#e0aa84'); }   // hands up
+      }
       for (const t of [7.5, 21, 54.5]) prop(ctx, c, 'w11_table', t, FLOOR + 1, 0.97);
       ctx.fillStyle = bright ? '#5e6e5a' : '#4a2c14'; ctx.fillRect(0, FLOOR - 6 - c.y, VW, 6);
       ctx.save(); ctx.globalCompositeOperation = 'lighter';   // lights: the TV cart, or the fluorescent cones

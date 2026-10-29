@@ -419,7 +419,7 @@
   }
   function bingoStand(cx, tt, on) {   // the Manor's bingo table: a little BINGO plate, the cage, a resident waiting
     rect('#5a4a30', cx - 16, 70, 1, 30); rect('#5a4a30', cx + 15, 70, 1, 30);
-    box(cx - 22, 62, 44, 10, '#f4ece0'); 'BINGO'.split('').forEach((L, k) => text(L, cx - 16 + k * 8, 65, BALLC[k] === '#e8e0d0' ? '#7a6a5a' : BALLC[k], 1, null, 'center'));
+    box(cx - 22, 62, 44, 10, '#f4ece0'); 'BINGO'.split('').forEach((L, k) => text(L, cx - 16 + k * 8, 65, BALLI[k], 1, null, 'center'));
     senior(1, cx + 15, 100);
     box(cx - 24, 98, 48, 5, '#6a3a18'); rect('#f4ece0', cx - 24, 98, 48, 1); box(cx - 21, 103, 3, FLOOR - 103, '#4a2810'); box(cx + 18, 103, 3, FLOOR - 103, '#4a2810');
     cage(cx - 6, 84, 10, on ? tt * 0.2 : 0.3, on, tt);
@@ -959,6 +959,7 @@
   // ================================================================ BINGO NIGHT at Grand Terrace Manor (S16 eps 5-8; the activity room had a BINGO NIGHT sign)
   // New calls, faster every ball. You daub your own card; five residents daub theirs and shout a beat after they're done. First bingo wins.
   const BALLC = ['#d8202c', '#2a6ad8', '#e8e0d0', '#1a9a4a', '#e8a020'];   // B I N G O
+  const BALLI = ['#c41d28', '#2460c7', '#706152', '#137337', '#875c0e'];   // the same letters as ink on cream: each colour taken just dark enough to read
   const BG = { state: 'bet', card: null, mark: [], cur: 12, order: [], calls: [], called: new Set(), next: 0, roll: 99, res: [], lock: 0, stake: 0, win: 0, who: -1, say: '', sayT: 0, splat: [], first: true, bad: -1, badT: -99 };
   const bsay = (s, n = 110) => { BG.say = s; BG.sayT = n; };
   const letter = n => 'BINGO'[Math.floor((n - 1) / 15)];
@@ -1116,16 +1117,17 @@
     ctx.restore();
     // footer
     rect('#0a0408', 0, 149, VW, 31); if (A) A.trim(0, 148, VW, '#c98f22');
-    if (msgT > 0) text(msg, VW / 2, 153, msg.startsWith('NEED') || msg.startsWith('OUT') ? '#ff8080' : '#ffe680', 1, null, 'center');
-    else text(unl() ? 'UNLIMITED HEI POINTS: EVERYTHING PLAYS FREE, NOTHING PAYS' : scr === 'lobby' ? 'BIGGEST WIN ' + C.big + '   BEST STREAK ' + C.best + '   YOU VS THE HOUSE ' + (C.net > 0 ? '+' : '') + C.net : 'BALANCE ' + pts() + '   YOU VS THE HOUSE ' + (C.net > 0 ? '+' : '') + C.net, VW / 2, 153, '#9a8a90', 1, null, 'center');
+    rect('#000', 6, 151, VW - 12, 13); rect('#000', 5, 152, VW - 10, 11); rect('#1a0810', 6, 152, VW - 12, 11); rect('#3a1a24', 6, 152, VW - 12, 1);   // the message strip
+    if (msgT > 0) text(msg, VW / 2, 155, msg.startsWith('NEED') || msg.startsWith('OUT') ? '#ff8080' : '#ffe680', 1, null, 'center');
+    else text(unl() ? 'UNLIMITED HEI POINTS: EVERYTHING PLAYS FREE, NOTHING PAYS' : scr === 'lobby' ? 'BIGGEST WIN ' + C.big + '   BEST STREAK ' + C.best + '   YOU VS THE HOUSE ' + (C.net > 0 ? '+' : '') + C.net : 'BALANCE ' + pts() + '   YOU VS THE HOUSE ' + (C.net > 0 ? '+' : '') + C.net, VW / 2, 155, '#9a8a90', 1, null, 'center');
     const J = DD.padUsed ? 'CROSS' : 'JUMP', X = DD.padUsed ? 'CIRCLE' : 'X', SW = DD.padUsed ? 'R1' : 'C';
-    const help = scr === 'lobby' ? 'LEFT/RIGHT: PICK   ' + J + ': PLAY   ' + SW + ': STORE   ' + X + ': ' + (ST() ? ST().backLabel : 'BACK')
-      : scr === 'slots' ? (S.state === 'spin' ? J + ': STOP THE REELS' : J + ': SPIN   ARROWS: BET   ' + X + ': CASINO')
-      : scr === 'scratch' ? (K.state === 'pick' ? 'LEFT/RIGHT: PICK   ' + J + ': BUY   ' + X + ': CASINO' : K.state === 'scratch' ? 'DRAG OR ARROWS: SCRATCH   ' + J + ': ALL   ' + X + ': REVEAL' : J + ': AGAIN   ' + X + ': TICKETS')
-      : scr === 'roul' ? (R.state === 'spin' ? J + ': HURRY IT UP' : 'ARROWS: MOVE   ' + J + ': CHIP DOWN / PRESS   ' + X + ': CASINO')
-      : scr === 'bingo' ? (BG.state === 'play' ? 'ARROWS OR MOUSE: MOVE   ' + J + ' OR CLICK: DAUB A CALLED NUMBER' : J + ': BUY A CARD   ARROWS: BET   ' + X + ': CASINO')
-      : B.state === 'play' ? 'ARROWS: PICK   ' + J + ': DO IT' : J + ': DEAL   ARROWS: BET   ' + X + ': CASINO';
-    text(help, VW / 2, 167, '#ffd27a', 1, '#000', 'center');
+    const keys = scr === 'lobby' ? [['LEFT/RIGHT', 'PICK'], [J, 'PLAY'], [SW, 'STORE'], [X, ST() ? ST().backLabel : 'BACK']]   // the controls as keycaps: [key, what it does]
+      : scr === 'slots' ? (S.state === 'spin' ? [[J, 'STOP THE REELS']] : [[J, 'SPIN'], ['ARROWS', 'BET'], [X, 'CASINO']])
+      : scr === 'scratch' ? (K.state === 'pick' ? [['LEFT/RIGHT', 'PICK'], [J, 'BUY'], [X, 'CASINO']] : K.state === 'scratch' ? [['DRAG OR ARROWS', 'SCRATCH'], [J, 'ALL'], [X, 'REVEAL']] : [[J, 'AGAIN'], [X, 'TICKETS']])
+      : scr === 'roul' ? (R.state === 'spin' ? [[J, 'HURRY IT UP']] : [['ARROWS', 'MOVE'], [J, 'CHIP DOWN / PRESS'], [X, 'CASINO']])
+      : scr === 'bingo' ? (BG.state === 'play' ? [['ARROWS OR MOUSE', 'MOVE'], [J + ' OR CLICK', 'DAUB A CALLED NUMBER']] : [[J, 'BUY A CARD'], ['ARROWS', 'BET'], [X, 'CASINO']])
+      : B.state === 'play' ? [['ARROWS', 'PICK'], [J, 'DO IT']] : [[J, 'DEAL'], ['ARROWS', 'BET'], [X, 'CASINO']];
+    window.DDUI.keycaps(keys);
   }
   function drawTop() {   // over the store's header: coins into the balance, sparks and the banner
     for (const p of spark) { const a = 1 - p.t / p.life; ctx.globalAlpha = a; rect('#000', p.x, p.y + 1, 2, 2); rect(p.c, p.x, p.y, 2, 2); ctx.globalAlpha = 1; }

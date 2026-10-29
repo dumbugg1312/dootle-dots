@@ -36,6 +36,13 @@ Object.assign(window.LEVEL, {
         A.R(X, 0, 16, VH, '#2a0e1a'); A.planks(X, 0, 16, VH, '#2a0e1a', 4, true); A.R(X, 0, 2, VH, '#4a1a2e'); A.R(X + 14, 0, 2, VH, '#12050a');
         A.box(X - 3, 24 - c.y * 0.3, 22, 7, '#5a4018', { outline: '#1a0e04' }); A.trim(X - 3, 22 - c.y * 0.3, 22, '#c8a040'); A.trim(X - 3, 31 - c.y * 0.3, 22, '#c8a040');   // the gilt capital
       }
+      // between the columns: tall gilt-framed smoked mirrors with a glint that travels across the glass, and brass sconces that throw a warm cone on the wallpaper
+      for (let i = -1; i < 4; i++) {
+        const X = Math.round(i * 230 + 305 - (c.x * 0.62) % 230), Y = Math.round(54 - c.y * 0.3);
+        A.box(X - 3, Y - 3, 46, 74, '#6a4a18', { outline: '#1a0e04' }); A.R(X, Y, 40, 68, '#0e0a14'); A.R(X, Y, 40, 68, 'rgba(60,70,110,0.18)'); A.trim(X - 3, Y - 3, 46, '#e8c860'); A.R(X + 2, Y + 4, 1, 52, 'rgba(255,255,255,0.08)');
+        const gl = ((f * 0.6 + i * 55) % 160) - 40; if (gl > -10 && gl < 60) { ctx.fillStyle = 'rgba(255,240,200,0.12)'; for (let k = 0; k < 68; k++) { const gx = gl - k * 0.5; if (gx > 0 && gx < 36) ctx.fillRect(X + Math.round(gx), Y + k, 3, 1); } }
+        for (const sx of [X - 14, X + 54]) { A.R(sx, Y + 22, 3, 8, '#c8a040'); A.R(sx - 3, Y + 18, 9, 5, '#e8d090'); A.R(sx - 3, Y + 18, 9, 1, '#fff6d0'); A.glow(sx + 1, Y + 20, 34, '#ffc870', 0.2 + 0.03 * Math.sin(f / 13 + i)); A.cone(sx + 1, Y + 23, 44, 16, '#ffd890', 0.07); }
+      }
       // neon sevens, far
       for (let i = -1; i < 4; i++) {
         const X = Math.round(i * 300 + 120 - (c.x * 0.55) % 300), Y = Math.round(34 - c.y * 0.5), fl = 0.8 + 0.2 * Math.sin(f / 9 + i * 2) * ((f + i * 40) % 220 < 8 ? 0.3 : 1);
@@ -52,6 +59,11 @@ Object.assign(window.LEVEL, {
         if (lit) { A.R(X + 26, gy - 28, 2, 10, '#8a8a96'); A.R(X + 25, gy - 31, 4, 4, '#a82030'); A.glow(X + 15, gy - 24, 26, '#ffd070', 0.1); }
         ctx.fillStyle = lit ? '#6a5a2a' : '#10060a'; ctx.fillRect(X + 4, gy - 30, 22, 12);
         if (lit && (f >> 3) % 3 === 0) { ctx.fillStyle = '#c8a040'; ctx.fillRect(X + 6, gy - 28, 4, 8); ctx.fillRect(X + 13, gy - 28, 4, 8); ctx.fillRect(X + 20, gy - 28, 4, 8); }
+        const kk = i + Math.floor(c.x * 0.75 / 40);
+        if (lit && hx(kk, 7) > 0.45) {   // a patron on a stool at the machine, seen from behind in the glow: sways, pulls the lever now and then, hunches when the Dot is hurt
+          const ph = Math.floor(hx(kk, 8) * 300), pull = (f + ph) % 260 < 14, hunch = G.pl && G.pl.inv > 0 ? 2 : 0, sw = Math.round(Math.sin(f / 40 + kk) * 0.8), px = X + 6 + (hx(kk, 9) > 0.5 ? 2 : 0), hc = hx(kk, 10) > 0.6 ? '#2a1a30' : '#0e060c';
+          A.R(px + 2, gy - 5, 8, 2, '#1a0a12'); A.R(px + 5, gy - 3, 2, 3, '#1a0a12'); A.R(px + 1, gy - 20 + hunch, 10, 14 - hunch, hc); A.R(px + 1, gy - 20 + hunch, 1, 14 - hunch, 'rgba(255,208,112,0.22)'); A.R(px + 3 + sw, gy - 27 + hunch, 6, 7, hc); A.R(px + 3 + sw, gy - 27 + hunch, 1, 6, 'rgba(255,208,112,0.3)');
+          if (pull) { A.R(px + 10, gy - 22 - (f + ph) % 260 % 14 % 7 + 0, 3, 2, hc); A.R(X + 27, gy - 28 + ((f + ph) % 260 > 5 ? 4 : 0), 1, 6, '#c8c8d0'); } else A.R(px + 10, gy - 16, 2, 6, hc); }
       }
       // chandeliers
       for (let i = -1; i < 4; i++) {
@@ -78,6 +90,9 @@ Object.assign(window.LEVEL, {
           ctx.fillStyle = '#242836'; ctx.fillRect(X, Y, 16, 16); ctx.fillStyle = '#1c1f2a'; ctx.fillRect(X, Y + 15, 16, 1); ctx.fillRect(X + 15, Y, 1, 16);
           if (lip) { ctx.fillStyle = '#8a90a8'; ctx.fillRect(X, Y, 16, 1); ctx.fillStyle = '#5a6078'; ctx.fillRect(X, Y + 1, 16, 2); }
           if (hx(tx, ty, 2) < 0.12) { ctx.fillStyle = '#12141c'; ctx.fillRect(X + 4, Y + 6, 3, 3); ctx.fillStyle = '#4a5064'; ctx.fillRect(X + 4, Y + 6, 3, 1); }
+          { const A = DD.art; if (lip) { A.R(X, Y + 3, 16, 2, '#6a4a30'); A.R(X, Y + 3, 16, 1, '#8a6a48'); }   // the carpet's underlay pad
+            if (ty === 22) { A.R(X, Y + 8, 16, 4, '#3a3e4c'); A.R(X, Y + 8, 16, 1, '#6a7088'); A.R(X, Y + 11, 16, 1, '#12141c'); if (tx % 4 === 1) { A.R(X + 6, Y + 6, 4, 8, '#4a5064'); A.R(X + 6, Y + 6, 4, 1, '#8a90a8'); } if (tx % 7 === 3) A.R(X + 2, Y + 8, 7, 4, '#d8c040'); }   // a conduit run with a clamp every four tiles and a yellow caution wrap
+            if (ty >= 23) { ctx.fillStyle = 'rgba(6,4,12,' + Math.min(0.6, 0.18 + (ty - 22) * 0.16) + ')'; ctx.fillRect(X, Y, 16, 16); } }
           return true;
         }
         ctx.fillStyle = '#4a1226'; ctx.fillRect(X, Y, 16, 16);

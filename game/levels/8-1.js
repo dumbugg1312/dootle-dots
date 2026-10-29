@@ -224,6 +224,18 @@ DD.defineEntity('w8shop', {   // the HEI Points shop: a kiosk where the points b
     ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(x - w0, y0); ctx.lineTo(x + w0, y0); ctx.lineTo(x + w1, y1); ctx.lineTo(x - w1, y1); ctx.fill();
   };
   const tile = (ctx, im, X, Y, sx, sy) => ctx.drawImage(im, sx, sy, 16, 16, X, Y, 16, 16);
+  // the painted hosts have a little life: [eye row, left eye [pupil x, white x], right eye, lid colour] in the 28x29 busts. Each blinks on its own beat (every 3 to 6 seconds), glances aside now and then, winces when the Dot is hurt
+  const EYE = { w8_timceo: [10, [10, 11], [16, 17], '#cc8462'], w8_tim11: [10, [10, 11], [16, 17], '#cc8462'], w8_bond: [10, [11, 12], [18, 19], '#c88460'], w8_timranch: [10, [11, 11], [17, 17], '#14141c'],
+    w8_greggranch: [11, [11, 12], [18, 19], '#c88460'], w8_gregg11: [11, [11, 12], [18, 19], '#c88460'] };
+  const alive = (ctx, G, nm, X, Y, flip, seed) => {
+    const e = EYE[nm]; if (!e) return;
+    const f = G.frame, per = 170 + Math.floor(hash(seed, 5) * 190), ph = (f + Math.floor(hash(seed, 9) * per)) % per, shut = ph < 6 || (G.pl && G.pl.inv > 0), gl = (f + seed * 37) % 460 < 46;
+    for (const [p, w] of [e[1], e[2]]) {
+      const px = flip ? 27 - p : p, wx = flip ? 27 - w : w;
+      if (shut) { ctx.fillStyle = e[3]; ctx.fillRect(X + Math.min(px, wx), Y + e[0], Math.abs(px - wx) + 1, 1); }
+      else if (gl && p !== w) { ctx.fillStyle = '#f6f4f0'; ctx.fillRect(X + px, Y + e[0], 1, 1); ctx.fillStyle = '#0e060e'; ctx.fillRect(X + wx, Y + e[0], 1, 1); }
+    }
+  };
 
   const PIT = { red: ['#14040a', '#050102'], ad: ['#06241a', '#02100a'], news: ['#0a1228', '#04060e'], board: ['#07080e', '#030308'], wed: ['#2a1230', '#0e0612'], vfa: ['#120e1e', '#06040c'] };
   const BG = {   // every layer is placed from FY, the screen y of the floor line (about 132 when Dot stands on the floor)
@@ -240,7 +252,7 @@ DD.defineEntity('w8shop', {   // the HEI Points shop: a kiosk where the points b
         ctx.restore(); ctx.fillStyle = '#0a0206'; ctx.fillRect(X0, Y + 32, X1 - X0, 200);
         if (p === 0.7) {   // Tim and Gregg in the house, each in a seat of the near row
           const hx = 267 - cx * p, sx = Math.round(hx / 28) * 28 + ((cx * p) % 28 ? 0 : 0);
-          for (const [nm, dx] of [['w8_tim11', 0], ['w8_gregg11', 56]]) { const im = I(nm); if (!im) continue; ctx.save(); ctx.filter = 'brightness(0.8)'; ctx.drawImage(im, Math.round(hx + dx), Y - 16); ctx.restore(); if (s) { ctx.save(); ctx.filter = 'brightness(0.36)'; ctx.drawImage(s, 0, 0, 28, 32, Math.round(hx + dx) - 0, Y + 10, 28, 22); ctx.restore(); } }
+          for (const [nm, dx] of [['w8_tim11', 0], ['w8_gregg11', 56]]) { const im = I(nm); if (!im) continue; ctx.save(); ctx.filter = 'brightness(0.8)'; ctx.drawImage(im, Math.round(hx + dx), Y - 16); alive(ctx, G, nm, Math.round(hx + dx), Y - 16, false, dx + 7); ctx.restore(); if (s) { ctx.save(); ctx.filter = 'brightness(0.36)'; ctx.drawImage(s, 0, 0, 28, 32, Math.round(hx + dx) - 0, Y + 10, 28, 22); ctx.restore(); } }
         }
       }
       ctx.save(); ctx.globalCompositeOperation = 'lighter';
@@ -405,6 +417,16 @@ DD.defineEntity('w8shop', {   // the HEI Points shop: a kiosk where the points b
         if (!kind(tx - 1, ty)) { ctx.fillStyle = 'rgba(0,0,0,0.42)'; ctx.fillRect(X, Y, 1, 16); }
         if (!kind(tx + 1, ty)) { ctx.fillStyle = 'rgba(0,0,0,0.42)'; ctx.fillRect(X + 15, Y, 1, 16); }
         if (lip && z === 'ranch' && (tx * 7) % 5 === 0) { const sc = I('w8_scrub'); if (sc) ctx.drawImage(sc, X, Y - 9); }
+        if (!lip && z !== 'ranch') {   // the floor band below the walkable lip: a cable run with gaffer tape, a vent, darker and calmer with depth
+          const A = DD.art; let d = 0; while (d < 4 && kind(tx, ty - 1 - d) === 'floor') d++;
+          if (d === 1) {
+            A.R(X, Y + 6, 16, 4, '#0a0610'); A.R(X, Y + 6, 16, 1, '#2a2230'); A.R(X, Y + 9, 16, 1, '#030206');
+            if (hash(tx, 61) < 0.5) { A.R(X, Y + 11, 16, 1, '#12091a'); A.R(X + 2, Y + 11, 5, 1, '#3a2a4a'); }
+            if (tx % 6 === 1) { A.R(X + 4, Y + 4, 6, 8, '#7a7468'); A.R(X + 4, Y + 4, 6, 1, '#a8a290'); A.R(X + 9, Y + 4, 1, 8, '#5a564c'); }
+            if (z === 'red' && tx % 4 === 0) { A.R(X + 7, Y + 2, 2, 1, '#ffc060'); }   // the aisle lights along the kick
+          } else if (d === 2 && tx % 11 === 5) { A.box(X + 2, Y + 3, 12, 9, '#14081a', { outline: '#030206' }); for (let q = 0; q < 4; q++) A.R(X + 4, Y + 5 + q * 2, 8, 1, '#030206'); }
+          ctx.fillStyle = 'rgba(4,1,8,' + (0.15 * d) + ')'; ctx.fillRect(X, Y, 16, 16);
+        }
         return true;
       }
       if (k === 'tier' || k === 'cracked') {
@@ -430,7 +452,7 @@ DD.defineEntity('w8shop', {   // the HEI Points shop: a kiosk where the points b
     },
     drawMid(ctx, G) {   // props drawn whole (seats, the news desk, the screening-room set, the ranch set), plus the hosts in place
       const c = G.cam, cx = Math.round(c.x), cy = Math.round(c.y), VW = DD.VW, VH = DD.VH, f = G.frame;
-      const put = (n, x, y, flip) => { const im = I(n); if (!im) return; const X = Math.round(x - cx), Y = Math.round(y - cy); if (X > VW + 90 || X < -170) return; if (flip) { ctx.save(); ctx.translate(X + im.width, Y); ctx.scale(-1, 1); ctx.drawImage(im, 0, 0); ctx.restore(); } else ctx.drawImage(im, X, Y); };
+      const put = (n, x, y, flip) => { const im = I(n); if (!im) return; const X = Math.round(x - cx), Y = Math.round(y - cy); if (X > VW + 90 || X < -170) return; if (flip) { ctx.save(); ctx.translate(X + im.width, Y); ctx.scale(-1, 1); ctx.drawImage(im, 0, 0); ctx.restore(); } else ctx.drawImage(im, X, Y); alive(ctx, G, n, X, Y, !!flip, Math.round(x)); };
       const seat = I('seat');
       if (seat) for (const [x, y, w, h] of G.s.seats) {   // every 2x2 block of seat tiles is one theatre seat; a lone top row shows a seat back
         const X = x * 16 - cx, Y = y * 16 - cy;

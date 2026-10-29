@@ -1,7 +1,7 @@
 // Which track plays where. Track names are music/source/<name>, built by music/build.sh into game/music/<name>.js.
 // Each level STARTS with its own song (precedence: level[id], then boss[world] on boss levels, then world[world], then title).
-// After that the music moves through one shared rotation of every track, so nobody has to reach World 9 to hear a song:
-// it changes only on an event (a checkpoint lit, a boss fight starting or changing phase), at most twice a level.
+// A stage keeps that song to the end. On a boss level the music moves once through one shared rotation of every track
+// (the fight starting or changing phase), so the rest of the songs still turn up before World 9; the jukebox plays any of them.
 window.CUES = {
   title: 'theme',                                   // the On Cinema theme: title, world select, and any world without its own track
   world: {
@@ -29,7 +29,7 @@ window.CUES = {
     '12-1': 'oscar-theme',                          // the Last On Cinema Oscar Special
     '12-3': 'oscar-fever-remix',                    // the Oscar Fever stage
   },
-  rotation: [   // the shared order songs move through once a level is under way (it carries on from level to level)
+  rotation: [   // the shared order a boss fight moves through (it carries on from level to level)
     'theme', 'dekkar-empty-bottle', 'dekkar-trigger-everything', 'oscar-theme', 'dkr-mt-botl-2', 'dekkar-farewell-axiom',
     'dekkar-my-angel', 'axiom-qui-con-me', 'dekkar-decision-points', 'dekkar-mt-botl-3q', 'dekkar-judas-to-me',
     'dekkar-oscar-medley-2016', 'dekkar-hole-in-my-soul', 'dekkar-ride-with-the-devil', 'dekkar-you-asked-for-a-hero',
@@ -44,6 +44,7 @@ window.CUES = {
     'dekkar-you-asked-for-a-hero': 'YOU ASKED FOR A HERO', 'dekkar-oscar-medley-2022': 'OSCAR MEDLEY 2022', 'oscar-fever-remix': 'OSCAR FEVER REMIX',
     'new-heidecker-daddys-gone': "DADDY'S GONE",
   },
-  switchesPerLevel: 2,     // at most this many song changes inside one level
+  switchesPerLevel: 0,     // song changes inside a regular stage: none, it keeps its own song
+  bossSwitches: 1,         // song changes inside a boss level
   minSeconds: 40,          // and never sooner than this after the level starts or the last change
 };

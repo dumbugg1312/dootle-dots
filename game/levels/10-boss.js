@@ -229,6 +229,7 @@
         for (const hx of HOLES) { const X = hx * TS - cx; if (X < -30 || X > VW + 30) continue; const hot = gt > 0 && hs.some(h => h.x === hx);
           ctx.fillStyle = '#0a0408'; ctx.beginPath(); ctx.ellipse(X + 8, FY - 1, 11, 12, 0, Math.PI, 0); ctx.fill(); ctx.fillStyle = '#3a2218'; ctx.beginPath(); ctx.ellipse(X + 8, FY - 1, 13, 14, 0, Math.PI, 0); ctx.fill();
           ctx.fillStyle = '#0a0408'; ctx.beginPath(); ctx.ellipse(X + 8, FY - 1, 10, 11, 0, Math.PI, 0); ctx.fill();
+          if (!hot && ((f + hx * 37) % 300) < 140 && ((f + hx * 11) % 70) > 4) { ctx.fillStyle = '#e8d890'; ctx.fillRect(X + 4, FY - 8, 2, 2); ctx.fillRect(X + 10, FY - 8, 2, 2); ctx.fillStyle = '#fff8d0'; ctx.fillRect(X + 4, FY - 8, 1, 1); ctx.fillRect(X + 10, FY - 8, 1, 1); }   // art pass: a rat watching from the dark, blinking now and then
           if (hot) { glow(ctx, X + 8, FY - 6, 22, '255,50,40', 0.45); ctx.fillStyle = '#ff5a4a'; ctx.fillRect(X + 4, FY - 9, 2, 2); ctx.fillRect(X + 10, FY - 9, 2, 2); } }
         { const A = DD.art;   // art pass: caged work lamps on the orange cord with cones, a flickering junction box, a gilt-less rim of shadow on the studs, dust
           for (let i = Math.floor(o2 / 168) - 1; i < Math.ceil((o2 + VW) / 168) + 1; i++) { const X = i * 168 - o2 + 90, Y = 30 + (i * 29 & 15), on = (i + Math.floor(f / 3)) % 11 !== 0 || f % 80 > 6;
@@ -244,6 +245,10 @@
           const i = I.w10_floor, sx = (tx % 2) * 16;
           if (lip) ctx.drawImage(i, sx, 0, 16, 16, X, Y, 16, 16);
           else { ctx.drawImage(i, sx, 6, 16, 5, X, Y, 16, 5); ctx.drawImage(i, sx, 6, 16, 5, X, Y + 5, 16, 5); ctx.drawImage(i, sx, 6, 16, 6, X, Y + 10, 16, 6); ctx.fillStyle = `rgba(14,4,10,${Math.min(0.7, 0.35 + 0.08 * (ty - 21))})`; ctx.fillRect(X, Y, 16, 16); }
+          if (!lip) { const A = DD.art, d = ty - 21, h = A.hash(tx, ty);   // art pass: the cut-away under the boards: a joist with nail heads, then a crawlspace with a sagging orange cord, a copper pipe and rat droppings, darker with depth
+            if (d === 1) { A.R(X, Y, 16, 16, '#1c0f12'); A.R(X, Y + 2, 16, 9, '#4a2c22'); A.R(X, Y + 2, 16, 1, '#7a5238'); A.R(X, Y + 10, 16, 1, '#241410'); A.R(X + 3, Y + 5, 1, 1, '#9a8a7a'); A.R(X + 12, Y + 5, 1, 1, '#9a8a7a'); A.R(X + 4 + (h * 6 | 0), Y + 7, 5, 1, '#3a2418'); }
+            else { A.R(X, Y, 16, 16, 'rgba(10,4,10,0.5)'); if (d === 2) { A.R(X, Y + 7, 16, 3, '#5a4a3c'); A.R(X, Y + 7, 16, 1, '#8a7a64'); A.R(X, Y + 9, 16, 1, '#2a2018'); if (tx % 5 === 0) A.R(X + 5, Y + 5, 5, 7, '#8a7a64'); }
+              else { const sg = Math.round(Math.sin((tx + 0.5) / 3) * 3); A.R(X, Y + 6 + sg, 16, 2, 'rgba(232,116,42,0.55)'); if (h < 0.3) { A.R(X + 3 + (h * 30 | 0), Y + 12, 2, 1, '#2a1a10'); A.R(X + 9, Y + 13, 1, 1, '#2a1a10'); } } } }
           { const A = DD.art, T = DD.T; if (lip) { A.R(X, Y, 16, 1, 'rgba(255,240,210,0.42)'); A.R(X, Y + 1, 16, 1, 'rgba(255,240,210,0.1)'); } if (!T(tx - 1, ty)) A.R(X, Y, 1, 16, 'rgba(255,240,210,0.14)'); if (!T(tx + 1, ty)) A.R(X + 15, Y, 1, 16, 'rgba(0,0,0,0.3)'); if (!T(tx, ty + 1)) A.R(X, Y + 15, 16, 1, 'rgba(0,0,0,0.38)'); }
           return true;
         }

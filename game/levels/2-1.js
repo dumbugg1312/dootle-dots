@@ -29,18 +29,26 @@ Object.assign(window.LEVEL, {
         const pw = 220, po = -(((c.x * 0.3) % pw) + pw) % pw;
         for (let x = po - pw; x < VW + pw; x += pw) { const X = Math.round(x + 2);   // a fluted gilt pilaster between the sconces, dimmed so it sits back
           A.R(X, 0, 14, VH, '#5a3a10'); for (let i = 0; i < 14; i++) A.R(X + i, 0, 1, VH, A.mix('#8a5a14', [0.25, 0.1, -0.1, -0.25][i & 3] + (i === 0 ? 0.2 : 0))); A.R(X - 3, 0, 20, 6, '#8a5a14'); A.R(X - 3, 0, 20, 1, '#e8c060'); A.R(X - 3, 6, 20, 1, '#2a1804'); }
-        ctx.fillStyle = 'rgba(14,3,10,0.55)'; ctx.fillRect(0, 0, VW, VH);   // the architecture sits back in the dark
+        ctx.fillStyle = 'rgba(14,3,10,0.3)'; ctx.fillRect(0, 0, VW, VH);   // the architecture sits back, but the velvet still reads
       }
       if (ok('w2_sconce')) for (let i = Math.floor(c.x * 0.3 / 220) - 1; i <= Math.floor((c.x * 0.3 + VW) / 220) + 1; i++) {
         const X = Math.round(i * 220 + 110 - c.x * 0.3), Y = Math.round(44 - c.y * 0.3);
         const g = ctx.createRadialGradient(X, Y + 8, 2, X, Y + 8, 34); g.addColorStop(0, 'rgba(255,200,120,0.12)'); g.addColorStop(1, 'rgba(255,200,120,0)');
-        ctx.fillStyle = g; ctx.fillRect(X - 34, Y - 26, 68, 68); ctx.globalAlpha = 0.55; ctx.drawImage(I.w2_sconce, X - 5, Y); ctx.globalAlpha = 1;   // wall sconces stay dim and steady, so they never read as a pickup
+        ctx.fillStyle = g; ctx.fillRect(X - 34, Y - 26, 68, 68); DD.art.glow(X, Y + 14, 90, '#ff9a48', 0.32); DD.art.cone(X, Y + 22, 110, 40, '#ffc070', 0.14); ctx.globalAlpha = 0.55; ctx.drawImage(I.w2_sconce, X - 5, Y); ctx.globalAlpha = 1;   // wall sconces stay dim and steady, so they never read as a pickup
       }
-      if (ok('seat')) for (const [par, dim, base] of [[0.45, 0.12, 150], [0.62, 0.2, 168]]) {   // two rows of empty seats further back in the house
+      if (ok('seat')) for (const [par, dim, base] of [[0.45, 0.22, 150], [0.62, 0.34, 168]]) {   // two rows of empty seats further back in the house
         const Y = Math.round(base - c.y * par * 0.6), ox = -Math.round(c.x * par) % 28;
         ctx.save(); ctx.filter = 'brightness(' + dim + ')';
         for (let x = ox - 28; x < VW + 28; x += 28) ctx.drawImage(I.seat, x, Y);
-        ctx.restore(); ctx.fillStyle = '#0a0206'; ctx.fillRect(0, Y + 32, VW, VH);
+        ctx.restore(); ctx.fillStyle = '#12040a'; ctx.fillRect(0, Y + 32, VW, VH);
+        { const A = DD.art, f = G.frame, b0 = Math.floor(Math.round(c.x * par) / 28), row = base > 150 ? 1 : 0, hurt = G.pl.inv > 0;   // looks pass 2: a sparse audience in the far rows, dark against the dim seats: heads bob and turn on their own offsets, and duck when the Dot is hurt
+          for (let k = -1, x = ox - 28; x < VW + 28; x += 28, k++) { const id = b0 + k + row * 997; if (A.hash(id, 7) > 0.5) continue;
+            const o = Math.floor(A.hash(id, 3) * 400), cyc = (f + o) % 330, turn = cyc < 40 ? (cyc < 20 ? 1 : 2) * (A.hash(id, 5) < 0.5 ? 1 : -1) : 0, bob = Math.sin((f + o) / 55) > 0.96 ? -1 : 0;
+            const hx = x + 9 + turn, hy = Y - 4 + bob + (hurt ? 2 : 0), v = Math.floor(A.hash(id, 1) * 4), cloth = ['#2a1420', '#1a1c2e', '#2c2418', '#22181e'][v], hair = ['#0e080a', '#3a3438', '#1a1008', '#0e080a'][v];
+            A.R(x + 5, hy + 10, 18, 9, cloth); A.R(x + 5, hy + 10, 18, 1, A.mix(cloth, 0.35)); A.R(hx + 1, hy, 7, 1, hair); A.R(hx, hy + 1, 9, 8, '#2e1a1c'); A.R(hx + 1, hy + 9, 7, 1, '#2e1a1c'); A.R(hx, hy + 1, 9, 3, hair);
+            if (v === 3) A.R(hx - 1, hy + 3, 11, 1, '#0a0608'); A.R(hx + 1, hy, 5, 1, 'rgba(210,180,255,0.22)'); } }
+        { const A = DD.art; A.R(0, Y + 32, VW, 1, '#6a3a1c'); A.R(0, Y + 33, VW, 1, '#2a0c10');   // a brass kick-rail at the foot of each row, with aisle step-lights
+          for (let x = ox - 28; x < VW + 28; x += 28) { A.R(x + 12, Y + 30, 4, 2, '#ffb860'); A.R(x + 11, Y + 29, 6, 1, 'rgba(255,184,96,0.22)'); } }
       }
       { const A = DD.art, f = G.frame;   // art pass: gilt pilasters, a velvet balcony rail with fringe, exit signs, a flickering projector beam, a gilt valance with marquee bulbs
         const by = Math.round(76 - c.y * 0.3), bo = -Math.round(c.x * 0.4) % 40;   // the balcony front: a velvet band, a gilt rail on top, fringe below
@@ -48,6 +56,10 @@ Object.assign(window.LEVEL, {
           A.R(0, by - 3, VW, 3, '#b07a1c'); A.R(0, by - 3, VW, 1, '#f0d070'); A.trim(0, by - 5, VW, '#c98f22'); A.fringe(0, by + 12, VW, '#c98f22'); ctx.fillStyle = 'rgba(8,2,6,0.35)'; ctx.fillRect(0, by - 5, VW, 22); }
         { const ew = 440, eo = -(((c.x * 0.3) % ew) + ew) % ew; for (let x = eo - ew; x < VW + ew; x += ew) { const X = Math.round(x + 70), Y = Math.round(20 - c.y * 0.3);   // green EXIT signs
           if (X > -40 && X < VW + 10 && Y > -20) { A.glow(X + 12, Y + 5, 26, '#40ff80', 0.18); A.box(X, Y, 24, 10, '#0a2a14', { outline: '#02080a' }); A.R(X + 1, Y + 1, 22, 8, '#106a30'); DD.text('EXIT', X + 12, Y + 2, '#b8ffd0', 1, null, 'center'); } } }
+        { const rw = 96, ro = -(((c.x * 0.3) % rw) + rw) % rw, Y = Math.round(20 - c.y * 0.3); if (Y > -10 && Y < VH) for (let x = ro - rw, i = 0; x < VW + rw; x += rw, i++) {   // a rig of par cans on a pipe, each a different gel, beams swinging slowly
+            const ii = i + Math.floor(c.x * 0.3 / rw), col = ['#ffb060', '#ff7088', '#8ab4ff'][((ii % 3) + 3) % 3], sw = Math.sin(f / 70 + ii * 1.3) * 10;
+            A.R(x - 2, Y - 5, 14, 2, '#2a2a34'); A.box(x + 2, Y - 3, 8, 7, '#2a2a36', { outline: '#0a0a10' }); A.R(x + 3, Y + 3, 6, 2, '#fff0c0'); A.cone(x + 6 + sw * 0.4, Y + 5, 130, 22 + sw, col, 0.14); A.glow(x + 6, Y + 5, 14, col, 0.28); } }
+        A.glow(VW * 0.5 - c.x * 0.02 % 40, VH * 0.55, 150, '#6a7ad0', 0.07);   // the cool wash of the screen from far across the house
         A.cone(VW * 0.78, -4, 190, 46, '#cfe0ff', 0.05 + 0.025 * Math.sin(f / 3) * (f % 53 < 5 ? 1 : 0.2));
         A.R(0, 0, VW, 9, '#4a0a18'); for (let x = -(Math.round(c.x * 0.3) % 24); x < VW + 24; x += 24) { A.R(x, 0, 12, 9, '#6a1224'); A.R(x, 0, 12, 1, '#8a2038'); } A.trim(0, 9, VW, '#e0a830'); A.fringe(0, 12, VW, '#c98f22'); A.bulbs(4, 6, VW, 12, f); }
       const v = ctx.createLinearGradient(0, 0, 0, VH); v.addColorStop(0, 'rgba(0,0,0,0.35)'); v.addColorStop(0.35, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.25)');
@@ -57,6 +69,12 @@ Object.assign(window.LEVEL, {
       const I = DD.IMG, ok = DD.ready, L = DD.L, kind = (x, y) => DD.kindAt(x, y);
       const lip = kind(tx, ty - 1) !== k;
       if (k === 'carpet' && ok('w2_carpet')) {
+        if (!lip && ty > 21) { const A = DD.art, d = ty - 21, hh = A.hash(tx, ty);   // looks pass 2: the floor band, cut away: a panelled riser fascia with a moulding and brass step-lights, then dark joists, a cable run with gaffer tape
+          if (d === 1) { A.R(X, Y, 16, 16, '#2c120e'); A.R(X, Y, 16, 1, '#7a4a22'); A.R(X, Y + 1, 16, 1, '#140806'); A.R(X + 2, Y + 3, 12, 10, '#22100c'); A.R(X + 2, Y + 3, 12, 1, '#0e0604'); A.R(X + 2, Y + 12, 12, 1, '#5a3220'); A.R(X + 13, Y + 3, 1, 10, '#4a2818'); A.R(X, Y + 15, 16, 1, '#0e0604');
+            if (tx % 4 === 1) { A.R(X + 5, Y + 5, 6, 5, 'rgba(255,184,96,0.16)'); A.R(X + 6, Y + 6, 4, 3, '#ffc870'); A.R(X + 6, Y + 6, 4, 1, '#fff0c0'); } A.R(X, Y, 16, 16, 'rgba(6,0,4,0.18)'); }
+          else { A.R(X, Y, 16, 16, '#140608'); A.R(X, Y + 5, 16, 4, '#241010'); A.R(X, Y + 5, 16, 1, '#3a1c14'); A.R(X, Y + 9, 16, 1, '#0a0304'); if (tx % 4 === 0) { A.R(X + 6, Y, 4, 5, '#1e0c0c'); A.R(X + 6, Y, 1, 5, '#341a14'); }
+            A.R(X, Y + 11, 16, 2, '#07020a'); A.R(X, Y + 11, 16, 1, '#2a1c2a'); if (hh < 0.4) A.R(X + 3 + (tx & 3) * 2, Y + 11, 3, 2, (tx & 1) ? '#c8c8b0' : '#e8c84a'); A.R(X, Y, 16, 16, 'rgba(0,0,0,' + Math.min(0.4, (d - 2) * 0.16) + ')'); }
+          return true; }
         ctx.drawImage(I.w2_carpet, X, Y);
         { const A = DD.art; if (ty > 21) { ctx.fillStyle = 'rgba(8,0,6,' + Math.min(0.5, (ty - 21) * 0.14) + ')'; ctx.fillRect(X, Y, 16, 16); } if (lip) { A.R(X, Y, 16, 1, '#d8a040'); A.R(X, Y + 1, 16, 1, '#8a5a1c'); A.R(X, Y + 2, 16, 1, 'rgba(0,0,0,0.3)'); } }
         if (lip) { ctx.fillStyle = '#5a3418'; ctx.fillRect(X, Y, 16, 1); if (tx % 3 === 0) { ctx.fillStyle = '#fff2a6'; ctx.fillRect(X + 7, Y + 2, 2, 1); ctx.fillStyle = '#c98f22'; ctx.fillRect(X + 6, Y + 2, 1, 1); ctx.fillRect(X + 9, Y + 2, 1, 1); } }
@@ -167,8 +185,9 @@ Object.assign(window.LEVEL, {
       ctx.fillStyle = pool; ctx.fillRect(X - 10, Y - 90, 170, 100);
       for (let i = 0; i < 3; i++) if (ok('seat')) ctx.drawImage(I.seat, X + 30 + i * 28, Y - 32);
       if (ok('tub')) ctx.drawImage(I.tub, X + 63, Y - 42);
-      if (ok('tim')) ctx.drawImage(I.tim, X + 28, Y - 47);
-      if (ok('gregg')) ctx.drawImage(I.gregg, X + 84, Y - 47);
+      { const hf = G.frame, hu = G.pl.inv > 0 ? 1 : 0, tb = Math.round(Math.sin(hf / 46) * 0.7) + hu, gb = Math.round(Math.sin(hf / 52 + 2) * 0.7) + hu;   // looks pass 2: the hosts breathe, blink every few seconds on their own beats, and lean in when the Dot is hurt
+        if (ok('tim')) { ctx.drawImage(I.tim, X + 28, Y - 47 + tb); if ((hf + 40) % 230 < 5) { ctx.fillStyle = '#7a4a3a'; ctx.fillRect(X + 40, Y - 40 + tb, 2, 1); ctx.fillRect(X + 45, Y - 40 + tb, 2, 1); } }
+        if (ok('gregg')) { ctx.drawImage(I.gregg, X + 84, Y - 47 + gb); if ((hf + 130) % 280 < 5) { ctx.fillStyle = '#5a3a30'; ctx.fillRect(X + 96, Y - 40 + gb, 2, 1); ctx.fillRect(X + 101, Y - 40 + gb, 2, 1); } } }
       if (G.greggAlert) DD.text('!', X + 99, Y - 60 - (40 - G.greggAlert) / 4, '#ffe680', 2);
       if (G.s.argument && !G.s.tantrum && G.frame % 60 < 30) DD.text('!!', X + 40, Y - 62, '#ff6a6a', 2);
     },

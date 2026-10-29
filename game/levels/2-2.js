@@ -36,16 +36,50 @@ Object.assign(window.LEVEL, {
           }
         }
       }
-      ctx.fillStyle = 'rgba(10,8,16,0.45)'; ctx.fillRect(0, 0, VW, VH);   // the racks sit back in the dark
+      for (let i = -1; i < 4; i++) {   // the gaps between the racks, mid: a wall shelf every so often with something from Gregg's room on it (a CRT on colour bars, a stack of boxes, a desk lamp, a taped-up sign, a clock)
+        const X = Math.round(i * 130 - (c.x * 0.55) % 130) + 66, Y0 = -Math.round(c.y * 0.55) % 24, seed = i + Math.floor(c.x * 0.55 / 130), r0 = Math.floor(c.y * 0.55 / 24);
+        for (let y = Y0 - 24, m = 0; y < VH + 24; y += 24, m++) {
+          const row = m - r0 - 1; if (((row % 6) + 6) % 6 !== 3) continue;
+          const yb = y + 22, v = Math.floor(A.hash(seed * 5 + 1, Math.floor(row / 6)) * 5);
+          A.R(X, yb, 62, 3, '#4a3220'); A.R(X, yb, 62, 1, '#7a5632'); A.R(X + 6, yb + 3, 2, 4, '#2a1c12'); A.R(X + 54, yb + 3, 2, 4, '#2a1c12');
+          if (v === 0) {   // a CRT on a VCR: colour bars and a scan line
+            A.R(X + 8, yb - 8, 24, 8, '#26262e'); A.R(X + 10, yb - 7, 6, 1, '#6a6a76'); A.R(X + 26, yb - 5, 3, 2, '#ff3a3a');
+            A.box(X + 6, yb - 34, 28, 26, '#3a3a44', { outline: '#0a0a10' }); A.R(X + 9, yb - 31, 22, 18, '#0a0a10');
+            const cols = ['#c8c8c8', '#c8c800', '#00c8c8', '#00c800', '#c800c8', '#c80000', '#0000c8']; for (let b = 0; b < 7; b++) A.R(X + 9 + b * 3, yb - 31, 3, 18, cols[b]);
+            A.R(X + 9, yb - 31 + ((f >> 1) % 18), 22, 1, 'rgba(255,255,255,0.35)'); A.R(X + 36, yb - 29, 8, 2, '#1a1a22'); A.R(X + 36, yb - 24, 8, 2, '#1a1a22');
+          } else if (v === 1) {   // cardboard boxes, red tape and a code
+            for (const [bx, by, bw, bh] of [[X + 4, yb - 18, 26, 18], [X + 32, yb - 14, 22, 14], [X + 10, yb - 32, 20, 14]]) { A.box(bx, by, bw, bh, '#8a6a3c', { outline: '#2a1c0c' }); A.R(bx + bw / 2 - 2 | 0, by, 4, bh, '#c8202c'); A.R(bx + 2, by + bh - 6, 7, 4, '#e8e0d0'); }
+          } else if (v === 2) {   // a gooseneck desk lamp over a tape stack: the warm light in the room
+            A.R(X + 8, yb - 6, 20, 6, '#16131a'); A.R(X + 8, yb - 4, 20, 2, '#c8202c'); A.R(X + 10, yb - 12, 16, 6, '#1a161e'); A.R(X + 10, yb - 10, 16, 2, '#c8202c');
+            A.R(X + 44, yb - 3, 8, 3, '#2a2c34'); A.R(X + 47, yb - 20, 2, 17, '#3a3c44'); A.R(X + 40, yb - 24, 9, 2, '#3a3c44'); A.box(X + 37, yb - 24, 6, 5, '#d8b040', { outline: '#2a2008' });
+          } else if (v === 3) {   // a paper sign taped to the wall
+            A.box(X + 4, yb - 28, 54, 24, '#e8e0cc', { outline: '#3a3226' }); A.R(X + 8, yb - 30, 10, 3, '#c8b870'); A.R(X + 44, yb - 30, 10, 3, '#c8b870');
+            DD.text('BE KIND', X + 31, yb - 24, '#8a1a10', 1, null, 'center'); DD.text('REWIND', X + 31, yb - 15, '#8a1a10', 1, null, 'center');
+          } else {   // a plain wall clock and a stack of loose tapes
+            const cx0 = X + 20, cy0 = yb - 18, an = f / 40; ctx.fillStyle = '#1a1814'; ctx.beginPath(); ctx.arc(cx0, cy0, 13, 0, 7); ctx.fill(); ctx.fillStyle = '#d8d4c4'; ctx.beginPath(); ctx.arc(cx0, cy0, 11, 0, 7); ctx.fill(); ctx.fillStyle = '#9a9684'; ctx.beginPath(); ctx.arc(cx0 + 2, cy0 + 3, 8, 0, 7); ctx.fill(); ctx.fillStyle = '#d8d4c4'; ctx.beginPath(); ctx.arc(cx0, cy0, 8.5, 0, 7); ctx.fill();
+            for (const [tx2, ty2] of [[0, -9], [9, 0], [0, 8], [-9, 0]]) A.R(cx0 + tx2 - 1, cy0 + ty2, 2, 2, '#1a1814'); A.R(cx0, cy0 - 6, 1, 6, '#14121a'); A.R(cx0 + Math.round(Math.cos(an) * 7), cy0 + Math.round(Math.sin(an) * 7), 1, 1, '#c8202c'); A.R(cx0 + 1, cy0 - 1, 4, 1, '#14121a');
+            A.R(X + 38, yb - 4, 16, 4, '#16131a'); A.R(X + 38, yb - 8, 16, 4, '#1a161e'); A.R(X + 40, yb - 3, 12, 2, '#c8202c'); A.R(X + 40, yb - 7, 12, 2, '#7a1418');
+          }
+        }
+      }
+      ctx.fillStyle = 'rgba(10,8,16,0.36)'; ctx.fillRect(0, 0, VW, VH);   // the racks sit back in the dark, but the shapes read
+      for (let i = -1; i < 4; i++) {   // light from the gap props: a CRT's blue wash and the desk lamp's warm pool, over the dimming so they glow
+        const X = Math.round(i * 130 - (c.x * 0.55) % 130) + 66, Y0 = -Math.round(c.y * 0.55) % 24, seed = i + Math.floor(c.x * 0.55 / 130), r0 = Math.floor(c.y * 0.55 / 24);
+        for (let y = Y0 - 24, m = 0; y < VH + 24; y += 24, m++) {
+          const row = m - r0 - 1; if (((row % 6) + 6) % 6 !== 3) continue;
+          const v = Math.floor(A.hash(seed * 5 + 1, Math.floor(row / 6)) * 5);
+          if (v === 0) A.glow(X + 20, y - 4, 52, '#7ab4ff', 0.2 + 0.03 * Math.sin(f / 4)); else if (v === 2) { A.glow(X + 40, y, 50, '#ffc860', 0.32); A.cone(X + 40, y - 2, 40, 26, '#ffd890', 0.12); }
+        }
+      }
       { const sy = Math.round(((-c.y * 0.6) % 260 + 260) % 260) - 60, sx = Math.round(((-c.x * 0.6) % 360 + 360) % 360) - 60;   // the POPCORN CLASSICS marquee, the warm focal light of the room
         A.glow(sx + 60, sy + 22, 90, '#ffcf80', 0.18); A.box(sx, sy, 120, 44, '#3a1208', { outline: '#120402' }); A.trim(sx + 3, sy + 3, 114, '#e0a848'); A.trim(sx + 3, sy + 38, 114, '#e0a848');
         A.R(sx + 8, sy + 9, 104, 26, '#f4ead0'); A.R(sx + 8, sy + 9, 104, 1, '#fffaf0'); DD.text('POPCORN', sx + 60, sy + 12, '#8a1a10', 1, null, 'center'); DD.text('CLASSICS', sx + 60, sy + 22, '#8a1a10', 1, null, 'center');
         A.bulbs(sx + 2, sy - 3, 118, 8, f); A.bulbs(sx + 2, sy + 45, 118, 8, f + 9); }
       for (let i = -1; i < 4; i++) for (let k = -1; k < 2; k++) {   // tube lights on chains, near: cones of light and the odd flicker
-        const X = Math.round(i * 150 + 40 - (c.x * 0.75) % 150), Y = Math.round(((-c.y * 0.75) % 120 + 120) % 120) + k * 120 + 10, on = (i + k) % 3 !== 1 || (f % 97) > 6;
+        const X = Math.round(i * 150 + 40 - (c.x * 0.75) % 150), Y = Math.round(((-c.y * 0.75) % 120 + 120) % 120) + k * 120 + 10, on = (i + k) % 3 !== 1 || (f % 97) > 6, warm = (i + k + 9) % 4 === 0;
         A.R(X + 4, Y - 14, 1, 14, '#2a2c34'); A.R(X + 35, Y - 14, 1, 14, '#2a2c34');
-        A.box(X, Y, 40, 4, on ? '#e8eef8' : '#4a5060');
-        if (on) { A.cone(X + 20, Y + 4, 110, 40, '#dfe8ff', 0.11); A.glow(X + 20, Y + 2, 30, '#dfe8ff', 0.2); }
+        A.box(X, Y, 40, 4, on ? (warm ? '#ffe6b0' : '#e8eef8') : '#4a5060');
+        if (on) { A.cone(X + 20, Y + 4, 120, 44, warm ? '#ffd890' : '#dfe8ff', 0.15); A.glow(X + 20, Y + 2, 34, warm ? '#ffd890' : '#dfe8ff', 0.26); }
       }
     },
     tile(ctx, k, X, Y, tx, ty) {
@@ -74,6 +108,12 @@ Object.assign(window.LEVEL, {
         return true;
       }
       if (k === 'floor') {   // sealed concrete, scuffed, a worn yellow safety line along the walk
+        if (!top && ty > 89) {   // looks pass 2: the slab edge, cut away: a cable bundle taped with silver gaffer and Gregg's red tape, an expansion joint, then a floor drain in the dark, calmer with depth
+          const d = ty - 89; A.R(X, Y, 16, 16, d === 1 ? '#2a2c34' : '#1a1c22'); A.tex(X, Y, 16, 16, d === 1 ? '#2a2c34' : '#1a1c22', 0.08, 5); A.R(X + 7, Y, 2, 16, 'rgba(8,8,12,0.55)'); A.R(X + 9, Y, 1, 16, 'rgba(120,124,140,0.12)');
+          if (d === 1) { A.R(X, Y, 16, 1, '#14151a'); A.R(X, Y + 5, 16, 4, '#0c0c10'); A.R(X, Y + 5, 16, 1, '#3a3c48'); A.R(X + 1 + (tx * 5) % 6, Y + 5, 3, 4, '#b8b8c0'); A.R(X + 1 + (tx * 5) % 6, Y + 5, 3, 1, '#e8e8f0'); if (tx % 3 === 0) { A.R(X + 11, Y + 5, 2, 4, '#c8202c'); A.R(X + 11, Y + 5, 2, 1, '#e8504a'); } A.R(X, Y + 11, 16, 1, '#8a2a2a'); A.R(X, Y + 12, 16, 1, '#3a1010'); }
+          else { if (tx % 9 === 4) { A.R(X + 2, Y + 6, 12, 6, '#0a0b0e'); A.R(X + 2, Y + 6, 12, 1, '#4a4c58'); for (let i = 0; i < 5; i++) A.R(X + 4 + i * 2, Y + 8, 1, 3, '#2a2c34'); } A.R(X, Y, 16, 16, 'rgba(0,0,0,0.22)'); }
+          return true;
+        }
         A.R(X, Y, 16, 16, '#30323a'); A.tex(X, Y, 16, 16, '#30323a', 0.1, 5);
         if (top) { A.R(X, Y, 16, 1, '#6a6c76'); A.R(X, Y + 1, 16, 1, '#40424c'); if ((tx % 6) < 4) A.R(X, Y + 3, 16, 2, h < 0.4 ? '#8a7428' : '#a08a30'); }
         return true;

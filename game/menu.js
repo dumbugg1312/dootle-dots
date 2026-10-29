@@ -165,7 +165,7 @@
   const DOTS = { y: 112, gx: 8 }, dotX = i => Math.round(VW / 2 - ((WORLDS.length - 1) * DOTS.gx) / 2) + i * DOTS.gx;   // one dot a world under the shelf, with an arrow each side
   const UNIT = { top: 22, bot: 106, post: 9 };   // the shelf unit: its top lip, its plank, and the posts at each side the row slides behind
   const sleeveSeasons = w => w.seasons.split(' + ')[0];   // what the sleeve says: SEASONS 11-12 (the Oscars and Decker ride along in the panel below)
-  const HB = { shelf: [2, 2, 52], store: [VW - 98, 2, 36], opt: [VW - 60, 2, 58] };   // the header buttons: x, y, w (11 tall)
+  const HB = { shelf: [4, 3, 44], bags: [53, 3, 44], store: [223, 3, 44], opt: [272, 3, 44] };   // the header boxes: x, y, w (11 tall), two each side of the sign
   const compact = () => world && world.levels.length > 2, rowY = i => compact() ? 34 + i * 31 : 44 + i * 40;   // four stages a world get slimmer rows
 
   // ---- Gregg's shelf: every Popcorn Classic tape, one per stage, in world order (classics.js)
@@ -655,80 +655,127 @@
       text('>', dotX(WORLDS.length - 1) + 12 + k, DOTS.y - 3, scroll < mx - 1 ? '#ffd27a' : '#3a2a30', 2, scroll < mx - 1 ? '#000' : null);
       for (let i = 0; i < WORLDS.length; i++) { const w = WORLDS[i], x = dotX(i), on = i === cur, open = worldPlay(w);
         if (on) { rect('#fff', x - 2, DOTS.y - 2, 5, 5); rect(w.accent, x - 1, DOTS.y - 1, 3, 3); } else rect(open ? '#c8b8c0' : '#4a3a40', x - 1, DOTS.y - 1, 3, 3); } }
-    // header: a marquee, with the buttons
-    rect('#2a0e1a', 0, 0, VW, 14); rect('#c98f22', 0, 14, VW, 1);
-    for (let x = 4, i = 0; x < VW; x += 8, i++) { rect((i + Math.floor(tt / 6)) % 3 === 0 ? '#fffbd0' : '#8a5a1c', x, 6, 2, 2); }
-    rect('#2a0e1a', 60, 0, 200, 14);
-    ctext('SELECT A WORLD', 2, '#ffe680', 2, '#7a2a10');
-    button(HB.shelf[0], HB.shelf[1], HB.shelf[2], 'SHELF', hover && inR(hover, HB.shelf[0] - 2, 0, HB.shelf[2] + 4, 15), x => vhsIcon(x, 4, '#e8504a'), 12);
+    // header: one even strip over the curtain. Two boxes each side of the gilded sign, all the same width, their feet on one line
+    hdrSign('SELECT A WORLD', tt);
+    button(HB.shelf[0], HB.shelf[1], HB.shelf[2], 'SHELF', hover && inR(hover, HB.shelf[0] - 2, 0, HB.shelf[2] + 4, 15), x => vhsIcon(x, 6, '#e8504a'), 9);
     button(HB.opt[0], HB.opt[1], HB.opt[2], 'OPTIONS', hover && inR(hover, HB.opt[0] - 2, 0, HB.opt[2] + 4, 15));
     storeBtn(HB.store[0], HB.store[1], HB.store[2], 'STORE', tt, hover && inR(hover, HB.store[0] - 2, 0, HB.store[2] + 4, 15));
-    const tot = WORLDS.reduce((s, x) => s + worldBags(x), 0), mx = WORLDS.reduce((s, x) => s + worldMax(x), 0);   // the total, by the shelf button
-    tubIcon(60, 4, '#d8202c'); text(tot + '/' + mx, 68, 5, '#fff6d4', 1, null);
-    // the bill: the selected world's name in big type, its seasons, its line, and the run so far
-    const w = WORLDS[cur], open = worldPlay(w), locked = worldOpen(w) && !open, pw = WORLDS[cur - 1], IY = 122, IH = 44;
-    rect('rgba(0,0,0,0.5)', 8, IY + 2, VW - 16, IH); rect('#000', 7, IY - 1, VW - 14, IH + 2); rect('#0e0608', 8, IY, VW - 16, IH);
-    rect(open ? w.accent : '#4a3a40', 8, IY, VW - 16, 2); rect(open ? shade(w.accent, 0.4) : '#2a1a20', 8, IY + IH - 1, VW - 16, 1);
-    text(w.title, VW / 2, IY + 6, open ? w.accent : '#9a8a90', 2, '#000', 'center');
-    text(w.seasons, VW / 2, IY + 18, open ? '#ffd27a' : '#7a6a70', 1, null, 'center');
-    text(open ? w.tag : locked ? (pw && worldUnlocked(pw) ? 'NEXT. BEAT ' + pw.boss + ' TO OPEN IT' : 'LOCKED') : 'COMING SOON', VW / 2, IY + 27, open ? '#fff6d4' : locked ? '#ffb070' : '#9a8a90', 1, null, 'center');
-    if (noteT > 0) { rect('#0e0608', 8, IY + 35, VW - 16, 8); ctext(note, IY + 36, '#ff8080', 1); }   // BEAT ... FIRST, where the run would be
-    else if (open) {
-      tubIcon(VW / 2 - 66, IY + 35, '#d8202c'); text(worldBags(w) + '/' + worldMax(w) + ' BAGS', VW / 2 - 59, IY + 36, '#ffd27a', 1, null);
-      vhsIcon(VW / 2 - 12, IY + 36, '#e8504a'); text(worldVhs(w) + '/' + w.levels.length + ' VHS', VW / 2 - 1, IY + 36, '#ffd27a', 1, null);
-      text(worldMarks(w) + '/' + w.levels.length * 3 + ' MARKS', VW / 2 + 38, IY + 36, worldMarks(w) === w.levels.length * 3 ? '#ffe680' : '#9ac8a0', 1, null);
+    const tot = WORLDS.reduce((s, x) => s + worldBags(x), 0), mx = WORLDS.reduce((s, x) => s + worldMax(x), 0);   // the total, in a sunken box the size of a button
+    { const s2 = tot + '/' + mx, gx = HB.bags[0] + Math.floor((HB.bags[2] - (7 + tw(s2, 1))) / 2); inset(HB.bags[0], HB.bags[1] - 1, HB.bags[2], 13); tubIcon(gx, 5, '#d8202c'); text(s2, gx + 7, 6, '#fff6d4', 1, null); }
+    // the bill: a lit marquee box with the selected world's name in big type, its seasons, its line, and the run so far
+    const w = WORLDS[cur], open = worldPlay(w), locked = worldOpen(w) && !open, pw = WORLDS[cur - 1], IY = 120, IH = 47, IX = 8, IW = VW - 16;
+    goldPanel(IX, IY, IW, IH, tt, open ? w.accent : '#9a8a90');
+    { const lab = open ? 'NOW SHOWING' : 'COMING SOON', lw = tw(lab, 1) + 8, lx = VW / 2 - Math.floor(lw / 2), ly = IY - 4;   // the tab on the top edge
+      rect('#000', lx, ly - 1, lw, 11); rect('#000', lx - 1, ly, lw + 2, 9);
+      rect('#f0c84a', lx, ly, lw, 9); rect('#fff6c0', lx, ly, lw, 1); rect('#b06a18', lx, ly + 8, lw, 1);
+      text(lab, VW / 2, ly + 2, '#3a1408', 1, null, 'center'); }
+    text(w.title, VW / 2, IY + 8, open ? w.accent : '#9a8a90', 2, '#000', 'center');
+    text(w.seasons, VW / 2, IY + 20, open ? '#ffd27a' : '#7a6a70', 1, null, 'center');
+    text(open ? w.tag : locked ? (pw && worldUnlocked(pw) ? 'NEXT. BEAT ' + pw.boss + ' TO OPEN IT' : 'LOCKED') : 'COMING SOON', VW / 2, IY + 28, open ? '#fff6d4' : locked ? '#ffb070' : '#9a8a90', 1, null, 'center');
+    if (noteT > 0) ctext(note, IY + 37, '#ff8080', 1);   // BEAT ... FIRST, where the run would be
+    else if (open) {   // the run so far, in three little insets
+      const all = worldMarks(w) === w.levels.length * 3;
+      const chips = [[worldBags(w) + '/' + worldMax(w) + ' BAGS', '#ffd27a', x => tubIcon(x, IY + 36, '#d8202c'), 7], [worldVhs(w) + '/' + w.levels.length + ' VHS', '#ffd27a', x => vhsIcon(x, IY + 37, '#e8504a'), 11], [worldMarks(w) + '/' + w.levels.length * 3 + ' MARKS', all ? '#ffe680' : '#9ac8a0', null, 0]];
+      const ws = chips.map(c => tw(c[0], 1) + 6 + c[3]), gap = 6; let x = Math.round(VW / 2 - (ws.reduce((a, b) => a + b, 0) + gap * (chips.length - 1)) / 2);
+      chips.forEach((c, k) => { inset(x, IY + 35, ws[k], 9); if (c[2]) c[2](x + 2); text(c[0], x + 3 + c[3], IY + 37, c[1], 1, null); x += ws[k] + gap; });
     }
-    rect('rgba(0,0,0,0.55)', 0, VH - 12, VW, 12);
-    ctext(DD.padUsed ? 'CROSS: PLAY    SQUARE: STORE    CIRCLE: BACK' : 'JUMP: PLAY    H: STORE    X: BACK', VH - 9, '#d8c8d0', 1, null);
+    keycaps(DD.padUsed ? [['CROSS', 'PLAY'], ['SQUARE', 'STORE'], ['CIRCLE', 'BACK']] : [['JUMP', 'PLAY'], ['H', 'STORE'], ['X', 'BACK']]);
   }
 
-  function button(x, y, w, label, lit, icon, pad) {   // a raised marquee-red button: black edge, a lit top bevel, a dark foot; brighter under the pointer
-    rect('#000', x - 1, y - 1, w + 2, 13);
-    rect(lit ? '#7a3a4e' : '#5a2236', x, y, w, 11);
-    rect(lit ? '#c07a8a' : '#8a4a5e', x, y, w, 1); rect(lit ? '#c07a8a' : '#8a4a5e', x, y, 1, 11);   // bevel
-    rect('#2a0a16', x, y + 10, w, 1); rect('#2a0a16', x + w - 1, y, 1, 11);
-    rect('#000', x - 1, y + 12, w + 2, 1);   // the drop under it
-    if (icon) icon(x + 3);
-    text(label, x + (pad || 0) + (icon ? 3 : Math.floor((w - (label.length * 4 - 1)) / 2)), y + 3, lit ? '#fffbd0' : '#ffd27a', 1, null);
+  function button(x, y, w, label, lit, icon, iw) {   // a brass plaque: black edge with clipped corners, a gold rim, a maroon face lit from above; brighter under the pointer. iw: the icon's width, centred with the label
+    rect('rgba(0,0,0,0.45)', x + 1, y + 2, w, 11);
+    rect('#000', x, y - 1, w, 13); rect('#000', x - 1, y, w + 2, 11);
+    rect(lit ? '#ffe27a' : '#c98f22', x, y, w, 11); rect(lit ? '#fff6c0' : '#f0c84a', x, y, w, 1); rect('#8a5a1c', x, y + 10, w, 1);
+    const g = ctx.createLinearGradient(0, y + 1, 0, y + 10); g.addColorStop(0, lit ? '#9a2a48' : '#6a1a34'); g.addColorStop(1, lit ? '#5a1428' : '#3a0c1e'); ctx.fillStyle = g; ctx.fillRect(x + 1, y + 1, w - 2, 9);
+    const gw = (icon ? iw + 3 : 0) + tw(label, 1), gx = x + Math.floor((w - gw) / 2);
+    if (icon) icon(gx);
+    text(label, gx + (icon ? iw + 3 : 0), y + 3, lit ? '#ffffff' : '#fff6c0', 1, '#2a0a16');
   }
+  function goldText(str, cx, y, s, glint) {   // logoWord's gold ramp for small type: a one-pixel drop instead of the outline
+    const x = cx - Math.floor(tw(str, s) / 2);
+    text(str, x + 1, y + 1, '#1a0606', s, null);
+    for (let r = 0; r < 5; r++) { clipRect(x - 1, y + r * s, tw(str, s) + 2, s); text(str, x, y, GOLD[r], s, null); ctx.restore(); }
+    if (glint !== null) { ctx.save(); ctx.beginPath(); ctx.moveTo(glint, y - 2); ctx.lineTo(glint + 8, y - 2); ctx.lineTo(glint + 2, y + 5 * s + 2); ctx.lineTo(glint - 6, y + 5 * s + 2); ctx.closePath(); ctx.clip(); text(str, x, y, '#ffffff', s, null); ctx.restore(); }
+  }
+  function sign(sx, sw, title, tt, on) {   // a gilded sign hanging from the top edge with a bulb row along its foot; its foot lines up with the buttons'. Off: a dim one (a tab you're not on)
+    const sh = 14, bulb = Math.floor(tt / 6);
+    rect('rgba(0,0,0,0.5)', sx + 2, 0, sw, sh + 2);
+    rect('#000', sx - 1, 0, sw + 2, sh); rect('#000', sx, sh, sw, 1);
+    rect(on ? '#c98f22' : '#6a4418', sx, 0, sw, sh); rect(on ? '#ffe27a' : '#8a5a1c', sx, 0, 1, sh - 1); rect(on ? '#8a5a1c' : '#3a2410', sx, sh - 1, sw, 1); rect(on ? '#8a5a1c' : '#3a2410', sx + sw - 1, 0, 1, sh);
+    rect('#3a1408', sx + 2, 0, sw - 4, 12);
+    const g = ctx.createLinearGradient(0, 0, 0, 11); g.addColorStop(0, on ? '#5a1428' : '#2a0a16'); g.addColorStop(1, on ? '#2a0a16' : '#140408'); ctx.fillStyle = g; ctx.fillRect(sx + 3, 0, sw - 6, 11);
+    for (let i = 0, x = sx + 4; x < sx + sw - 4; x += 6, i++) rect(on && (i + bulb) % 3 === 0 ? '#fffbd0' : on ? '#8a5a1c' : '#4a2e14', x, 12, 2, 1);
+    const gl = tt % 240;
+    if (on) goldText(title, sx + Math.floor(sw / 2), 1, 2, gl < 50 ? sx - 10 + gl * 3 : null);
+    else text(title, sx + Math.floor(sw / 2), 1, '#8a6a70', 2, '#140408', 'center');
+  }
+  function hdrSign(title, tt) {   // the screen's title on a sign in the middle, over a soft shade along the top
+    for (let y = 0; y < 20; y++) rect('rgba(6,2,8,' + (0.6 * (1 - y / 20)).toFixed(3) + ')', 0, y, VW, 1);
+    const sw = tw(title, 2) + 8; sign(VW / 2 - Math.floor(sw / 2), sw, title, tt, true);
+  }
+  function goldPanel(X, Y, W, H, tt, glow) {   // a lit marquee box: gilded frame with chasing bulbs top and bottom, a dark warm face, a soft glow of colour behind the top line
+    rect('rgba(0,0,0,0.5)', X + 2, Y + 3, W, H);
+    rect('#000', X, Y - 1, W, H + 2); rect('#000', X - 1, Y, W + 2, H);
+    rect('#c98f22', X, Y, W, H); rect('#ffe27a', X, Y, W, 1); rect('#ffe27a', X, Y, 1, H); rect('#8a5a1c', X, Y + H - 1, W, 1); rect('#8a5a1c', X + W - 1, Y, 1, H);
+    rect('#3a1408', X + 2, Y + 2, W - 4, H - 4);
+    const g = ctx.createLinearGradient(0, Y + 3, 0, Y + H - 3); g.addColorStop(0, '#1c0a12'); g.addColorStop(1, '#0a0406'); ctx.fillStyle = g; ctx.fillRect(X + 3, Y + 3, W - 6, H - 6);
+    if (glow) { const r = ctx.createRadialGradient(X + W / 2, Y + 14, 2, X + W / 2, Y + 14, W * 0.37); r.addColorStop(0, hexA(glow, 0.1)); r.addColorStop(1, hexA(glow, 0)); ctx.fillStyle = r; ctx.fillRect(X + 3, Y + 3, W - 6, H - 6); }
+    const bulb = Math.floor(tt / 6);
+    for (let i = 0, x = X + 4; x < X + W - 4; x += 8, i++) for (const yy of [Y, Y + H - 2]) { const on = (i + bulb) % 3 === 0; rect(on ? '#fffbd0' : '#8a5a1c', x, yy, 2, 2); if (on) rect('rgba(255,240,160,0.3)', x - 1, yy - 1, 4, 4); }
+  }
+  function hilite(x, y, w, h, tab) {   // the row you're on: a maroon plaque with clipped corners and a gold tab at its left (or tab's colour)
+    rect('#000', x, y - 1, w, h + 2); rect('#000', x - 1, y, w + 2, h);
+    rect('#4f0f24', x, y, w, h); rect('#7a2a44', x, y, w, 1); rect('#2a0a16', x, y + h - 1, w, 1);
+    rect(tab || '#f0c84a', x, y, 2, h);
+  }
+  function keycaps(keys, labCol) {   // the controls along the foot: [key, what it does] as little cream keycaps
+    for (let y = VH - 16; y < VH; y++) rect('rgba(4,1,6,' + (0.5 * (y - VH + 16) / 16).toFixed(3) + ')', 0, y, VW, 1);
+    const ws = keys.map(([k, l]) => tw(k, 1) + 6 + 3 + tw(l, 1)), gap = 12, y = VH - 9; let x = Math.round(VW / 2 - (ws.reduce((a, b) => a + b, 0) + gap * (keys.length - 1)) / 2);
+    keys.forEach(([k, l], i) => { const kw = tw(k, 1) + 6; rect('#000', x, y - 1, kw, 9); rect('#000', x - 1, y, kw + 2, 7); rect('#8a7a68', x, y, kw, 7); rect('#e8dcc0', x, y, kw, 6); text(k, x + 3, y + 1, '#2a0e1a', 1, null); text(l, x + kw + 3, y + 1, labCol || '#d8c8d0', 1, '#000'); x += ws[i] + gap; });
+  }
+  function inset(x, y, w, h) { rect('#000', x, y, w, h); rect('rgba(40,14,24,0.9)', x + 1, y + 1, w - 2, h - 2); rect('#120608', x + 1, y + 1, w - 2, 1); rect('rgba(255,210,122,0.18)', x + 1, y + h - 1, w - 2, 1); }   // a little sunken box for a count
+  window.DDUI = { sign, hdrSign, goldPanel, hilite, keycaps, button, inset, goldText };   // the store draws its screen with these too
+  const hexA = (hex, a) => { const n = parseInt(hex.slice(1), 16); return 'rgba(' + [16, 8, 0].map(sh => (n >> sh) & 255).join(',') + ',' + a + ')'; };
   function storeBtn(x, y, w, label, tt, lit) {   // the HEI store's button: a coin and the label, the coin hopping when something is affordable
     const S = window.DDStore; if (!S) return;
     const can = S.canBuy(), hop = can ? Math.round(Math.abs(Math.sin(tt / 9)) * 1) : 0;
-    button(x, y, w, label, lit || (can && Math.floor(tt / 20) % 2), x2 => S.icon('rewards', x2 - 1, y + 1 - hop, 1), 9);
+    button(x, y, w, label, lit || (can && Math.floor(tt / 20) % 2), x2 => S.icon('rewards', x2, y + 1 - hop, 1), 8);
   }
-  function curtainBg(tt) { rect('#120610', 0, 0, VW, VH); for (let x = -CURT + (-tt * 0.05 % CURT); x < VW + CURT; x += CURT) spr('w2_curtain', x + CURT / 2, 216); rect('rgba(10,4,14,0.8)', 0, 0, VW, VH); rect('#2a0e1a', 0, 0, VW, 14); rect('#c98f22', 0, 14, VW, 1); }
-  function drawNote() { if (noteT > 0) { rect('#0a0408', 0, 150, VW, 11); ctext(note, 152, '#ff8080', 1); } }
+  function curtainBg(tt, title) { rect('#120610', 0, 0, VW, VH); for (let x = -CURT + (-tt * 0.05 % CURT); x < VW + CURT; x += CURT) spr('w2_curtain', x + CURT / 2, 216); rect('rgba(10,4,14,0.8)', 0, 0, VW, VH); if (title) hdrSign(title, tt); }
+  function drawNote() { if (noteT > 0) { rect('#000', 60, 149, VW - 120, 13); rect('#2a0a12', 61, 150, VW - 122, 11); ctext(note, 153, '#ff8080', 1); } }
   function drawOptions() {
-    curtainBg(t); ctext('OPTIONS', 2, '#ffe680', 2, '#7a2a10');
+    curtainBg(t, 'OPTIONS');
     const O = OPTS();
+    goldPanel(32, 17, VW - 64, OY(O.length - 1) - 17 + 12, t);
     O.forEach((o, i) => {
       const y = OY(i), on = i === ocur;
-      if (on) { rect('#3a1420', 40, y - 3, VW - 80, 10); rect('#c98f22', 40, y - 3, 2, 10); }
+      if (on) hilite(40, y - 2, VW - 80, 9);
       if (o[2]) {   // a volume slider: ten notches
         text(o[0], 50, y, on ? '#fffbd0' : '#c8a8a0', 1, null);
-        for (let k = 0; k < 10; k++) rect(k < o[3] ? (on ? '#ffd27a' : '#c98f22') : '#4a2a30', SLX + k * SLW, y - 1, SLW - 2, 7);
+        for (let k = 0; k < 10; k++) { const f = k < o[3]; rect(f ? (on ? '#ffd27a' : '#c98f22') : '#2a1218', SLX + k * SLW, y - 1, SLW - 2, 7); rect(f ? (on ? '#fff6c0' : '#f0c84a') : '#3a1a22', SLX + k * SLW, y - 1, SLW - 2, 1); if (f) rect(on ? '#d89a28' : '#8a5a1c', SLX + k * SLW, y + 5, SLW - 2, 1); }
         text(String(o[3] * 10) + '%', SLX + 10 * SLW + 6, y, on ? '#fffbd0' : '#c8a8a0', 1, null);
       } else ctext(o[0], y, on ? (i === CLR && clearArm ? '#ff8080' : '#fffbd0') : '#c8a8a0', 1);
     });
     if (O[ocur][1]) ctext(O[ocur][1], 157, '#9ac8a0', 1);
     drawNote();
-    ctext(DD.padUsed ? 'CROSS: CHOOSE    CIRCLE: BACK' : 'JUMP: CHOOSE    X: BACK', 168, '#ffd27a', 1, '#000');
+    keycaps(DD.padUsed ? [['CROSS', 'CHOOSE'], ['CIRCLE', 'BACK']] : [['JUMP', 'CHOOSE'], ['X', 'BACK']]);
   }
   function drawJukebox() {
-    curtainBg(t); ctext('JUKEBOX', 2, '#ffe680', 2, '#7a2a10');
+    curtainBg(t, 'JUKEBOX');
     const m = MUS(), list = ROTL(), sh = m && m.prefs && m.prefs.shuffle;
-    if (jcur === 0) rect('#3a1420', 100, 18, 120, 12);
+    goldPanel(8, 17, VW - 16, JB.y0 + (JB.per - 1) * JB.dy + 12 - 17, t);
+    if (jcur === 0) hilite(100, 19, 120, 10);
     ctext('SHUFFLE: ' + (sh ? 'ON' : 'OFF'), 21, jcur === 0 ? '#fffbd0' : '#c8a8a0', 1);
     list.forEach((n, k) => {
       const p = jPos(k), on = jcur === k + 1, yes = !m || m.isOn(n);
-      if (on) { rect('#3a1420', p.x - 2, p.y - 2, 148, 10); rect('#c98f22', p.x - 2, p.y - 2, 2, 10); }
+      if (on) hilite(p.x - 2, p.y - 2, 148, 9);
       text(yes ? '[X]' : '[ ]', p.x + 2, p.y, yes ? '#9ac8a0' : '#6a5a60', 1, null);
       text(songTitle(n), p.x + 18, p.y, on ? '#fffbd0' : yes ? '#c8a8a0' : '#6a5a60', 1, null);
       if (on && Math.floor(t / 15) % 2) rect('#ffd27a', p.x + 140, p.y + 1, 3, 3);   // playing
     });
     drawNote();
     ctext(jcur === 0 ? 'SONGS COME UP ' + (sh ? 'IN ANY ORDER' : 'IN ORDER') : 'PLAYING NOW. ' + (DD.padUsed ? 'CROSS' : 'JUMP') + ': IN OR OUT OF THE ROTATION', 158, '#9ac8a0', 1);
-    ctext(DD.padUsed ? 'CROSS: CHOOSE    CIRCLE: BACK' : 'JUMP: CHOOSE    X: BACK', 168, '#ffd27a', 1, '#000');
+    keycaps(DD.padUsed ? [['CROSS', 'CHOOSE'], ['CIRCLE', 'BACK']] : [['JUMP', 'CHOOSE'], ['X', 'BACK']]);
   }
 
   function drawShelf() {   // Gregg's shelf: red-tape spines for the tapes you've found, dark gaps for the rest
@@ -736,10 +783,10 @@
     rect('#120610', 0, 0, VW, VH);
     for (let x = -CURT + (-tt * 0.05 % CURT); x < VW + CURT; x += CURT) spr('w2_curtain', x + CURT / 2, 216);
     rect('rgba(10,4,14,0.8)', 0, 0, VW, VH);
-    rect('#2a0e1a', 0, 0, VW, 14); rect('#c98f22', 0, 14, VW, 1);
     const got = ids.filter(id => PROG[id] && PROG[id].vhs).length;
-    ctext("GREGG'S SHELF", 2, '#ffe680', 2, '#7a2a10');
-    text(got + '/' + ids.length, VW - 4 - (String(got).length + String(ids.length).length + 1) * 4, 5, '#fff6d4', 1, null);
+    hdrSign("GREGG'S SHELF", tt);
+    inset(4, 2, 92, 13); inset(224, 2, 92, 13);   // the world's tapes on the left, the whole shelf on the right
+    { const s2 = got + '/' + ids.length + ' TAPES', gx = 270 - Math.floor((12 + tw(s2, 1)) / 2); vhsIcon(gx, 5, '#e8504a'); text(s2, gx + 12, 6, '#fff6d4', 1, null); }
     for (let r = 0; r < 2; r++) {
       const y = SH.y0[r] + SH.h;
       rect('#000', 0, y, VW, 6); rect('#94683c', 0, y + 1, VW, 1); rect('#6a4626', 0, y + 2, VW, 2); rect('#3a2414', 0, y + 4, VW, 2);
@@ -756,7 +803,7 @@
       if (sel) { ctx.strokeStyle = '#ffe680'; ctx.lineWidth = 1; ctx.strokeRect(x - 0.5, y + (on ? 0 : 4) - 0.5, SH.w + 1, SH.h - (on ? 0 : 4) + 1); }
     });
     const id = ids[scur], c = CLASSICS[id], p = PROG[id] || {}, boss = /boss/.test(id), Y = 141;
-    rect('#0a0408', 0, Y - 4, VW, VH - Y + 4); rect('#c98f22', 0, Y - 4, VW, 1);
+    goldPanel(4, Y - 6, VW - 8, VH - Y + 10, tt, p.vhs ? '#e8504a' : null);
     if (p.vhs) {
       ctext(c.title, Y, '#ffe680', 1);
       ctext(c.year + '   ' + c.min + ' MIN   DIR. ' + c.dir, Y + 8, '#fff6d4', 1, null);
@@ -766,7 +813,7 @@
       ctext('STILL OUT THERE', Y, '#9a8a90', 1);
       ctext(boss ? 'BEAT THE BOSS OF WORLD ' + parseInt(id, 10) + ' FOR THIS ONE' : 'HIDDEN SOMEWHERE IN LEVEL ' + id.toUpperCase(), Y + 8, '#cfc6bc', 1, null);
     }
-    { const w = WORLDS[parseInt(id, 10) - 1], k = worldTapes(w), n = w.levels.length; if (k === n && Math.floor(tt / 20) % 2) text('W' + w.n + ' 4/4 JUMP: SCREENING', 4, 5, '#ffe680', 1, null); else if (k !== n) text('W' + w.n + ' TAPES ' + k + '/' + n, 4, 5, '#9a8a90', 1, null); }
+    { const w = WORLDS[parseInt(id, 10) - 1], k = worldTapes(w), n = w.levels.length; if (k === n && Math.floor(tt / 20) % 2) text('W' + w.n + ' JUMP: SCREEN', 50, 6, '#ffe680', 1, null, 'center'); else text('W' + w.n + ' ' + k + '/' + n + ' TAPES', 50, 6, k === n ? '#ffe680' : '#c8b8c0', 1, null, 'center'); }
     if (p.fact) ctext('BLUE CARD: ' + c.fact + (c.wrong ? ' (WRONG)' : ''), Y + 33, '#7ab0ff', 1, null);
     else ctext('BLUE CARD: NOT FOUND YET', Y + 33, '#4a5a8a', 1, null);
   }
@@ -884,7 +931,8 @@
     rect(w.bg, 0, 0, VW, VH);
     backdrop(w, tt, 30, VH);
     rect(lt ? 'rgba(240,235,245,0.55)' : 'rgba(6,2,8,0.62)', 0, 30, VW, VH - 30);
-    rect(w.band, 0, 0, VW, 28); rect(w.accent, 0, 28, VW, 2);
+    rect(w.band, 0, 0, VW, 28); rect('#000', 0, 27, VW, 1); rect('#c98f22', 0, 28, VW, 2); rect('#ffe27a', 0, 28, VW, 1); rect('#000', 0, 30, VW, 1);
+    for (let i = 0, x = 3; x < VW; x += 8, i++) rect((i + Math.floor(tt / 6)) % 3 === 0 ? '#fffbd0' : '#8a5a1c', x, 28, 2, 2);   // bulbs chase along the rim
     text('WORLD ' + w.n, 8, 4, w.accent, 2, '#000'); text(w.title, 8, 19, w.fg, 1, SHD(w)); text(w.seasons, VW - 8, 19, w.fg, 1, SHD(w), 'right');
     storeBtn(VW - 56, 3, 52, 'HEI STORE', tt);
     const cm = compact(), H = cm ? 26 : 32;
@@ -929,8 +977,7 @@
     }
     if (!cm) w.dots.forEach((n, i) => { const sp = w.dots.length > 2 ? [30, 60, 90, 120][i] : [50, 110][i], ph = Math.sin(tt / 11 + i * 1.9), hy = Math.abs(ph) * 6; drawDot(n, hy > 4.5 ? (Math.cos(tt / 11 + i * 1.9) * ph > 0 ? 'jump' : 'fall') : hy < 0.8 ? 'land' : 'apex', sp, 158 - Math.round(hy), i % 2 === 1, 1, 1); });
     if (noteT > 0) ctext(note, 142, '#ff8080', 1);
-    rect('rgba(0,0,0,0.55)', 0, 160, VW, 20);
-    ctext(DD.padUsed ? 'CROSS: PLAY    SQUARE: HEI STORE    CIRCLE: BACK' : 'JUMP: PLAY    H: HEI STORE    X: BACK', 168, w.fg, 1, '#000');
+    keycaps(DD.padUsed ? [['CROSS', 'PLAY'], ['SQUARE', 'HEI STORE'], ['CIRCLE', 'BACK']] : [['JUMP', 'PLAY'], ['H', 'HEI STORE'], ['X', 'BACK']]);
   }
 
   // screen changes: the last frame of the old screen is pulled up out of the gate like film, the new one comes in under it

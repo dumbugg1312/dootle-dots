@@ -77,7 +77,15 @@ window.LEVEL = {"id": "1-2", "name": "HAS ANYONE SEEN MAYOR RON?", "sub": "I'M N
     const X = DD.wx(x) - 8; if (X > DD.VW || X < -16) return;
     let f = (Math.floor(G.frame / 22 + ph * 9) & 1), hop = 0;
     if (!calm && Math.abs(DD.cx(G.pl) - x) < 70) { f = 2; hop = Math.abs(Math.sin(G.frame / 5 + ph * 20)) * 2.5; }
-    ctx.drawImage(I()[n], f * 16, 0, 16, 24, X, Math.round(DD.wy(y) - 23 - hop), 16, 24);
+    let lean = 0;   // looks pass 2: the crowd winces when the Dot is hurt (hunkers down and leans away)
+    if (G.pl.inv > 0 && Math.abs(DD.cx(G.pl) - x) < 150) { f = 1; hop = 0; lean = (x >= DD.cx(G.pl) ? 1 : -1); }
+    ctx.drawImage(I()[n], f * 16, 0, 16, 24, X + lean, Math.round(DD.wy(y) - 23 - hop), 16, 24);
+  }
+  // looks pass 2: a blink for the faced citizens, every few seconds on its own offset (the eye's white pixel takes the body colour from the pixel above it)
+  function blink(ctx, G, im, f, X, Y, ph) {
+    if ((G.frame + Math.floor(ph * 997)) % (190 + Math.floor(ph * 150)) > 4) return;
+    const by = [2, 3, 0, 2][f];
+    for (const ex of [5, 9]) ctx.drawImage(im, f * 16 + ex, by + 5, 1, 1, X + ex, Y + by + 6, 1, 1);
   }
   function bubble(ctx, X, Y, text, a) {   // a cream speech board centred above (X, Y), with a little tail
     if (!text) return;
@@ -119,7 +127,9 @@ window.LEVEL = {"id": "1-2", "name": "HAS ANYONE SEEN MAYOR RON?", "sub": "I'M N
     draw(e, ctx, G) {
       const n = 'w1_citf_' + CITS[e.c]; if (!ok(n)) return;
       const X = DD.wx(e.x + 6), Y = DD.wy(e.y + e.h), talk = e.a > 0.5 && (G.frame >> 3) % 3 === 0;
-      ctx.drawImage(I()[n], (talk ? 3 : (G.frame / 22 + e.ph * 9 | 0) & 1) * 16, 0, 16, 24, X - 8, Y - 24, 16, 24);
+      const hurt = G.pl.inv > 0 && Math.abs(DD.cx(G.pl) - e.x) < 150, fr = talk ? 3 : hurt ? 1 : (G.frame / 22 + e.ph * 9 | 0) & 1;
+      ctx.drawImage(I()[n], fr * 16, 0, 16, 24, X - 8, Y - 24, 16, 24);
+      if (!talk) blink(ctx, G, I()[n], fr, X - 8, Y - 24, e.ph);
       if (e.a > 0.05 && !DD.hush) bubble(ctx, X, Y - 26, e.text, Math.min(1, e.a * 1.5));
       else if (!e.told && e.light && Math.abs(DD.cx(G.pl) - X) < 190) DD.text('!', X, Y - 34 + Math.round(Math.sin(G.frame / 8) * 1.5), '#ffe14a', 1, INK, 'center');
     },
@@ -285,6 +295,9 @@ window.LEVEL = {"id": "1-2", "name": "HAS ANYONE SEEN MAYOR RON?", "sub": "I'M N
         if (k === 'road') {
           const lip = up !== k; if (!slice('w1_road', lip ? 0 : 16)) return false;
           { const A = DD.art; if (lip) { A.R(X, Y, 16, 1, '#f6f8ff'); A.R(X, Y + 3, 16, 1, 'rgba(40,44,90,0.18)'); if (!(tx & 1)) { A.R(X, Y + 4, 1, 12, 'rgba(30,34,80,0.22)'); A.R(X + 1, Y + 4, 1, 12, 'rgba(255,255,255,0.14)'); } } else if (ty < 26) { const o = (ty & 1) ? 8 : 0; A.R(X, Y, 16, 1, 'rgba(255,255,255,0.13)'); A.R(X, Y + 15, 16, 1, 'rgba(10,10,40,0.30)'); A.R(X + o, Y + 1, 1, 14, 'rgba(10,10,40,0.28)'); A.R(X + o + 1, Y + 1, 1, 14, 'rgba(255,255,255,0.10)'); } }
+          { const A = DD.art; if (!lip && ty === 22) { A.R(X, Y, 16, 16, 'rgba(14,12,40,0.22)'); A.R(X, Y + 5, 16, 6, '#3c4272'); A.R(X, Y + 5, 16, 1, '#7a82bc'); A.R(X, Y + 6, 16, 1, '#5a6298'); A.R(X, Y + 10, 16, 1, '#20244a');   // looks pass 2: a buried drain pipe with flanges under the pavement
+              if ((tx & 7) === 2) { A.R(X + 6, Y + 3, 4, 10, '#4a5086'); A.R(X + 6, Y + 3, 4, 1, '#98a0d8'); A.R(X + 6, Y + 12, 4, 1, '#1a1e40'); A.R(X + 7, Y + 6, 1, 1, '#c8d0ff'); A.R(X + 7, Y + 9, 1, 1, '#c8d0ff'); } }
+            else if (!lip && ty >= 23 && ty < 26) { A.R(X, Y, 16, 16, 'rgba(10,8,30,0.14)'); for (let q = 0; q < 3; q++) { const hh = A.hash(tx * 7 + q, ty); A.R(X + Math.floor(hh * 13), Y + 3 + q * 4, 2, 1, 'rgba(120,124,170,0.35)'); } } }
           if (dn === 'under' && ty >= 23) { ctx.fillStyle = 'rgba(12,10,30,0.3)'; ctx.fillRect(X, Y, 16, 16); } return true;
         }
         if (k === 'awning' || k === 'balcony') return slice('w1_' + k, 0);
@@ -389,9 +402,9 @@ window.LEVEL = {"id": "1-2", "name": "HAS ANYONE SEEN MAYOR RON?", "sub": "I'M N
         let a = 0; if (s.tele) a = Math.min(1, (G.frame - s.tele.f0 + 1) / 9); else if (G.frame - s.arriveF < 14) a = 1 - (G.frame - s.arriveF) / 14;
         if (a > 0) { ctx.fillStyle = 'rgba(8,4,12,' + a + ')'; ctx.fillRect(0, 0, VW, VH); }
         // the search so far: three shops to look in
-        ctx.fillStyle = 'rgba(10,4,8,0.62)'; ctx.fillRect(156, 4, 76, 24);
+        ctx.fillStyle = 'rgba(10,4,8,0.9)'; ctx.fillRect(156, 4, 76, 24); ctx.fillStyle = 'rgba(207,198,188,0.35)'; ctx.fillRect(156, 4, 76, 1); ctx.fillRect(156, 27, 76, 1);   // nearly opaque: the shop sign behind mustn't read through the names
         DD.text('LOOKED IN', 160, 6, '#cfc6bc', 1, null);
-        [['BANK', 'bank'], ['BARBER', 'barber'], ['POST', 'post']].forEach(([n, k], i) => { const x = [160, 184, 213][i], on = s.peek[k]; ctx.fillStyle = on ? '#9ae0a8' : '#3a3438'; ctx.fillRect(x, 14, 5, 5); DD.text(n, x, 21, on ? '#9ae0a8' : '#8a7e86', 1, null); });
+        [['BANK', 'bank'], ['BARBER', 'barber'], ['POST', 'post']].forEach(([n, k], i) => { const x = [160, 184, 213][i], on = s.peek[k]; ctx.fillStyle = on ? '#9ae0a8' : '#645960'; ctx.fillRect(x, 14, 5, 5); DD.text(n, x, 21, on ? '#9ae0a8' : '#8a7e86', 1, null); });
       },
     },
     drawGoal(ctx, G, b, X, Y) {   // the Residence's back door: it cracks open as you come, and shuts when you reach it

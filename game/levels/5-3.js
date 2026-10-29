@@ -59,6 +59,7 @@ Object.assign(window.LEVEL, {
       const c = G.cam, VW = DD.VW, VH = DD.VH, f = G.frame, s = G.s, wx = DD.wx, wy = DD.wy;
       const sk = ctx.createLinearGradient(0, 0, 0, VH); sk.addColorStop(0, '#1a0a2a'); sk.addColorStop(0.45, '#6a1e5a'); sk.addColorStop(0.8, '#d8603a'); sk.addColorStop(1, '#f0a050'); ctx.fillStyle = sk; ctx.fillRect(0, 0, VW, VH);
       ctx.fillStyle = '#fff2d0'; for (let i = 0; i < 22; i++) { ctx.globalAlpha = 0.25 + 0.4 * hx(i, 2); ctx.fillRect(Math.round(hx(i, 1) * 320 - c.x * 0.02 + 320) % 320, Math.round(hx(i, 3) * 60), 1, 1); } ctx.globalAlpha = 1;
+      if (LEVEL.farSky) LEVEL.farSky(ctx, G);   // (art pass) the downtown skyline and the premiere searchlights, behind the hills
       const hy = Math.round(150 - c.y * 0.3);
       // the Hollywood hills, and the sign
       ctx.fillStyle = '#2a0e30'; ctx.beginPath(); ctx.moveTo(0, VH); for (let x = 0; x <= VW; x += 8) { const wx = x + c.x * 0.1; ctx.lineTo(x, hy - 20 - 18 * Math.sin(wx / 60) - 10 * Math.sin(wx / 23 + 1)); } ctx.lineTo(VW, VH); ctx.fill();
@@ -73,6 +74,7 @@ Object.assign(window.LEVEL, {
       const ry = DD.wy(26 * TS); ctx.fillStyle = '#0c0810'; ctx.fillRect(0, ry, VW, VH); ctx.fillStyle = '#1a1220'; ctx.fillRect(0, ry, VW, 2); ctx.fillStyle = '#e0b040'; for (let x = -((c.x * 1) % 40); x < VW; x += 40) ctx.fillRect(x, ry + 10, 22, 2);
       for (let tx = 14; tx < 220; tx += 22) { const X = DD.wx(tx * TS); if (X < -20 || X > VW + 20) continue; ctx.fillStyle = '#1a1220'; ctx.fillRect(X, DD.wy(12 * TS), 2, ry - DD.wy(12 * TS)); ctx.fillRect(X, DD.wy(12 * TS), 12, 2); ctx.fillStyle = '#ffd890'; ctx.fillRect(X + 9, DD.wy(12 * TS) + 2, 5, 2); glow(ctx, X + 12, DD.wy(12 * TS) + 12, 60, '255,170,90', 0.2); }
       for (const ln of LANES) { const Y = wy(ln.roof * TS + 30); ctx.fillStyle = 'rgba(8,4,12,0.55)'; ctx.fillRect(0, Y, VW, 3); ctx.fillStyle = 'rgba(224,176,64,0.35)'; for (let x = -((c.x * 1) % 48); x < VW; x += 48) ctx.fillRect(x, Y + 1, 18, 1); }   // a stripe of road under every lane
+      if (LEVEL.farMid) LEVEL.farMid(ctx, G);   // (art pass) palms, power lines, the glow of the sign
       // the traffic, behind the piers
       for (const cr of c.x > 3300 ? [] : s.cars || []) {
         const X = Math.round(wx(cr.x)); if (X > VW + 30 || X + cr.w < -30) continue; const Y0 = wy(LANES[cr.lane].roof * TS);
@@ -268,6 +270,56 @@ Object.assign(window.LEVEL, {
 // ==== ART PASS (design/ART-PASS-BRIEF.md): three-tone edges, light, depth and a little life, layered over the set art above ====
 ;(function () {
   const L = window.LEVEL, th = L.theme, S = L.script || (L.script = {});
+  L.farSky = function (ctx, G) {   // behind the hills: premiere searchlights sweeping the dusk, then the downtown towers with lit windows and red beacons
+    const c = G.cam, VW = DD.VW, f = G.frame, A = DD.art, hy = Math.round(150 - c.y * 0.3);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    for (const [bx, ph, col] of [[70, 0, '255,244,210'], [190, 2.1, '255,226,190'], [290, 4.2, '255,240,220']]) {   // three searchlights, each swinging on its own slow beat
+      const X = Math.round(bx - c.x * 0.06), a = Math.sin(f / 150 + ph) * 0.55, tx = X + Math.sin(a) * 150, ty = hy - 20 - Math.cos(a) * 150;
+      ctx.fillStyle = 'rgba(' + col + ',0.085)'; ctx.beginPath(); ctx.moveTo(X - 2, hy); ctx.lineTo(X + 2, hy); ctx.lineTo(tx + 9, ty); ctx.lineTo(tx - 9, ty); ctx.fill();
+      ctx.fillStyle = 'rgba(' + col + ',0.07)'; ctx.beginPath(); ctx.moveTo(X - 1, hy); ctx.lineTo(X + 1, hy); ctx.lineTo(tx + 3, ty); ctx.lineTo(tx - 3, ty); ctx.fill();
+    }
+    ctx.restore();
+    const k = 0.07, s = 34;
+    for (let i = Math.floor(c.x * k / s) - 1; ; i++) {
+      const X = Math.round(i * s - c.x * k); if (X > VW) break;
+      if (A.hash(i, 3) < 0.28) continue;
+      const h = 34 + Math.floor(A.hash(i, 1) * 52), w = 14 + Math.floor(A.hash(i, 2) * 14), top = hy + 6 - h, st = A.hash(i, 4) < 0.5;
+      A.R(X, top, w, h, '#3c1a48'); A.R(X, top, w, 1, '#8a4a68'); A.R(X + w - 2, top + 1, 2, h, 'rgba(10,2,20,0.4)');   // body, a sunset-lit roofline, the shaded side
+      if (st) { A.R(X + 3, top - 6, w - 6, 6, '#3c1a48'); A.R(X + 3, top - 6, w - 6, 1, '#8a4a68'); }   // a stepped crown, like the Library Tower
+      if (A.hash(i, 5) < 0.35) { A.R(X + (w >> 1), top - (st ? 15 : 9), 1, st ? 9 : 9, '#2a1236'); if ((f + i * 23) % 90 < 50) { A.R(X + (w >> 1) - 1, top - (st ? 16 : 10), 3, 2, '#ff4a4a'); A.glow(X + (w >> 1), top - (st ? 15 : 9), 9, '#ff3030', 0.3); } }   // an aerial with a blinking red beacon
+      for (let y = top + 4; y < hy - 14; y += 4) for (let x = X + 2; x < X + w - 3; x += 3) { const r = A.hash(i * 31 + x, y); if (r < 0.2) A.R(x, y, 1, 2, r < 0.1 ? 'rgba(255,200,120,0.55)' : 'rgba(255,170,110,0.3)'); }   // office windows
+    }
+  };
+  L.farMid = function (ctx, G) {   // after the hills and sign: the sign's own glow, palms swaying, power lines strung between poles
+    const c = G.cam, VW = DD.VW, f = G.frame, A = DD.art, hy = Math.round(150 - c.y * 0.3);
+    const sx = Math.round(2400 * 0.1 - c.x * 0.1 + 40);
+    if (sx > -140 && sx < VW + 40) { A.glow(sx + 40, hy - 46, 70, '#ffb878', 0.2); for (let i = 0; i < 5; i++) { A.R(sx + 6 + i * 16, hy - 33, 6, 2, '#ffe0a0'); A.glow(sx + 9 + i * 16, hy - 34, 12, '#ffcc80', 0.16); } }   // the sign's ground spotlights
+    for (const ln of L.LANES) {   // a Jersey barrier running along the top of each lane: lit edge, joints every 3 tiles, amber reflectors, a shadow underneath
+      const y = Math.round(DD.wy(ln.roof * 16 - 13)); if (y > DD.VH + 4 || y < -16) continue;
+      A.R(0, y + 5, VW, 7, '#262234'); A.R(0, y + 4, VW, 1, 'rgba(180,170,230,0.45)'); A.R(0, y + 5, VW, 1, '#3a3650'); A.R(0, y + 12, VW, 2, '#14101c'); A.R(0, y + 14, VW, 2, 'rgba(0,0,0,0.3)');
+      const o = Math.round(c.x % 48);
+      for (let x = -o; x < VW; x += 48) { A.R(x, y + 5, 1, 9, '#0a080e'); if ((Math.floor((x + c.x) / 48)) % 2 === 0) { A.R(x + 22, y + 7, 3, 2, '#f0c84a'); A.glow(x + 23, y + 8, 7, '#ffc040', 0.2); } }
+    }
+    const ks = 0.5, ss = 150;   // power poles and sagging lines, mid-distance
+    ctx.save(); ctx.strokeStyle = '#1c0e24'; ctx.lineWidth = 1;
+    for (let i = Math.floor(c.x * ks / ss) - 1; ; i++) {
+      const X = Math.round(i * ss + 40 - c.x * ks); if (X > VW + ss) break;
+      const top = hy - 8, bot = hy + 54;
+      A.R(X, top, 2, bot - top, '#1c0e24'); A.R(X - 7, top + 3, 16, 2, '#1c0e24'); A.R(X - 6, top + 1, 1, 2, '#3a2038'); A.R(X + 7, top + 1, 1, 2, '#3a2038');
+      for (const dy of [3, 9]) { ctx.beginPath(); ctx.moveTo(X - 6, top + dy); ctx.quadraticCurveTo(X + ss / 2, top + dy + 12, X + ss - 6, top + dy); ctx.stroke(); }
+      if (A.hash(i, 8) < 0.5) A.glow(X + 1, top + 6, 14, '#ffc070', 0.2);   // a pole-top lamp
+    }
+    ctx.restore();
+    const kp = 0.3, sp = 112;   // tall palms
+    for (let i = Math.floor(c.x * kp / sp) - 1; ; i++) {
+      const X = Math.round(i * sp + 20 + A.hash(i, 6) * 40 - c.x * kp); if (X > VW + 30) break;
+      const h = 54 + Math.floor(A.hash(i, 7) * 26), bx = X, by = hy + 36, tx = bx + Math.sin(f / 90 + i) * 1.5 + 5, ty = by - h;
+      ctx.fillStyle = '#14081c'; for (let y = 0; y < h; y += 2) ctx.fillRect(Math.round(bx + (tx - bx) * (y / h) * (y / h)), by - y, 2, 2);   // a curved trunk
+      ctx.strokeStyle = '#14081c'; ctx.lineWidth = 1;
+      for (let a = 0; a < 7; a++) { const ang = -Math.PI / 2 + (a - 3) * 0.55 + Math.sin(f / 50 + i + a) * 0.06; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.quadraticCurveTo(tx + Math.cos(ang) * 12, ty + Math.sin(ang) * 12 - 4, tx + Math.cos(ang) * 22, ty + Math.sin(ang) * 14 + 10); ctx.stroke(); }
+      A.R(Math.round(tx) - 1, Math.round(ty), 3, 2, 'rgba(255,170,110,0.35)');   // the sunset catches the crown
+    }
+  };
   const P = {
   hi: '255,200,170', hiK: { pier: '210,200,255', grate: '220,230,255' }, mote: ['#ffd890', 20, 0.35],
   bg(ctx, G, A, Q) {

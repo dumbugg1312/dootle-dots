@@ -346,7 +346,19 @@ window.LEVEL = {"id": "12-1", "name": "COUNTDOWN", "sub": "LIVE FROM THE SPECIAL
         if (lip && (tx + 1) % 5 === 0) { ctx.fillStyle = '#f0c84a'; ctx.fillRect(X + 6, Y + 2, 4, 1); }   // a gold braid stud
         if (K(tx - 1, ty) !== k) { ctx.fillStyle = 'rgba(10,30,10,0.45)'; ctx.fillRect(X, Y + (lip ? 7 : 0), 1, lip ? 9 : 16); }
         if (K(tx + 1, ty) !== k) { ctx.fillStyle = 'rgba(10,30,10,0.45)'; ctx.fillRect(X + 15, Y + (lip ? 7 : 0), 1, lip ? 9 : 16); }
-        if (!lip) { ctx.fillStyle = 'rgba(0,20,0,0.25)'; ctx.fillRect(X, Y, 16, 16); }
+        if (!lip) {   // the cut-away under the carpet: a red velvet stage skirt with a gilt rail and footlights, and below it the dark understage with taped cable runs, calmer with depth
+          const A = DD.art, R = A.R, f = DD.G.frame; let d = 1; while (d < 5 && K(tx, ty - d - 1) === k) d++;
+          if (d === 1) {
+            R(X, Y, 16, 16, '#5a1028'); for (let i = 1; i < 16; i += 4) R(X + i, Y, 2, 16, '#7a1a38'); R(X, Y, 16, 2, '#c98f22'); R(X, Y, 16, 1, '#fff2a6'); R(X, Y + 2, 16, 1, 'rgba(0,0,0,0.45)');
+            for (let b = 0; b < 2; b++) { const on = ((f >> 3) + tx * 2 + b) % 4 !== 0; R(X + 3 + b * 8, Y + 4, 2, 2, on ? '#fff2a6' : '#6a5a3a'); if (on) R(X + 2 + b * 8, Y + 3, 4, 1, 'rgba(255,226,140,0.3)'); }
+            R(X, Y + 11, 16, 5, 'rgba(0,0,0,0.3)');
+          } else {
+            const h = A.hash(tx, ty); R(X, Y, 16, 16, '#17121c'); A.tex(X, Y, 16, 16, '#2a2434', 0.05, 8);
+            R(X, Y + 5, 16, 3, '#0a080e'); R(X, Y + 5, 16, 1, '#3a3446'); R(X, Y + 7, 16, 1, ['#e8c02a', '#d8202c', '#e8e8e8'][(tx >> 2) % 3]); if (h > 0.7) { R(X + 4, Y + 3, 7, 7, '#9a9aa6'); R(X + 4, Y + 3, 7, 1, '#c8c8d4'); R(X + 4, Y + 9, 7, 1, '#4a4a56'); }
+            if (tx % 10 === 3) { R(X + 2, Y + 10, 12, 5, '#101018'); R(X + 3, Y + 11, 10, 1, '#4a4a56'); R(X + 11, Y + 13, 2, 1, (f >> 4) % 5 ? '#3ad868' : '#e83a3a'); }
+            R(X, Y, 16, 16, 'rgba(0,0,0,' + (0.1 + 0.12 * d) + ')');
+          }
+        }
         return true;
       }
       if (k === 'tier' && ok('w12_tier')) { ctx.drawImage(IM('w12_tier'), X, Y); return true; }
@@ -384,7 +396,10 @@ window.LEVEL = {"id": "12-1", "name": "COUNTDOWN", "sub": "LIVE FROM THE SPECIAL
       const S = x => Math.round(DD.wx(x)), Yf = Math.round(DD.wy(floorY));
       if (S(0) > VW + 400 && S(236 * TS) < -400) return;
       // A. the two-shot on a low riser: Tim in his cream blazer and Gregg with the wings, the TV between them
-      if (ok('w12_twoshot')) { const X = S(3 * TS); if (X > -180 && X < VW) ctx.drawImage(IM('w12_twoshot'), X, Yf - 96); }
+      if (ok('w12_twoshot')) { const X = S(3 * TS); if (X > -180 && X < VW) { ctx.drawImage(IM('w12_twoshot'), X, Yf - 96);
+        const A = DD.art, fr = G.frame, hurt = G.pl.inv > 0, bl = (o, per) => hurt || (fr + o) % per < 6;   // Tim and Gregg blink on their own offsets, and wince when the Dot is hurt
+        if (bl(40, 230)) { A.R(X + 17, Yf - 96 + 63, 2, 1, '#8a6a3a'); A.R(X + 21, Yf - 96 + 63, 2, 1, '#8a6a3a'); }
+        if (bl(130, 290)) A.R(X + 146, Yf - 96 + 64, 4, 1, '#e2a07a'); } }
       // C. the TotoGate mock theatre; D. the Amato Foundation screen
       let X = S(85 * TS); if (X > -130 && X < VW) theatre(ctx, G, X, Yf);
       X = S(121 * TS); if (X > -170 && X < VW) foundation(ctx, G, X, Math.round(DD.wy(5 * TS)));
@@ -416,6 +431,7 @@ window.LEVEL = {"id": "12-1", "name": "COUNTDOWN", "sub": "LIVE FROM THE SPECIAL
     },
     drawMid(ctx, G) {   // velvet-rope stanchions along the red carpet, drawn whole
       const K = DD.kindAt, Yf = Math.round(DD.wy(21 * TS));
+      for (let tx = Math.floor(G.cam.x / TS); tx < Math.floor(G.cam.x / TS) + 22; tx++) if (tx % 3 === 0 && K(tx, 21) === 'floor' && K(tx, 22) === 'floor') DD.art.glow(Math.round(DD.wx(tx * TS + 8)), Yf + 5, 20, '#ffd890', 0.1);   // the footlights wash the carpet's front edge
       for (let tx = 4; tx < 232; tx += 9) {
         let free = true; for (let i = 0; i <= 4; i++) if (K(tx + i, 21) !== 'floor' || K(tx + i, 20)) free = false;
         if (!free) continue;

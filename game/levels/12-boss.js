@@ -249,15 +249,24 @@
         if (ok('w12_sky')) { const im = IM('w12_sky'), ox = -(Math.round(c.x * 0.06 + f * 0.04) % im.width + im.width) % im.width; for (let x = ox - im.width; x < VW; x += im.width) ctx.drawImage(im, x, 0); }
         ctx.fillStyle = 'rgba(40,14,84,0.62)'; ctx.fillRect(0, 0, VW, VH);
         for (let i = 0; i < 40; i++) { const x = (i * 71) % VW, y = (i * 37) % 90; if ((Math.floor(f / 14) + i) % 5) { ctx.fillStyle = i % 3 ? '#fff2c0' : '#ffd0e0'; ctx.fillRect(x, y, 1 + (i % 7 === 0), 1); } }
-        if (ok('w12_city')) { const im = IM('w12_city'), ox = -(Math.round(c.x * 0.18) % im.width + im.width) % im.width; for (let x = ox - im.width; x < VW; x += im.width) ctx.drawImage(im, x, 128); ctx.fillStyle = 'rgba(30,12,70,0.6)'; ctx.fillRect(0, 128, VW, 60); }
-        if (ok('w12_hills_far')) { const im = IM('w12_hills_far'), ox = -(Math.round(c.x * 0.3) % im.width + im.width) % im.width; for (let x = ox - im.width; x < VW; x += im.width) ctx.drawImage(im, x, 128); ctx.fillStyle = '#58a84a'; ctx.fillRect(0, 128 + im.height, VW, VH); ctx.fillStyle = 'rgba(30,12,70,0.55)'; ctx.fillRect(0, 128, VW, 60); }
-        // the audience: rows of dark heads on the risers behind the stage, hands up for the finale
-        for (const [par, y0, col, col2] of [[0.62, 142, '#1a1030', '#241640'], [0.8, 156, '#120a22', '#1a1030']]) {
+        const Yfa = Math.round(DD.wy(FLOOR_Y)), yc = 118 - Math.round(c.y * 0.12), yh = 116 - Math.round(c.y * 0.2), yn = 128 - Math.round(c.y * 0.3);   // the painted set sits on the floor line: skyline, far hills, the cartoon tree and Spaghetti shop, near hills
+        if (ok('w12_city')) { const im = IM('w12_city'), ox = -(Math.round(c.x * 0.18) % im.width + im.width) % im.width; for (let x = ox - im.width; x < VW; x += im.width) ctx.drawImage(im, x, yc); }
+        if (ok('w12_hills_far')) { const im = IM('w12_hills_far'), ox = -(Math.round(c.x * 0.3) % im.width + im.width) % im.width; for (let x = ox - im.width; x < VW; x += im.width) ctx.drawImage(im, x, yh); ctx.fillStyle = '#58a84a'; ctx.fillRect(0, yh + im.height, VW, VH); }
+        { const par = 0.5, base = 150 - Math.round(c.y * 0.3);
+          for (let i = Math.floor(c.x * par / 150) - 1; i <= Math.floor((c.x * par + VW) / 150) + 1; i++) { const X = Math.round(i * 150 + 40 - c.x * par);
+            if (i % 3 === 0 && ok('w12_tree')) ctx.drawImage(IM('w12_tree'), X, base - 78); else if (i % 3 === 1 && ok('w12_shop')) { ctx.drawImage(IM('w12_shop'), X, base - 40); DD.text('SPAGHETTI', X + 32, base - 29, '#3a1620', 1, null, 'center'); } } }
+        if (ok('w12_hills_near')) { const im = IM('w12_hills_near'), ox = -(Math.round(c.x * 0.5) % im.width + im.width) % im.width; for (let x = ox - im.width; x < VW; x += im.width) ctx.drawImage(im, x, yn); ctx.fillStyle = '#2e7234'; ctx.fillRect(0, yn + im.height, VW, VH); }
+        ctx.fillStyle = 'rgba(30,12,70,0.6)'; ctx.fillRect(0, Math.min(yc, yh, yn) - 4, VW, VH);   // night over the painted set
+        // the audience: rows of dark heads on the risers behind the stage, rim-lit; each has its own idle (a bob now and then, a glance), they duck when the Dot is hurt, hop with arms up on every hit and phase change, and rattle on a slam
+        for (const [par, y0, col, col2] of [[0.62, Yfa - 13, '#1a1030', '#3a2a5a'], [0.8, Yfa - 5, '#120a22', '#2a1c44']]) {
           for (let i = Math.floor(c.x * par / 11) - 1; i < Math.floor((c.x * par + VW) / 11) + 2; i++) {
-            const X = Math.round(i * 11 - c.x * par), h = (i * 7) % 5, wave = G.s.ovation || G.s.fin ? Math.round(Math.sin(f / 6 + i) * 3) : 0;
+            const X0 = Math.round(i * 11 - c.x * par), hr = DD.art.hash(i, par * 10), ov = G.s.ovation || G.s.fin;
+            const cheer = f - (G.flashAt ?? -999) < 30 || f - (G.flareAt ?? -999) < 50, rat = f - (G.dipAt ?? -999) < 14, hurt = G.pl.inv > 0;
+            const h = (i * 7) % 5 + (((f + ((hr * 170) | 0)) % 170) < 12 ? 1 : 0) + (hurt ? 2 : 0) - (cheer ? ((f + i) % 8 < 4 ? 2 : 0) : 0), wave = ov ? Math.round(Math.sin(f / 6 + i) * 3) : (cheer ? ((f >> 2) + i) % 2 * 2 - 1 : 0);
+            const X = X0 + (rat ? ((f >> 1) & 1 ? 1 : -1) : 0) + (!hurt && ((f + ((hr * 400) | 0)) % 400) < 50 ? (hr > 0.5 ? 1 : -1) : 0);
             ctx.fillStyle = col; ctx.beginPath(); ctx.arc(X + 5, y0 + h, 5, 0, 7); ctx.fill(); ctx.fillRect(X, y0 + h + 4, 11, 40);
             ctx.fillStyle = col2; ctx.fillRect(X + 2, y0 + h - 4, 3, 2);
-            if ((G.s.ovation || G.s.fin) && i % 3 === 0) { ctx.fillStyle = col; ctx.fillRect(X + 1, y0 + h - 8 + wave, 2, 8); ctx.fillRect(X + 8, y0 + h - 9 - wave, 2, 8); }
+            if ((ov || cheer) && i % 3 === 0) { ctx.fillStyle = col; ctx.fillRect(X + 1, y0 + h - 8 + wave, 2, 8); ctx.fillRect(X + 8, y0 + h - 9 - wave, 2, 8); }
           }
         }
         for (let k = 0; k < 4; k++) { const ph = (f + k * 47) % 110; if (ph > 5) continue; const n = Math.floor((f + k * 47) / 110), x = (n * 83 + k * 109) % VW, y = 120 + (n * 41 + k * 29) % 40; ctx.fillStyle = 'rgba(255,255,255,' + (0.9 - ph * 0.15) + ')'; ctx.fillRect(x - 1, y - 4, 2, 9); ctx.fillRect(x - 4, y, 9, 2); ctx.fillRect(x - 1, y - 1, 3, 3); }
@@ -283,7 +292,15 @@
         if (k === 'floor' && ok('w12_floor')) {
           ctx.drawImage(IM('w12_floor'), 0, lip ? 0 : 16, 16, 16, X, Y, 16, 16);
           if (lip && (tx + 1) % 5 === 0) { ctx.fillStyle = '#f0c84a'; ctx.fillRect(X + 6, Y + 2, 4, 1); }
-          if (!lip) { ctx.fillStyle = 'rgba(0,20,0,0.3)'; ctx.fillRect(X, Y, 16, 16); }
+          if (!lip) {   // the cut-away under the carpet: a red velvet stage skirt with a gilt rail and footlights, and below it the dark understage with taped cable runs and a road case, calmer with depth
+            const A = DD.art, R = A.R, f = DD.G.frame; let d = 1; while (d < 5 && K(tx, ty - d - 1) === k) d++;
+            if (d === 1) { R(X, Y, 16, 16, '#4a0e22'); for (let i = 1; i < 16; i += 4) R(X + i, Y, 2, 16, '#681632'); R(X, Y, 16, 2, '#c98f22'); R(X, Y, 16, 1, '#fff2a6'); R(X, Y + 2, 16, 1, 'rgba(0,0,0,0.45)');
+              for (let b = 0; b < 2; b++) { const on = ((f >> 3) + tx * 2 + b) % 4 !== 0; R(X + 3 + b * 8, Y + 4, 2, 2, on ? '#fff2a6' : '#6a5a3a'); if (on) R(X + 2 + b * 8, Y + 3, 4, 1, 'rgba(255,226,140,0.3)'); } R(X, Y + 11, 16, 5, 'rgba(0,0,0,0.3)'); }
+            else { const h = A.hash(tx, ty); R(X, Y, 16, 16, '#13101a'); A.tex(X, Y, 16, 16, '#262034', 0.05, 8);
+              if (tx % 9 === 4) { R(X, Y + 1, 16, 14, '#1a1826'); R(X, Y + 1, 16, 1, '#4a465a'); R(X, Y + 3, 16, 1, '#0a0812'); R(X + 6, Y + 7, 4, 3, '#8a8a96'); R(X + 6, Y + 7, 4, 1, '#c0c0cc'); }
+              else { R(X, Y + 6, 16, 3, '#06040c'); R(X, Y + 6, 16, 1, '#2a2640'); R(X, Y + 8, 16, 1, ['#e8c02a', '#d8202c', '#e8e8e8'][(tx >> 2) % 3]); if (h > 0.7) { R(X + 4, Y + 4, 7, 7, '#8a8a9a'); R(X + 4, Y + 4, 7, 1, '#b8b8c8'); } }
+              R(X, Y, 16, 16, 'rgba(0,0,0,' + (0.1 + 0.12 * d) + ')'); }
+          }
           return true;
         }
         if (k === 'tier' && ok('w12_tier')) { ctx.drawImage(IM('w12_tier'), X, Y); return true; }
@@ -303,6 +320,7 @@
         if (s.ovation && G.frame % 50 === 0 && B && !B.dead) confettiBurst(B.arena[0] + 40 + Math.random() * (B.arena[1] - B.arena[0] - 80), 100, 10, 1);
       },
       drawMid(ctx, G) {   // the Baxter cameo: the blue mascot sprints in, bonks New Amato from behind and sprints off
+        { const Yf = Math.round(DD.wy(FLOOR_Y)); for (let tx = Math.floor(G.cam.x / TS); tx < Math.floor(G.cam.x / TS) + 22; tx += 3) DD.art.glow(Math.round(DD.wx(tx * TS + 8)), Yf + 5, 20, '#ffd890', 0.09); }   // the footlights wash the carpet's front edge
         const s = G.s, bo = DD.bodies.find(b => b.kind === 'angel_boss');
         if (s.cameo > 0 && bo && ok('w12_mascot_b1')) {
           const t = 150 - s.cameo, k = t < 60 ? t / 60 : t < 90 ? 1 : 1 + (t - 90) / 60;

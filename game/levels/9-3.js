@@ -81,9 +81,21 @@ DD.defineEntity('w93piston', {   // a cylinder's piston: a platform that rises a
       // the hotel and convention hall far off (parallax .15)
       { const o = Math.round(cx * 0.15), base = FY - 10; for (let i = -1; i < 9; i++) { const bx = i * 150 - (o % 150), bh = 60 + (hash(i + Math.floor(o / 150), 3) * 70 | 0), bw = 100 + (hash(i + Math.floor(o / 150), 5) * 40 | 0);
           ctx.fillStyle = '#8a9cc0'; ctx.fillRect(bx, base - bh, bw, bh); ctx.fillStyle = '#a4b4d4'; ctx.fillRect(bx, base - bh, bw, 3);
-          ctx.fillStyle = '#6a7ca8'; for (let wy = base - bh + 8; wy < base - 6; wy += 10) for (let wx = bx + 6; wx < bx + bw - 6; wx += 12) ctx.fillRect(wx, wy, 6, 5); } }
+          const kk = i + Math.floor(o / 150); let ri = 0; for (let wy = base - bh + 8; wy < base - 6; wy += 10, ri++) { let ci = 0; for (let wx = bx + 6; wx < bx + bw - 6; wx += 12, ci++) { ctx.fillStyle = hash(ci * 31 + ri * 7 + kk * 13, 4) < 0.12 ? '#f4e4a4' : '#6a7ca8'; ctx.fillRect(wx, wy, 6, 5); } } } }
       // the lot: a strip of asphalt behind the route with the far row of parked cars (parallax .6)
       ctx.fillStyle = '#5a5e6a'; ctx.fillRect(0, FY - 14, VW, 40); ctx.fillStyle = '#7a7e8a'; ctx.fillRect(0, FY - 14, VW, 1);
+      { const A = DD.art, o = Math.round(cx * 0.6), hurt = G.pl && G.pl.inv > 0;   // art pass: painted parking bays, and AmatoCon attendees milling about with lanyards and tote bags (each blinks its lanyard badge, sways, and leans away when a Dot is hurt)
+        for (let x = -(o % 65) - 65; x < VW + 65; x += 65) { A.R(x, FY - 12, 2, 16, 'rgba(240,240,230,0.42)'); A.R(x + 1, FY - 12, 1, 16, 'rgba(0,0,0,0.12)'); }
+        A.R(0, FY + 10, VW, 3, '#8a8e98'); A.R(0, FY + 10, VW, 1, '#b8bcc8'); A.R(0, FY + 13, VW, 1, '#3a3e48');   // a kerb along the lot's front edge
+        const o2 = Math.round(cx * 0.7);
+        for (let i = Math.floor(o2 / 96) - 1; i < Math.floor(o2 / 96) + 5; i++) { const h = A.hash(i, 33); if (h < 0.35) continue;
+          const px = i * 96 - o2 + Math.round(h * 50), sway = ((f + (h * 400 | 0)) % 200) < 60 ? 1 : 0, lean = hurt ? (i & 1 ? 1 : -1) : 0, shirt = ['#c8c8d0', '#3a5a8a', '#a83a32', '#2a2e38', '#6a8a5a'][(h * 5 * 7 | 0) % 5], by = FY + 8;
+          A.R(px + 1 + lean, by - 9, 2, 9, '#20242c'); A.R(px + 4 + lean, by - 9, 2, 9, '#20242c');   // legs
+          A.R(px + lean, by - 19 - sway, 7, 11, shirt); A.R(px + lean, by - 19 - sway, 7, 1, A.mix(shirt, 0.3)); A.R(px + 3 + lean, by - 18 - sway, 1, 7, '#ffd84a');   // body and lanyard
+          A.R(px + 1 + lean, by - 25 - sway, 5, 5, ['#e8b890', '#c89068', '#f0c8a0'][(h * 9 | 0) % 3]); A.R(px + 1 + lean, by - 26 - sway, 5, 2, ['#2a1a10', '#8a8e98', '#5a3a1a'][(h * 11 | 0) % 3]);   // head and hair
+          if (((f + (h * 300 | 0)) % 240) < 5) A.R(px + 2 + lean, by - 23 - sway, 3, 1, '#c89068');   // a blink
+          if (h > 0.7) { A.R(px + 7 + lean, by - 15, 5, 6, '#e8e4d8'); A.R(px + 8 + lean, by - 18, 1, 3, '#e8e4d8'); }   // a tote bag
+        } }
       { const o = Math.round(cx * 0.6), cols = ['#a83a32', '#d8d4c8', '#3a5a8a', '#8a8f9a', '#2a2e38', '#e0b030'];
         for (let i = -1; i < 7; i++) { const k = i + Math.floor(o / 130), bx = i * 130 - (o % 130) + 10, col = cols[(hash(k, 9) * 6) | 0]; const by = FY - 14;
           ctx.fillStyle = col; ctx.fillRect(bx, by - 13, 64, 10); ctx.fillRect(bx + 14, by - 21, 34, 9); ctx.fillStyle = '#9ac4e4'; ctx.fillRect(bx + 17, by - 19, 12, 6); ctx.fillRect(bx + 32, by - 19, 13, 6);
@@ -105,17 +117,46 @@ DD.defineEntity('w93piston', {   // a cylinder's piston: a platform that rises a
       // below the floor line: a dark trench, so a pit is a pit
       ctx.fillStyle = '#0c0e14'; ctx.fillRect(0, FY + 1, VW, VH);
       // ---- the Charger, in its blue, standing open behind the route
-      const slab = (tx0, tw, r0, r1, win) => {   // a body panel seen edge-on: blue, a chrome beltline, a window opening, a handle
-        const x = X(tx0), w = tw * TS, y0 = r0 * TS - cy, h = (r1 - r0) * TS; if (x + w < 0 || x > VW) return;
-        ctx.fillStyle = '#0e2a66'; ctx.fillRect(x - 2, y0 - 2, w + 4, h + 2); ctx.fillStyle = '#1d4fa0'; ctx.fillRect(x, y0, w, h); ctx.fillStyle = '#4a86e0'; ctx.fillRect(x, y0, w, 3); ctx.fillRect(x, y0, 3, h);
-        if (win) { ctx.fillStyle = '#10121a'; ctx.fillRect(x + 6, y0 + 8, w - 12, h * 0.38); const wg = ctx.createLinearGradient(0, y0 + 8, 0, y0 + 8 + h * 0.38); wg.addColorStop(0, '#a8cdee'); wg.addColorStop(1, '#d8e4f0'); ctx.fillStyle = wg; ctx.fillRect(x + 8, y0 + 10, w - 16, h * 0.38 - 4); }
-        ctx.fillStyle = '#c8ccd8'; ctx.fillRect(x + 6, y0 + h * 0.52, w - 12, 2); ctx.fillStyle = '#8a90a0'; ctx.fillRect(x + w - 16, y0 + h * 0.6, 10, 3); ctx.fillStyle = '#0a1a44'; ctx.fillRect(x, y0 + h - 5, w, 5); };
+      const slab = (tx0, tw, r0, r1, win) => {   // art pass: a body panel seen from inside: shaded blue paint, a liner or door card with texture, glass with reflections, chrome, a lit edge
+        const A = DD.art, x = X(tx0), w = tw * TS, y0 = r0 * TS - cy, h = (r1 - r0) * TS; if (x + w < 0 || x > VW) return;
+        A.R(x - 2, y0 - 2, w + 4, h + 2, '#0a1a44');
+        const bgd = ctx.createLinearGradient(x, 0, x + w, 0); bgd.addColorStop(0, '#2a62bc'); bgd.addColorStop(0.45, '#1d4fa0'); bgd.addColorStop(1, '#123380'); ctx.fillStyle = bgd; ctx.fillRect(x, y0, w, h);
+        A.R(x, y0, w, 3, '#78aef4'); A.R(x, y0, 3, h, '#4a86e0'); A.R(x + w - 3, y0, 3, h, '#0e2a66'); A.R(x, y0 + h - 5, w, 5, '#0a1a44');
+        for (let i = 0; i < 3; i++) A.R(x + 6 + i * 3, y0 + 4, 1, h - 12, 'rgba(255,255,255,0.07)');   // a paint sheen running down the panel
+        if (win) {   // a door: black window surround, glass with sky and streaks, the door card (stitched top, armrest, speaker, handle, switches, reflector)
+          const gx = x + 9, gy = y0 + 9, gw = w - 18, gh = Math.round(h * 0.36);
+          A.R(gx - 3, gy - 3, gw + 6, gh + 6, '#10121a'); A.R(gx - 3, gy - 3, gw + 6, 1, '#3a4258');
+          const wg = ctx.createLinearGradient(0, gy, 0, gy + gh); wg.addColorStop(0, '#6aa0dc'); wg.addColorStop(1, '#d8e4f0'); ctx.fillStyle = wg; ctx.fillRect(gx, gy, gw, gh);
+          ctx.save(); ctx.beginPath(); ctx.rect(gx, gy, gw, gh); ctx.clip(); ctx.fillStyle = 'rgba(255,255,255,0.2)';
+          for (const sx of [gx + 12, gx + 44]) { ctx.beginPath(); ctx.moveTo(sx + 14, gy); ctx.lineTo(sx + 26, gy); ctx.lineTo(sx + 8, gy + gh); ctx.lineTo(sx - 4, gy + gh); ctx.fill(); }
+          ctx.restore();
+          const dy = gy + gh + 8, dh = y0 + h - 14 - dy;
+          A.box(x + 6, dy, w - 12, dh, '#2a2e38', { outline: '#10121a' }); for (let i = x + 9; i < x + w - 9; i += 4) A.R(i, dy + 3, 2, 1, '#c8301a');
+          A.box(x + 10, dy + Math.round(dh * 0.38), w - 20, 9, '#1a1a22'); A.R(x + 12, dy + Math.round(dh * 0.38) + 1, w - 24, 1, '#4a4e58');
+          A.box(x + w - 34, dy + 10, 24, 5, '#c8ccd8'); A.R(x + w - 33, dy + 11, 22, 1, '#ffffff'); A.R(x + w - 34, dy + 15, 24, 1, '#4a4e58');   // the chrome pull
+          for (let i = 0; i < 3; i++) A.box(x + 12 + i * 7, dy + 10, 5, 4, '#10121a');   // the window switches
+          for (let j = 0; j < 3; j++) for (let i = 0; i < 6; i++) A.R(x + 14 + i * 4, dy + dh - 24 + j * 4, 2, 2, '#0a0b10');   // the speaker grille
+          A.box(x + w - 24, y0 + h - 22, 12, 5, '#a01820'); A.R(x + w - 23, y0 + h - 21, 10, 1, '#ff8a8a');   // the red reflector
+        } else {   // the trunk lid's inside: a grey felt liner with ribs, the pull strap, the latch plate, tail-lamp housings, hinges
+          const lx = x + 9, ly = y0 + 9, lw = w - 18, lh = h - 28;
+          A.box(lx, ly, lw, lh, '#2e323c', { outline: '#10121a' });
+          for (let i = lx + 6; i < lx + lw - 4; i += 8) { A.R(i, ly + 4, 1, lh - 8, '#3c4252'); A.R(i + 1, ly + 4, 1, lh - 8, '#1c1f27'); }
+          A.tex(lx + 2, ly + 2, lw - 4, lh - 4, '#2e323c', 0.06, 17);
+          A.box(lx + lw / 2 - 16, ly + lh - 54, 32, 9, '#14141a'); A.R(lx + lw / 2 - 15, ly + lh - 53, 30, 1, '#4a4e58');
+          A.box(lx + lw / 2 - 9, ly + lh - 30, 18, 9, '#8a90a0'); A.R(lx + lw / 2 - 3, ly + lh - 28, 6, 5, '#10121a');
+          A.box(lx + 4, ly + lh - 18, 26, 10, '#7a1018'); A.box(lx + lw - 30, ly + lh - 18, 26, 10, '#7a1018'); A.R(lx + 6, ly + lh - 16, 22, 1, '#ff7a7a'); A.R(lx + lw - 28, ly + lh - 16, 22, 1, '#ff7a7a');
+          A.box(x + 10, y0 - 4, 20, 6, '#4a505c'); A.box(x + w - 30, y0 - 4, 20, 6, '#4a505c');
+        }
+      };
       slab(52, 11, 8, 21, false);           // the trunk lid, standing open over the cargo
       slab(98, 9, 9, 21, true);             // the rear door, open
       slab(133, 10, 8, 21, true);           // the driver's door, open
       // the hood, raised on its hinge over the engine bay
       { const hx = X(194), hy = 9 * TS - cy; if (hx < VW + 40) { ctx.fillStyle = '#0e2a66'; ctx.beginPath(); ctx.moveTo(hx - 4, hy + 14); ctx.lineTo(hx + 12, hy + 14); ctx.lineTo(hx + 12 + 44 * TS * 0.55, hy - 150); ctx.lineTo(hx + 44 * TS * 0.55 - 18, hy - 150); ctx.fill();
-          ctx.fillStyle = '#1d4fa0'; ctx.beginPath(); ctx.moveTo(hx, hy + 12); ctx.lineTo(hx + 10, hy + 12); ctx.lineTo(hx + 10 + 44 * TS * 0.55, hy - 148); ctx.lineTo(hx + 44 * TS * 0.55 - 14, hy - 148); ctx.fill(); ctx.fillStyle = '#4a86e0'; ctx.beginPath(); ctx.moveTo(hx, hy + 12); ctx.lineTo(hx + 3, hy + 12); ctx.lineTo(hx + 3 + 44 * TS * 0.55, hy - 148); ctx.lineTo(hx + 44 * TS * 0.55 - 14, hy - 148); ctx.fill(); } }
+          ctx.fillStyle = '#1d4fa0'; ctx.beginPath(); ctx.moveTo(hx, hy + 12); ctx.lineTo(hx + 10, hy + 12); ctx.lineTo(hx + 10 + 44 * TS * 0.55, hy - 148); ctx.lineTo(hx + 44 * TS * 0.55 - 14, hy - 148); ctx.fill(); ctx.fillStyle = '#4a86e0'; ctx.beginPath(); ctx.moveTo(hx, hy + 12); ctx.lineTo(hx + 3, hy + 12); ctx.lineTo(hx + 3 + 44 * TS * 0.55, hy - 148); ctx.lineTo(hx + 44 * TS * 0.55 - 14, hy - 148); ctx.fill();
+          const kx = 44 * TS * 0.55; ctx.fillStyle = '#2a2e38'; ctx.beginPath(); ctx.moveTo(hx + 4, hy + 4); ctx.lineTo(hx + 8, hy + 4); ctx.lineTo(hx + 8 + kx, hy - 156 + 8); ctx.lineTo(hx + kx - 4, hy - 156 + 8); ctx.fill();   // the insulation liner down the hood's inner face
+          ctx.fillStyle = '#4a505c'; for (let i = 1; i < 8; i++) { const t = i / 8; ctx.fillRect(Math.round(hx + 5 + kx * t), Math.round(hy + 6 - 158 * t), 3, 2); }   // its clips
+          DD.art.box(hx - 8, hy + 6, 18, 10, '#8a90a0'); } }   // the hinge
       if (on) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; glow(ctx, X(207), FY - 20, 120, '255,130,40', 0.18 + 0.05 * Math.sin(f / 5)); ctx.restore(); }
       // ---- Mel's room (x240+): the underbody, a metal cave
       const e0 = X(240);
@@ -138,7 +179,7 @@ DD.defineEntity('w93piston', {   // a cylinder's piston: a platform that rises a
     tile0(ctx, k, X, Y, tx, ty) {
       if (ty >= 22 && tx < 240 && (k === 'trunk' || k === 'floor' || k === 'seat' || k === 'metal' || k === 'engine')) {   // below the walkway: the Charger's lower body, blue, with a chrome sill and a 20-inch alloy wheel at each end
         const R = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(X + x, Y + y, w, h); };
-        R(0, 0, 16, 16, '#1d4fa0'); if (ty === 22) { R(0, 0, 16, 2, '#c8ccd8'); R(0, 2, 16, 2, '#0e2a66'); } else R(0, 0, 16, 1, '#2a62bc'); if (ty === 25) R(0, 12, 16, 4, '#0a1a44'); if (tx % 24 === 0) R(0, 0, 1, 16, '#0a1a44');
+        R(0, 0, 16, 16, '#1d4fa0'); if (ty === 22) { R(0, 0, 16, 2, '#c8ccd8'); R(0, 2, 16, 2, '#0e2a66'); } else R(0, 0, 16, 1, '#2a62bc'); if (ty === 25) R(0, 12, 16, 4, '#0a1a44'); if (tx % 24 === 0) R(0, 0, 1, 16, '#0a1a44'); if (ty === 23) { R(0, 5, 16, 1, '#3a74d0'); R(0, 6, 16, 1, '#0e2a66'); if (tx % 24 === 5) { R(1, 9, 10, 2, '#c8ccd8'); R(1, 9, 10, 1, '#ffffff'); } } if (ty === 24 && tx % 6 === 2) { R(2, 9, 12, 1, '#0a1a44'); } R(0, 0, 16, 16, 'rgba(0,0,30,' + ((ty - 22) * 0.07) + ')');   // art pass: a body crease, a door handle, and the paint darkening with depth
         for (const wcx of [1416, 2888]) {
           const dx = wcx - tx * 16, dy = 376 - ty * 16; if (Math.abs(dx - 8) > 76 || Math.abs(dy - 8) > 76) continue;
           ctx.save(); ctx.beginPath(); ctx.rect(X, Y, 16, 16); ctx.clip(); const ax = X + dx, ay = Y + dy, arc = (r, c) => { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(ax, ay, r, 0, 7); ctx.fill(); };

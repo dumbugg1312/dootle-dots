@@ -25,7 +25,7 @@ window.LEVEL = {"id": "11-2", "name": "ARTS AND CRAFTS NIGHT", "sub": "GREAT TUE
       crawl: ['#5a4a30', '#2a2010'],
       bg(ctx, G, DD) {   // kraft paper, a darker low-contrast sheet with faint pencil doodles on a slow parallax; the table's wood shows below
         const VW = DD.VW, VH = DD.VH, c = G.cam, cx = c.x, f = G.frame;
-        ctx.fillStyle = '#a89878'; ctx.fillRect(0, 0, VW, VH);
+        { const g = ctx.createLinearGradient(0, 0, 0, VH); g.addColorStop(0, '#c9ab78'); g.addColorStop(0.55, '#ba9b68'); g.addColorStop(1, '#a68858'); ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH); }
         ctx.fillStyle = '#b6a684'; for (let i = 0; i < 40; i++) { const x = ((i * 53 + 17) * 7 - cx * 0.3) % (VW + 40); ctx.fillRect(x < 0 ? x + VW + 40 : x, (i * 31 + Math.floor(cx * 0.05)) % VH, 14 + (i % 4) * 6, 1); }
         // pencil doodles: a sun, a house, clouds, a tree, a stick figure, a dog, and a row of tapes; faint grey-brown lines
         ctx.strokeStyle = '#8a7a5a'; ctx.lineWidth = 1; ctx.fillStyle = 'rgba(138,122,90,0.18)';
@@ -40,6 +40,29 @@ window.LEVEL = {"id": "11-2", "name": "ARTS AND CRAFTS NIGHT", "sub": "GREAT TUE
           if (t === 3) { ctx.strokeRect(ox + 20, 100, 24, 12); ctx.beginPath(); ctx.arc(ox + 46, 102, 5, 0, 7); ctx.moveTo(ox + 24, 112); ctx.lineTo(ox + 24, 120); ctx.moveTo(ox + 40, 112); ctx.lineTo(ox + 40, 120); ctx.stroke(); }
           if (t === 4) { for (let i = 0; i < 5; i++) ctx.strokeRect(ox + 20 + i * 10, 118, 8, 14); }
         }
+        // the looks pass: the sheet itself (same plane as the platforms): fibre streaks, creases, masking tape, a coffee ring and a child's crayon drawings in muted yellow, orange and purple
+        { const A = DD.art, X0 = Math.round(cx), Y0 = Math.round(c.y), CH = 170, k0 = Math.floor(X0 / CH), lw = ctx.lineWidth;
+          for (let k = k0 - 1; k <= k0 + Math.ceil(VW / CH) + 1; k++) {
+            const h1 = A.hash(k, 3), h2 = A.hash(k, 4), h3 = A.hash(k, 5), h4 = A.hash(k, 6), bx = k * CH - X0;
+            const cxl = bx + 30 + h1 * 150;   // a long vertical crease, a light lip and a dark valley
+            for (let yy = -Y0; yy < 336 - Y0; yy += 6) { const dx = Math.round(Math.sin(yy / 37 + k) * 3 + (yy + Y0) * (h2 - 0.5) * 0.08); if (yy > VH || yy < -6) continue; A.R(cxl + dx, yy, 1, 6, 'rgba(70,48,22,0.16)'); A.R(cxl + dx + 1, yy, 1, 6, 'rgba(255,240,200,0.14)'); }
+            const chy = Math.round(40 + h3 * 290 - Y0);   // a horizontal crease
+            if (chy > -2 && chy < VH) for (let xx = 0; xx < 150; xx += 6) { const dy = Math.round(Math.sin(xx / 29 + k * 2) * 2); A.R(bx + 40 + xx, chy + dy, 6, 1, 'rgba(70,48,22,0.14)'); A.R(bx + 40 + xx, chy + dy + 1, 6, 1, 'rgba(255,240,200,0.12)'); }
+            const ty0 = Math.round(20 + h4 * 300 - Y0), tx0 = Math.round(bx + 60 + h2 * 100);   // masking tape holding the sheet down
+            if (h2 > 0.4 && ty0 > -12 && ty0 < VH) { A.R(tx0, ty0, 26, 8, 'rgba(236,222,172,0.5)'); A.R(tx0, ty0, 26, 1, 'rgba(255,248,214,0.55)'); A.R(tx0, ty0 + 7, 26, 1, 'rgba(120,96,50,0.3)'); A.R(tx0 - 1, ty0 + 2, 1, 2, 'rgba(236,222,172,0.5)'); A.R(tx0 + 26, ty0 + 4, 1, 3, 'rgba(236,222,172,0.5)'); }
+            for (let j = 0; j < 2; j++) { const sy = Math.round((j ? 30 + h3 * 150 : 205 + h1 * 90) - Y0), sx = Math.round(bx + (j ? 20 + h1 * 120 : 70 + h3 * 80)), kind = Math.floor((j ? h2 : h4) * 6);   // crayon drawings, muted so the red/blue/green platforms stay the only strong colours
+            if (sy > -60 && sy < VH + 40) {
+              ctx.lineCap = 'round'; ctx.lineWidth = 4;
+              if (kind === 0) { ctx.strokeStyle = 'rgba(214,168,44,0.58)'; ctx.beginPath(); ctx.arc(sx, sy + 30, 26, Math.PI, 0); ctx.stroke(); ctx.strokeStyle = 'rgba(214,120,40,0.58)'; ctx.beginPath(); ctx.arc(sx, sy + 30, 19, Math.PI, 0); ctx.stroke(); ctx.strokeStyle = 'rgba(130,84,150,0.58)'; ctx.beginPath(); ctx.arc(sx, sy + 30, 12, Math.PI, 0); ctx.stroke(); }
+              else if (kind === 1) { ctx.strokeStyle = 'rgba(130,84,150,0.54)'; for (let a = 0; a < 6; a++) { ctx.beginPath(); ctx.arc(sx + Math.cos(a * 1.047) * 10, sy + Math.sin(a * 1.047) * 10, 6, 0, 7); ctx.stroke(); } ctx.fillStyle = 'rgba(224,176,40,0.62)'; ctx.beginPath(); ctx.arc(sx, sy, 5, 0, 7); ctx.fill(); ctx.strokeStyle = 'rgba(120,100,50,0.3)'; ctx.beginPath(); ctx.moveTo(sx, sy + 12); ctx.lineTo(sx + 2, sy + 44); ctx.stroke(); }
+              else if (kind === 2) { ctx.strokeStyle = 'rgba(214,168,44,0.62)'; ctx.beginPath(); for (let a = 0; a < 5; a++) { const an = -Math.PI / 2 + a * 2.513; ctx.lineTo(sx + Math.cos(an) * 16, sy + Math.sin(an) * 16); } ctx.closePath(); ctx.stroke(); }
+              else if (kind === 3) { ctx.strokeStyle = 'rgba(214,120,40,0.58)'; ctx.beginPath(); ctx.moveTo(sx, sy + 24); ctx.lineTo(sx, sy + 6); ctx.lineTo(sx + 18, sy - 6); ctx.lineTo(sx + 36, sy + 6); ctx.lineTo(sx + 36, sy + 24); ctx.closePath(); ctx.stroke(); ctx.strokeStyle = 'rgba(130,84,150,0.54)'; ctx.strokeRect(sx + 14, sy + 10, 8, 14); }
+              else if (kind === 4) { ctx.strokeStyle = 'rgba(130,84,150,0.51)'; ctx.beginPath(); for (let a = 0; a < 28; a += 0.5) ctx.lineTo(sx + Math.cos(a) * (2 + a * 0.9), sy + Math.sin(a) * (2 + a * 0.9)); ctx.stroke(); }
+              else { ctx.strokeStyle = 'rgba(214,168,44,0.58)'; ctx.beginPath(); ctx.arc(sx, sy, 12, 0, 7); ctx.stroke(); for (let a = 0; a < 8; a++) { ctx.beginPath(); ctx.moveTo(sx + Math.cos(a * 0.785) * 17, sy + Math.sin(a * 0.785) * 17); ctx.lineTo(sx + Math.cos(a * 0.785) * 24, sy + Math.sin(a * 0.785) * 24); ctx.stroke(); } }
+              ctx.lineWidth = lw; ctx.lineCap = 'butt';
+            } }
+            if (h1 > 0.45) { const ry = Math.round(30 + h4 * 300 - Y0), rx = Math.round(bx + 20 + h2 * 60); if (ry > -20 && ry < VH + 20) { ctx.strokeStyle = 'rgba(92,60,28,0.16)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(rx, ry, 11, 0, 7); ctx.stroke(); ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(92,60,28,0.1)'; ctx.beginPath(); ctx.arc(rx, ry, 9, 0.5, 5); ctx.stroke(); ctx.lineWidth = lw; } }   // a coffee ring
+          } }
         // the art pass: craft supplies standing on the table behind the sheet (low contrast, parallax), and a desk lamp whose warm cone pools on the paper
         { const A = DD.art, per = 150, ox = -((Math.round(cx * 0.62)) % per + per) % per, i0 = Math.floor(cx * 0.62 / per), by = Math.round(150 - c.y * 0.35);
           for (let x = ox - per, i = i0 - 1; x < VW + per; x += per, i++) {
@@ -51,12 +74,23 @@ window.LEVEL = {"id": "11-2", "name": "ARTS AND CRAFTS NIGHT", "sub": "GREAT TUE
             else { ctx.fillStyle = '#4a3a24'; ctx.beginPath(); ctx.arc(X + 12, by - 12, 12, 0, 7); ctx.fill(); ctx.fillStyle = '#c8a870'; ctx.beginPath(); ctx.arc(X + 12, by - 12, 10, 0, 7); ctx.fill(); ctx.fillStyle = '#a88a56'; ctx.beginPath(); ctx.arc(X + 12, by - 12, 4, 0, 7); ctx.fill(); }
             A.R(X - 4, by, 40, 2, 'rgba(30,18,6,0.35)');   // its shadow on the table
           }
-          ctx.fillStyle = 'rgba(150,130,96,0.42)'; ctx.fillRect(0, 0, VW, VH);   // the supplies sit back in the paper's haze
-          const lper = 420, lox = -((Math.round(cx * 0.8)) % lper + lper) % lper, ly = Math.round(40 - c.y * 0.3);
+          ctx.fillStyle = 'rgba(150,130,96,0.28)'; ctx.fillRect(0, 0, VW, VH);   // the supplies sit back in the paper's haze
+          { const per2 = 210, ox2 = -((Math.round(cx * 0.84)) % per2 + per2) % per2, i2 = Math.floor(cx * 0.84 / per2), by2 = Math.round(168 - c.y * 0.5);   // nearer supplies, brighter, in yellow / orange / purple / cream
+            for (let x = ox2 - per2, i = i2 - 1; x < VW + per2; x += per2, i++) {
+              const t = Math.floor(A.hash(i, 17) * 6), X = x + 24 + Math.floor(A.hash(i, 19) * 90);
+              if (t === 0) { A.box(X, by2 - 30, 10, 30, '#e8e4d4'); A.R(X + 1, by2 - 22, 8, 6, '#d8a62a'); A.box(X - 1, by2 - 38, 12, 9, '#e0782a'); A.R(X + 2, by2 - 36, 3, 4, '#f4b068'); }
+              else if (t === 1) { A.R(X, by2 - 26, 3, 24, '#c4c8d0'); A.R(X + 7, by2 - 26, 3, 24, '#9ea4b0'); A.R(X + 1, by2 - 26, 1, 22, '#f0f2f6'); A.box(X - 3, by2 - 6, 8, 6, '#e0782a'); A.box(X + 6, by2 - 6, 8, 6, '#e0782a'); A.R(X - 1, by2 - 4, 4, 2, '#7a3a10'); A.R(X + 8, by2 - 4, 4, 2, '#7a3a10'); }
+              else if (t === 2) { A.box(X, by2 - 40, 9, 40, '#d8b660'); for (let q = 3; q < 40; q += 4) A.R(X + 1, by2 - 40 + q, q % 8 === 3 ? 5 : 3, 1, '#6a4a14'); A.R(X + 1, by2 - 39, 1, 38, '#f0d890'); }
+              else if (t === 3) { const cs = ['#e8c23a', '#d8782a', '#8a5aa8', '#e6dcc0']; for (let k = 0; k < 4; k++) A.box(X + (k & 1) * 2, by2 - 7 * (k + 1), 24, 6, cs[k]); }
+              else if (t === 4) { for (let k = 0; k < 3; k++) { const cs = ['#e8c23a', '#8a5aa8', '#d8782a']; A.box(X + k * 8, by2 - 20 + k * 2, 7, 18 - k * 2, cs[k]); A.R(X + k * 8, by2 - 22 + k * 2, 7, 3, '#c8ccd4'); A.R(X + k * 8 + 1, by2 - 12, 5, 4, '#f0e8d0'); } }
+              else { for (let k = 0; k < 3; k++) { A.box(X, by2 - 6 * (k + 1) - 1, 28, 5, '#26242c'); A.R(X + 3, by2 - 6 * (k + 1), 14, 3, '#e6dcc0'); A.R(X + 6, by2 - 6 * k - 6, 8, 1, '#8a3a2a'); A.R(X + 21, by2 - 6 * (k + 1), 3, 3, '#4a4852'); } }
+              A.R(X - 4, by2, 40, 2, 'rgba(30,18,6,0.4)');
+            } }
+          const lper = 300, lox = -((Math.round(cx * 0.8)) % lper + lper) % lper, ly = Math.round(40 - c.y * 0.3);
           for (let x = lox - lper, i = Math.floor(cx * 0.8 / lper) - 1; x < VW + 60; x += lper, i++) {   // desk lamps on the table's far edge
             const X = x + 130, fl = ((f + i * 31) % 211) < 4 ? 0.5 : 1;
             A.R(X, ly + 20, 3, 60, '#3a3430'); A.R(X + 3, ly + 20, 22, 3, '#3a3430'); A.box(X + 16, ly + 22, 24, 10, '#c8782a'); A.R(X + 20, ly + 31, 16, 3, 'rgba(255,240,180,0.9)');
-            A.cone(X + 28, ly + 33, 110, 46, '#ffe9a8', 0.12 * fl); A.glow(X + 28, ly + 34, 36, '#fff0c0', 0.28 * fl);
+            A.cone(X + 28, ly + 33, 160, 64, '#ffe0a0', 0.2 * fl); A.glow(X + 28, ly + 34, 38, '#fff0c0', 0.3 * fl); A.glow(X + 28, ly + 150, 70, '#ffd890', 0.07 * fl);
           } }
         // the table: wood grain below the sheet
         const wy = Math.round(23 * TS - c.y); if (wy < VH) { ctx.fillStyle = '#5a3a1e'; ctx.fillRect(0, wy, VW, VH - wy); DD.art.planks(0, wy + 6, VW, VH, '#5a3a1e', 9, false); DD.art.trim(0, wy, VW, '#c8a060'); }
@@ -67,7 +101,12 @@ window.LEVEL = {"id": "11-2", "name": "ARTS AND CRAFTS NIGHT", "sub": "GREAT TUE
           if (k === 'r' || k === 'b' || k === 'g') { A.R(X, Y + 7, 16, 1, 'rgba(40,24,8,0.4)'); if (!K(tx - 1, ty)) A.R(X, Y, 1, 7, 'rgba(255,255,255,0.45)'); if (!K(tx + 1, ty)) A.R(X + 15, Y + 1, 1, 6, 'rgba(0,0,0,0.3)'); }
           else if (k === 'wall' || k === 'fold' || k === 'ledge' || k === 'frame') { if (!K(tx + 1, ty)) A.R(X + 14, Y, 2, 16, 'rgba(30,20,8,0.35)'); if (!K(tx, ty + 1)) A.R(X, Y + (k === 'ledge' || k === 'frame' ? 7 : 14), 16, 2, 'rgba(30,20,8,0.4)'); if (!K(tx - 1, ty)) A.R(X, Y, 1, 8, 'rgba(255,250,230,0.5)'); }
           else if (k === 'paper' && ty < 22) { A.R(X, Y + 4, 16, 1, '#f4ecd4'); A.tex(X, Y + 5, 16, 11, '#d6c8a4', 0.06, 4); }
-          else if (k === 'cracked' && !K(tx, ty - 1)) A.R(X, Y, 16, 1, '#e8d0a0'); }
+          else if (k === 'cracked' && !K(tx, ty - 1)) A.R(X, Y, 16, 1, '#e8d0a0'); if (k === 'paper' && ty === 22) { A.R(X, Y + 1, 16, 3, 'rgba(20,10,2,0.35)'); } else if (k === 'paper' && ty >= 22) { const hh = hash(tx, ty); A.R(X, Y + 12, 16, 1, 'rgba(30,16,4,0.35)'); A.R(X, Y + 13, 16, 1, 'rgba(255,214,150,0.12)'); if (hh === 3) { A.R(X + 4, Y + 5, 5, 3, '#3a2210'); A.R(X + 5, Y + 6, 3, 1, '#7a5230'); } if (ty === 23 && hh < 6) A.R(X + 2, Y + 2, 6, 1, 'rgba(255,230,180,0.2)');
+            const sp = A.hash(tx * 3, ty + 9);   // the craft table's front: crayon-coloured paint splashes, a strip of masking tape with a pencilled label, deeper and calmer toward the bottom
+            if (sp < 0.2) { const pc = ['#c8302c', '#2a6ab8', '#3a9a58'][(tx + ty) % 3]; A.R(X + 2 + (hh & 3), Y + 3, 7, 3, pc); A.R(X + 3 + (hh & 3), Y + 6, 2, 5, pc); A.R(X + 3 + (hh & 3), Y + 3, 7, 1, A.mix(pc, 0.4)); A.R(X + 11, Y + 2, 2, 2, pc); }
+            if (tx % 5 === 0) A.R(X, Y, 1, 16, 'rgba(0,0,0,0.32)');
+            if (tx % 13 === 5 && ty === 22) { A.R(X - 2, Y + 5, 20, 6, '#e8dcb4'); A.R(X - 2, Y + 5, 20, 1, '#f8f0d0'); A.R(X - 2, Y + 10, 20, 1, '#b8a878'); A.R(X + 1, Y + 7, 8, 1, '#4a3a2a'); A.R(X + 11, Y + 7, 4, 1, '#4a3a2a'); }
+            A.R(X, Y, 16, 16, 'rgba(10,4,0,' + (ty === 22 ? 0.06 : 0.28) + ')'); } }
         return r;
       },
       tile0(ctx, k, X, Y, tx, ty) {
@@ -183,7 +222,7 @@ window.LEVEL = {"id": "11-2", "name": "ARTS AND CRAFTS NIGHT", "sub": "GREAT TUE
         }
       },
       drawFG(ctx, G) {   // the crayon in your hand
-        const s = G.s; DD.art.motes(G, '#fff0c8', 16, 0.35); DD.art.vignette(0.22);   // dust in the lamplight and the table's dark corners
+        const s = G.s; DD.art.motes(G, '#fff0c8', 16, 0.35); DD.art.motes(G, '#e8a8d8', 5, 0.5); DD.art.vignette(0.3);   // dust in the lamplight and the table's dark corners
         if (DD.trailing) return;   // trailer footage shows the stage, not its readout
         ctx.fillStyle = 'rgba(30,20,10,0.7)'; ctx.fillRect(4, 24, 96, 18);
         DD.text('CRAYON', 8, 27, '#f0e6c8', 1, null);

@@ -10,6 +10,12 @@ window.LEVEL = {"id": "6-1", "name": "OBJECTION!", "sub": "THE TRIAL OF TIM HEID
   const ok = n => DD.ready(n);
   const say = name => { if (typeof DD.say === 'function' && DD.lines) DD.lines(name); };   // narrator lines, only if the narrator exists
   const hash = i => { let h = (i * 2654435761) >>> 0; h ^= h >>> 15; return (h >>> 0) % 997; };
+  const galHead = (ctx, G, I, h, kind, X, Y, bounce) => {   // a spectator with a little life: blinks on its own clock, turns its head now and then, winces in when the Dot is hurt
+    const hurt = G.pl && G.pl.inv > 0, tt = (G.frame + h * 7) % (230 + (h % 5) * 41), dx = tt < 26 ? ((h & 1) ? 1 : -1) : 0, dy = Math.round(bounce) + (hurt ? 1 : 0);
+    ctx.drawImage(I.w6_gallery, kind * 16, 9, 16, 9, X, Y + 9 + Math.round(bounce), 16, 9);
+    ctx.drawImage(I.w6_gallery, kind * 16, 0, 16, 9, X + dx, Y + dy, 16, 9);
+    if ((G.frame + h * 11) % (190 + (h % 4) * 45) < 6) { ctx.fillStyle = '#ecb088'; ctx.fillRect(X + dx + 5, Y + dy + 4, 2, 1); ctx.fillRect(X + dx + (kind === 2 ? 11 : 9), Y + dy + 4, 2, 1); }
+  };
 
   Object.assign(window.LEVEL, {
     sprites: ['w6_procserver_0', 'w6_procserver_1', 'w6_procserver_2', 'w6_procserver_3', 'w6_procserver_4', 'w6_floor', 'w6_bench', 'w6_gate', 'w6_board', 'w6_card', 'w6_gallery_t', 'w6_cracked', 'w6_wall', 'w6_seatrow', 'w6_rail',
@@ -160,7 +166,7 @@ window.LEVEL = {"id": "6-1", "name": "OBJECTION!", "sub": "THE TRIAL OF TIM HEID
         if (ok('w6_gallery')) for (let i = first; i <= last; i++) {
           const h = hash(i * 7 + row * 131 + 5); if (h % 4 === 0) continue;
           const kind = h % 3, bounce = cheer > 0 ? -Math.abs(Math.sin((G.frame + i * 5) / 3)) * 3 : 0;
-          ctx.drawImage(I.w6_gallery, kind * 16, 0, 16, 18, i * 32 + 8 - off, Math.round(ys - 6 + bounce), 16, 18);
+          galHead(ctx, G, I, h, kind, i * 32 + 8 - off, Math.round(ys - 6), bounce);
         }
         if (ok('w6_seatrow')) for (let x = -(off % 64) - 64; x < VW; x += 64) ctx.drawImage(I.w6_seatrow, x, ys);
         ctx.restore();

@@ -249,6 +249,15 @@ window.LEVEL = {"id": "9-1", "name": "THE MORNING SHOW", "sub": "HAPPY. HEALTHY.
   }
   const place = (ctx, n, tx, fy, dy) => { if (ok(n)) { const im = IMG[n]; ctx.drawImage(im, Math.round(DD.wx(tx * TS)), Math.round(fy - im.height + (dy || 0))); } };   // a prop standing on the floor at tile x
 
+  // ---- looks 2: a background person's idle life: a head bob now and then, a blink (the eye pixels painted over in skin), a wince when a Dot is hurt (head tilts, eyes shut)
+  function live(ctx, G, im, X, Y, seed, o) {
+    const A = DD.art, f = G.frame, h = A.hash(seed, 5), wince = !!(G.pl && G.pl.inv > 0), nod = ((f + (h * 300 | 0)) % 150) < 8 ? 1 : 0, lean = wince ? 1 : 0, hh = o.headH, ih = o.h || im.height;
+    const blink = ((f + (h * 400 | 0)) % (190 + (h * 120 | 0))) < 5 || wince, x = Math.round(X), y = Math.round(Y);
+    ctx.drawImage(im, 0, hh, im.width, ih - hh, x, y + hh, im.width, ih - hh);
+    ctx.drawImage(im, 0, 0, im.width, hh, x + lean, y + nod, im.width, hh);
+    if (blink && o.eyes) for (const e of o.eyes) A.R(x + lean + e[0], y + nod + e[1], e[2], 1, o.skin);
+  }
+  const EYES = { w9_seat_tim13: { headH: 11, eyes: [[9, 5, 1], [14, 5, 1]], skin: '#e8c89c' }, w9_seat_gregg13: { headH: 11, eyes: [[9, 6, 1], [14, 6, 1]], skin: '#e4b890' }, w9_seat_kaili: { headH: 11, eyes: [[9, 5, 2], [13, 5, 2]], skin: '#eec09a' } };
   // ---- art pass helpers: framed pictures on a far wall, a lit lip and shaded edges on the set tiles
   function frames(c, fy, par, gap, y, cols, seed) {   // gilt picture frames drifting on a far wall, each with a little picture light
     const A = DD.art, ox = Math.round(c.x * par), i0 = Math.floor(ox / gap) - 1;
@@ -300,7 +309,7 @@ window.LEVEL = {"id": "9-1", "name": "THE MORNING SHOW", "sub": "HAPPY. HEALTHY.
       }
       // the hosts on their white bar stools, around a plinth: Tim in his vest, Gregg in his cap, Kaili in red
       for (const [tx, n, st] of [[41.2, 'w9_seat_tim13'], [43.6, 'w9_seat_gregg13'], [46, 'w9_seat_kaili']]) {
-        place(ctx, 'w9_stool', tx - 0.1, fy + 1); if (ok(n)) { const X = DD.wx(tx * TS); ctx.drawImage(IMG[n], Math.round(X - 3), Math.round(fy - 56)); }
+        place(ctx, 'w9_stool', tx - 0.1, fy + 1); if (ok(n)) { const X = DD.wx(tx * TS); live(ctx, G, IMG[n], X - 3, fy - 56, tx, EYES[n]); }
       }
       place(ctx, 'w9_popmachine', 54, DD.wy(19 * TS) + 1);
       { const A = DD.art, f = G.frame, ty = Math.round(-c.y);   // the show's top rail: gilt trim, gold fringe, chasing bulbs, warm key lights with cones
@@ -334,9 +343,9 @@ window.LEVEL = {"id": "9-1", "name": "THE MORNING SHOW", "sub": "HAPPY. HEALTHY.
         // the host desk: HEI NETWORK on its front, T. Amato, Joey and Gregg behind it
         const X0 = DD.wx(82 * TS);
         if (X0 > -140 && X0 < VW + 20 && ok('w9_tiles')) {
-          if (ok('w9_amato_0')) ctx.drawImage(IMG.w9_amato_0, 0, 0, 40, 42, Math.round(X0 + 50), Math.round(fy - 32 - 34), 40, 42);
-          if (ok('w9_joey_0')) ctx.drawImage(IMG.w9_joey_0, 0, 0, 32, 34, Math.round(X0 + 94), Math.round(fy - 32 - 26), 32, 34);
-          if (ok('w9_seat_gregg14')) ctx.drawImage(IMG.w9_seat_gregg14, 0, 0, 24, 22, Math.round(X0 + 22), Math.round(fy - 32 - 14), 24, 22);
+          if (ok('w9_amato_0')) live(ctx, G, IMG.w9_amato_0, X0 + 50, fy - 32 - 34, 3, { headH: 22, h: 42 });
+          if (ok('w9_joey_0')) live(ctx, G, IMG.w9_joey_0, X0 + 94, fy - 32 - 26, 2, { headH: 15, h: 34, eyes: [[11, 10, 2], [19, 10, 2]], skin: '#e2a276' });
+          if (ok('w9_seat_gregg14')) live(ctx, G, IMG.w9_seat_gregg14, X0 + 22, fy - 32 - 14, 1, { headH: 11, h: 22, eyes: [[9, 6, 1], [14, 6, 1]], skin: '#e4b890' });
           for (let i = 0; i < 8; i++) { imgR(ctx, 'w9_tiles', 32 * 16, 0, 16, 16, X0 + i * 16, fy - 32); imgR(ctx, 'w9_tiles', (i === 0 ? 35 : i === 7 ? 34 : 33) * 16, 0, 16, 16, X0 + i * 16, fy - 16); }
           img(ctx, 'w9_deskprops', X0 + 4, fy - 32 - 22);
           DD.text('HEI NETWORK', Math.round(X0 + 64), Math.round(fy - 11), '#cfe0ff', 1, '#0a1020', 'center');
@@ -391,7 +400,7 @@ window.LEVEL = {"id": "9-1", "name": "THE MORNING SHOW", "sub": "HAPPY. HEALTHY.
       // the audience: twenty bored attendees in banquet chairs, deep in the room
       ctx.save(); ctx.filter = 'brightness(0.5)';
       const names = ['w9_att1', 'w9_att2', 'w9_att3'], ox = -Math.round(c.x * 0.55) % 66;
-      for (let x = ox - 66; x < VW + 40; x += 33) { const i = Math.floor((x + c.x * 0.55) / 33); img(ctx, names[((i % 3) + 3) % 3], x - 3, fy - 34 + ((i * 7) % 3)); }
+      for (let x = ox - 66; x < VW + 40; x += 33) { const i = Math.floor((x + c.x * 0.55) / 33); img(ctx, names[((i % 3) + 3) % 3], x - 3 + ((G.pl && G.pl.inv > 0 && (i & 1)) ? 1 : 0), fy - 34 + ((i * 7) % 3) + (((G.frame + i * 41) % 170) < 7 ? 1 : 0)); }   // looks 2: each attendee slumps a pixel now and then, and a few lean when a Dot is hurt
       ctx.restore();
       ctx.fillStyle = 'rgba(16,4,14,0.28)'; ctx.fillRect(0, fy - 30, VW, 30);
       place(ctx, 'w9_banner', 186, fy, -118); place(ctx, 'w9_booth', 191, fy + 1);
@@ -436,7 +445,18 @@ window.LEVEL = {"id": "9-1", "name": "THE MORNING SHOW", "sub": "HAPPY. HEALTHY.
         const put = c => ctx.drawImage(T, c * 16, 0, 16, 16, X, Y, 16, 16);
         if (cellOf) {
           put(lip ? cellOf[0] + v : cellOf[1] + v);
-          if (!lip) { let d = 1; while (K(tx, ty - d) === k) d++; ctx.fillStyle = 'rgba(8,4,18,' + Math.min(0.55, 0.12 * d) + ')'; ctx.fillRect(X, Y, 16, 16); }
+          if (!lip) { let d = 1; while (K(tx, ty - d) === k) d++; ctx.fillStyle = 'rgba(8,4,18,' + Math.min(0.55, 0.12 * d) + ')'; ctx.fillRect(X, Y, 16, 16);
+            const A = DD.art, h = A.hash(tx, ty), f = DD.G ? DD.G.frame : 0;   // looks 2: the floor's cut-away, set by set; darker and calmer with depth
+            if (k === 'marble' || k === 'carpet') {   // the stage front: a gilt moulding, a panelled plinth, footlights along its foot
+              if (d === 1) { A.R(X, Y + 1, 16, 2, '#c9a24a'); A.R(X, Y + 1, 16, 1, '#f0d070'); A.R(X, Y + 3, 16, 1, '#5a3a10'); A.R(X + 2, Y + 6, 12, 8, 'rgba(10,4,20,0.5)'); A.R(X + 2, Y + 6, 12, 1, 'rgba(255,220,150,0.18)'); }
+              else { A.R(X + 2, Y + 3, 12, 9, 'rgba(10,4,20,0.4)'); if (tx % 3 === 1) { const on = ((f >> 3) + tx) % 5 !== 0; A.R(X + 6, Y + 6, 4, 2, on ? '#ffe9a0' : '#7a5a1c'); if (on) A.glow(X + 8, Y + 7, 12, '#ffd890', 0.16); } } }
+            else if (k === 'slate') {   // the studio floor: an LED strip along the plinth, cable trays with gaffer tape, a vent now and then
+              if (d === 1) { A.R(X, Y + 2, 16, 1, '#6aa0ff'); A.R(X, Y + 3, 16, 2, 'rgba(90,150,255,0.18)'); }
+              else if (d === 2) { A.R(X, Y + 6, 16, 3, '#06080f'); A.R(X, Y + 6, 16, 1, '#2a3458'); A.R(X, Y + 11, 16, 1, tx % 3 ? '#1a3a7a' : '#7a1a22'); if (tx % 7 === 3) { A.R(X + 3, Y + 2, 9, 12, 'rgba(160,170,190,0.45)'); A.R(X + 3, Y + 6, 9, 1, 'rgba(0,0,0,0.25)'); A.R(X + 3, Y + 10, 9, 1, 'rgba(0,0,0,0.25)'); } }
+              else if (tx % 9 === 4) { A.R(X + 1, Y + 3, 14, 10, '#04050a'); for (let q = 0; q < 5; q++) A.R(X + 2, Y + 4 + q * 2, 12, 1, '#161c34'); } }
+            else if (k === 'sand') {   // the ranch's ground: strata, buried stones, a root now and then
+              A.R(X, Y + 4, 16, 1, 'rgba(60,30,10,0.35)'); A.R(X, Y + 10, 16, 1, 'rgba(255,220,160,0.1)'); if (h < 0.35) { A.R(X + 3 + (h * 20 | 0), Y + 6, 4, 3, 'rgba(40,24,20,0.5)'); A.R(X + 3 + (h * 20 | 0), Y + 6, 4, 1, 'rgba(255,230,190,0.18)'); } if (h > 0.9 && d > 1) A.R(X, Y + 8, 16, 1, 'rgba(90,50,24,0.5)'); }
+          }
           edge(X, Y, tx, ty, k, k === 'marble' ? 0.55 : 0.4);
           return true;
         }
