@@ -1182,10 +1182,12 @@ function cardSetup(d) {   // lay out the count-up timeline (card clock c, in fra
   G.dlg.q.length = 0; G.dlg.cur = null;
   if (!TR && DD.opts && DD.opts.perks && window.DDStore) d.hei = window.DDStore.award(result());   // the HEI store's pay-out (store.js award)
 }
+const HEIBTN = { x: VW - 73, y: 15, w: 70, h: 32 };   // the results card's HEI Points box, which opens the store
 function updateResults() {
   const d = G.done; if (!d) return;
   if (!d.card) { if (d.t >= 50 && (!(G.dlg.cur || G.dlg.q.length) || d.t >= 300)) cardSetup(d); return; }   // goal lines get to play over the closed iris first
   const sto = DD.opts && DD.opts.store;   // the menu's stages can stop at the HEI store on the way to the next one
+  if (IN.click && sto && d.hei && d.c >= d.tally + 18 && IN.click.x >= HEIBTN.x && IN.click.y >= HEIBTN.y && IN.click.x < HEIBTN.x + HEIBTN.w && IN.click.y < HEIBTN.y + HEIBTN.h) { leave(false, { store: true }); return; }   // the HEI Points on the card are a button: spend them, then on to the next stage
   if (IN.click) { if (d.c > d.END && IN.click.y > VH - 30 && IN.click.x > VW * (sto ? 0.62 : 0.5)) { G.restartReq = true; return; } if (sto && d.c > d.END && IN.click.y > VH - 30 && IN.click.x > VW * 0.38) { leave(false, { store: true }); return; } IN.jp = true; }   // click: skip, then continue (bottom right: play it again)
   if (d.c > d.END) { if (sto && (IN.sp || IN.store)) leave(false, { store: true }); else if (IN.jp || IN.start) leave(false); return; }
   if (IN.jp && d.c > 12) { d.c = d.END + 1; return; }   // jump skips the count-up
@@ -1247,9 +1249,12 @@ function drawResults() {
   if (d.hei && c >= d.tally + 18) {   // HEI Points, top right of the card: a coin and the pay-out
     const k = clamp((c - d.tally - 18) / 24, 0, 1), n = Math.round(d.hei.n * k), S = window.DDStore;
     if (c === d.tally + 18) SFX.bag();
+    const B = HEIBTN, sto2 = DD.opts && DD.opts.store, lit = sto2 && Math.floor(d.t / 24) % 2;
+    if (sto2) { ctx.fillStyle = '#000'; ctx.fillRect(B.x - 1, B.y - 1, B.w + 2, B.h + 3); ctx.fillStyle = lit ? '#3a2a6a' : '#2a1e52'; ctx.fillRect(B.x, B.y, B.w, B.h); ctx.fillStyle = '#6a5ab0'; ctx.fillRect(B.x, B.y, B.w, 1); ctx.fillStyle = '#140c30'; ctx.fillRect(B.x, B.y + B.h - 1, B.w, 1); }   // a raised button: click it to spend
     if (S) S.icon('rewards', VW - 70, 18, 1, d.t);
     text('+' + n, VW - 59, 18, '#ffe680', 2, '#0a1a4a'); text('HEI POINTS', VW - 70, 30, '#fff6d4', 1, '#0a1a4a');
-    if (d.hei.first) text('FIRST CLEAR', VW - 70, 39, '#94e0cc', 1, '#0a1a4a');
+    if (sto2) text('SPEND >', VW - 70, 39, lit ? '#ffe680' : '#c8b8f0', 1, '#0a1a4a');
+    if (d.hei.first) text('FIRST CLEAR', VW - 70, sto2 ? 50 : 39, '#94e0cc', 1, '#0a1a4a');
   }
   const sto = DD.opts && DD.opts.store;
   if (c > d.END - 24 && Math.floor(d.t / 30) % 2) text(padUsed ? (DD.opts && DD.opts.onExit ? (sto ? 'CROSS: CONTINUE  SQUARE: STORE  TRIANGLE: AGAIN' : 'CROSS: CONTINUE   TRIANGLE: AGAIN') : 'TRIANGLE: PLAY AGAIN') : DD.opts && DD.opts.onExit ? (sto ? 'JUMP: CONTINUE   X: HEI STORE   R: AGAIN' : 'JUMP: CONTINUE   R: AGAIN') : 'PRESS R TO PLAY AGAIN', VW / 2, 156, '#fff', 1, '#000', 'center');
