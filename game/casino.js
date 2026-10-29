@@ -19,10 +19,10 @@
 
   // ================================================================ the math
   // ---- LUCKY SEVEN: real reel strips, so payback is exact (every stop combination is counted in the test)
-  const SYM = ['kernel', 'pop', 'cup', 'tub', 'vhs', 'gregg', 'tim', 'boss', 'seven', 'wild'];
+  const SYM = ['dot', 'pop', 'cup', 'tub', 'vhs', 'gregg', 'tim', 'boss', 'seven', 'wild'];
   const KER = 0, BOSS = 7, SEV = 8, WILD = 9;
   const PAY3 = [5, 8, 10, 14, 20, 30, 30, 80, 150, 300];   // three on a line, in line bets (bet / 5)
-  const PAY77 = 6, PAYPOP = 3, PAYHOST = 12;   // two sevens from the left; ANY POPCORN (kernels and bags mixed); ON CINEMA (Tim and Gregg mixed)
+  const PAY77 = 6, PAYPOP = 3, PAYHOST = 12;   // two sevens from the left; ANY DOT OR BAG (Dootle Dots and popcorn bags mixed); ON CINEMA (Tim and Gregg mixed)
   const COUNTS = [[7, 6, 5, 4, 3, 3, 3, 1, 2, 2], [7, 6, 5, 4, 3, 3, 3, 1, 2, 2], [7, 6, 5, 4, 3, 3, 3, 1, 1, 2]];
   function seeded(s) { return () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
   const STRIPS = COUNTS.map((cs, r) => {   // spread each symbol out so no reel clumps
@@ -55,7 +55,7 @@
   const TIX = [
     { id: 'money', name: 'IN THE MONEY', price: 10, top: 1000, amts: [5, 10, 20, 50, 100, 1000],
       odds: [[1000, 1 / 1500], [100, 1 / 100], [50, 1 / 30], [20, 1 / 8], [10, 1 / 4.5], [5, 1 / 6]] },
-    { id: 'dip', name: 'LUCKY DIP', price: 25, top: 500, syms: ['pop', 'tub', 'vhs', 'cup', 'kernel', 'card'],
+    { id: 'dip', name: 'LUCKY DIP', price: 25, top: 500, syms: ['pop', 'tub', 'vhs', 'cup', 'dot', 'card'],
       odds: [[500, 1 / 500], [250, 1 / 100], [100, 1 / 20], [50, 1 / 6], [25, 1 / 4]] },
   ];
   function drawPrize(odds) { let r = M.rng(); for (const [p, q] of odds) { if (r < q) return p; r -= q; } return 0; }
@@ -213,9 +213,9 @@
   function bead(x, y, r, col) { ctx.drawImage(roundSpr('bead' + col + r, r, (d, a, dx, dy) => d > r - 0.6 ? mix(col, -0.6) : dx + dy < -r * 0.9 ? mix(col, 0.6) : mix(col, -(dx + dy) / (r * 4))), Math.round(x - r), Math.round(y - r)); }
 
   // ---- slot symbols: sprites at whole sizes only, a drawn 7 and a drawn WILD card
-  const SPR = { kernel: ['kernel', 2], pop: ['pop', 2], cup: ['cup', 1], tub: ['tub', 1], vhs: ['vhs', 1], gregg: ['portrait_gregg', 1], tim: ['portrait_tim', 1], card: ['card', 1] };
+  const SPR = { dot: ['sam', 1], pop: ['pop', 2], cup: ['cup', 1], tub: ['tub', 1], vhs: ['vhs', 1], gregg: ['portrait_gregg', 1], tim: ['portrait_tim', 1], card: ['card', 1] };
   const BOSSES = [['w10_portrait_rat', 10], ['w11_portrait_new', 11], ['w12_portrait_amato', 12]];
-  if (DD.loadSprites) DD.loadSprites(['kernel', 'pop', 'cup', 'tub', 'vhs', 'portrait_gregg', 'portrait_tim', 'card', 'gregg', 'tim', 'w10_portrait_rat', 'w11_portrait_new', 'w12_portrait_amato', 'w2_curtain', 'w11_portrait_new_manor', 'w11_seniors', 'w11_bingosign', 'w11_cork', 'w11_lino']);
+  if (DD.loadSprites) DD.loadSprites(['sam', 'mel', 'cloud', 'baxter', 'pop', 'cup', 'tub', 'vhs', 'portrait_gregg', 'portrait_tim', 'card', 'gregg', 'tim', 'w10_portrait_rat', 'w11_portrait_new', 'w12_portrait_amato', 'w2_curtain', 'w11_portrait_new_manor', 'w11_seniors', 'w11_bingosign', 'w11_cork', 'w11_lino']);
   const SEVEN = (() => {   // a 16 x 22 seven: outline, body, lit edge, shaded edge
     const W = 16, H = 22, inS = (x, y) => (y >= 1 && y <= 4 && x >= 1 && x <= 14) || (y > 4 && y <= 20 && x >= Math.round(10.5 - (y - 5) * 0.42) && x < Math.round(10.5 - (y - 5) * 0.42) + 4);
     const g = []; for (let y = 0; y < H; y++) { let row = ''; for (let x = 0; x < W; x++) { if (inS(x, y)) row += !inS(x - 1, y) || !inS(x, y - 1) ? 'l' : !inS(x + 1, y) || !inS(x, y + 1) ? 'd' : 'r'; else row += [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => inS(x + a, y + b)) ? 'k' : '.'; } g.push(row); }
@@ -228,17 +228,24 @@
     rect('#2a6a8a', x + 3, y + 3, 20, 1); text('WILD', cx, y + 7, '#10304a', 1, null, 'center'); rect('#2a6a8a', x + 3, y + 13, 20, 1);
     if (Math.floor(tt / 10) % 3 === 0) { rect('#fff', x + 21, y + 2, 1, 3); rect('#fff', x + 20, y + 3, 3, 1); }
   }
-  function sym(k, cx, cy, alpha = 1, face = 0, tt = 0, hot = false) {   // a reel symbol centred on cx, cy
+  const DOTS4 = ['sam', 'mel', 'cloud', 'baxter'];
+  function dotSym(k, cx, cy) {   // the Dootle Dots symbol: any Dot counts, each square shows one (Baxter from the knees up, to fit)
+    const n = DOTS4[mod(k, 4)];
+    if (n === 'baxter') { const im = DD.IMG && DD.IMG.baxter; if (im && im.complete && im.naturalWidth) ctx.drawImage(im, 0, 0, 12, 26, Math.round(cx - 6), Math.round(cy - 13), 12, 26); return; }
+    spr(n, cx, cy + (n === 'sam' ? 11 : n === 'mel' ? 10 : 9));
+  }
+  function sym(k, cx, cy, alpha = 1, face = 0, tt = 0, hot = false) {   // face: which boss (a spin's) or which Dot (the strip position)   // a reel symbol centred on cx, cy
     const n = SYM[k];
     if (alpha < 1) ctx.globalAlpha = alpha;
     if (n === 'seven') sevenSym(cx, cy, tt, hot);
     else if (n === 'wild') wildSym(cx, cy, tt);
     else if (n === 'boss') spr(BOSSES[face % 3][0], cx, cy + 12);
-    else { const [im, sc] = SPR[n]; spr(im, cx, cy + (n === 'pop' ? 10 : n === 'kernel' ? 13 : 12), false, sc, sc); }
+    else if (n === 'dot') dotSym(face, cx, cy);
+    else { const [im, sc] = SPR[n]; spr(im, cx, cy + (n === 'pop' ? 10 : 12), false, sc, sc); }
     ctx.globalAlpha = 1;
   }
   const IC = {   // 8 x 8 pay-table icons, drawn for the size (no shrunk sprites)
-    kernel: [['..ww.w..', '.wwwwww.', 'wwywwwww', 'wwwwwyww', '.wwywww.', '..wwww..', '...yy...', '........'], { w: '#fff6e0', y: '#f0c040' }],
+    dot: [['..oooo..', '.oooooo.', 'oowooowo', 'ookoooko', 'oooooooo', '.oommoo.', '..oooo..', '..k..k..'], { o: '#e8701e', w: '#fff6e8', k: '#1a1014', m: '#7a1a0a' }],
     pop: [['..y.yy..', '.yyyyyy.', '.rrrrrr.', '.rrrrrr.', '.wwwwww.', '.rrrrrr.', '.rrrrrr.', '.dddddd.'], { y: '#fff0b0', r: '#d8202c', w: '#f4ece0', d: '#8a1018' }],
     cup: [['....s...', '...s....', '.rrrrrr.', '.wwwwww.', '.rrrrrr.', '..wwww..', '..rrrr..', '..dddd..'], { s: '#e8e8f0', r: '#d8202c', w: '#f4ece0', d: '#8a1018' }],
     tub: [['.yywyyw.', 'yyyyyyyy', 'rwrwrwrw', 'rwrwrwrw', 'rwrwrwrw', 'rwrwrwrw', '.rwrwrw.', '.dddddd.'], { y: '#fff0b0', w: '#f4ece0', r: '#d8202c', d: '#8a1018' }],
@@ -529,7 +536,7 @@
     for (let r = 0; r < 3; r++) {
       const x = RX(r); rect('#fff6e8', x - 15, 48, 30, 86);
       const p = S.pos[r], f = p - Math.floor(p), blur = S.st[r] === 'spin' && S.spd[r] > 0.5;
-      for (let k = -2; k <= 2; k++) { const idx = Math.floor(p) + k, y = RY - (k - f) * CELL, s0 = STRIPS[r][mod(idx, STRIPS[r].length)]; sym(s0, x, y, blur ? 0.5 : 1, S.face, tt, jk && s0 === SEV && k === 0); if (blur) sym(s0, x, y - 8, 0.22, S.face, tt); }
+      for (let k = -2; k <= 2; k++) { const idx = Math.floor(p) + k, y = RY - (k - f) * CELL, s0 = STRIPS[r][mod(idx, STRIPS[r].length)]; const fc = s0 === 0 ? mod(idx, STRIPS[r].length) + r : S.face; sym(s0, x, y, blur ? 0.5 : 1, fc, tt, jk && s0 === SEV && k === 0); if (blur) sym(s0, x, y - 8, 0.22, fc, tt); }
       for (let b = 0; b < 4; b++) { const a = (0.26 - b * 0.06).toFixed(2); rect(`rgba(40,10,10,${a})`, x - 15, 48 + b * 4, 30, 4); rect(`rgba(40,10,10,${a})`, x - 15, 130 - b * 4, 30, 4); }   // the drum curves away
       rect('rgba(255,255,255,0.35)', x - 15, 48, 1, 86); rect('rgba(0,0,0,0.25)', x + 14, 48, 1, 86);
       if (r < 2) { rect('#1a0306', x + 15, 48, 4, 86); rect('#5a0a14', x + 16, 48, 2, 86); }
@@ -688,7 +695,7 @@
   function drawSpr(n, cx, by, mini) {   // ticket art: sprites at whole sizes only (the blue card gets its own little drawing)
     if (n === 'card') { const x = Math.round(cx - 9), y = Math.round(by - 10); rrect(x - 1, y - 1, 20, 12, 2, '#2a6a8a'); rrect(x, y, 18, 10, 1, '#7ad8e8'); rect('#c8f4fa', x + 2, y + 1, 14, 1); rect('#2a6a8a', x + 3, y + 4, 12, 1); rect('#2a6a8a', x + 3, y + 6, 8, 1); return; }
     if (mini) { const k = SYM.indexOf(n); if (k >= 0) { pmap(IC[n][0], IC[n][1], Math.round(cx - 8), Math.round(by - 16), 2); return; } }
-    const e = SPR[n]; if (e) spr(e[0], cx, by, false, e[0] === 'kernel' || e[0] === 'pop' ? 1 : 1, 1);
+    const e = SPR[n]; if (e) spr(e[0], cx, by);
   }
   function scratchDraw(tt) {
     // the shop: wood panelling, a counter, the ticket under a lamp
