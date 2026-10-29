@@ -1092,6 +1092,12 @@
     if (banner) { banner.t++; if (banner.t > banner.n) banner = null; }
     coins = coins.filter(f => { f.t++; if (f.t === f.d) SFX.count(f.k % 12); return f.t < f.d; });
     spark = spark.filter(p => { p.t++; p.x += p.vx; p.y += p.vy; p.vy += 0.18; return p.t < p.life; });
+    if (c && inR(c, 0, 0, 58, 14)) {   // the header's BACK button: a game goes back to the lobby, the lobby leaves the store
+      if (scr === 'lobby') return 'back';
+      if (busy()) { say('FINISH THIS ONE FIRST', 70); SFX.buzz(); return; }
+      scr = 'lobby'; SFX.switch(); return;
+    }
+    if (IN.back && busy() && scr !== 'scratch' && !(scr === 'bj' && B.walk)) { say('FINISH THIS ONE FIRST', 70); SFX.buzz(); }
     if (scr === 'lobby') return lobbyStep(IN, c);
     if (scr === 'slots') slotsStep(IN, c); else if (scr === 'scratch') scratchStep(IN, c); else if (scr === 'roul') rouletteStep(IN, c); else if (scr === 'bj') bjStep(IN, c); else if (scr === 'bingo') bingoStep(IN, c);
   }
