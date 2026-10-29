@@ -19,7 +19,7 @@
   var hover = matchMedia('(any-hover: hover)').matches;
   var mobile = !kb && !Q.has('desktop') && touch && (phone || !hover);
   var list = Q.has('card') ? ['engine.js', 'desktop.js']
-    : ['classics.js', 'engine.js', 'worlds.js', 'bonus.js', 'posters.js', 'store.js', 'menu.js', 'music/cues.js', 'music.js', 'voice/clips.js', 'voice/cues.js', 'voice.js'].concat(mobile ? ['touch.js'] : []);
+    : ['classics.js', 'engine.js', 'worlds.js', 'bonus.js', 'posters.js', 'store.js', 'casino.js', 'menu.js', 'music/cues.js', 'music.js', 'voice/clips.js', 'voice/cues.js', 'voice.js'].concat(mobile ? ['touch.js'] : []);
   for (var i = 0; i < list.length; i++) { var s = document.createElement('script'); s.src = list[i]; s.async = false; document.body.appendChild(s); }
 })();
 </script>

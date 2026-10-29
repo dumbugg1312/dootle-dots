@@ -93,7 +93,9 @@
   const say = (s, n = 90) => { msg = s; msgT = n; };
   function wrap(s, n) { const out = []; let line = ''; for (const w of s.split(' ')) { if (line && (line + ' ' + w).length > n) { out.push(line); line = w; } else line = line ? line + ' ' + w : w; } if (line) out.push(line); return out; }
 
-  function open(o = {}) { t = 0; back = o.onBack || null; label = o.label || 'BACK'; shown = S.pts; msgT = 0; fly = []; pop = null; tip = (tip + 1) % TIPS.length; if (o.cur !== undefined) cur = o.cur; }
+  let tab = 0;   // 0 the store, 1 the casino (casino.js); C / R1 or a click on the tab flips it, and it stays put between visits
+  const TABS = [{ x: 62, w: 92, label: 'HEI STORE' }, { x: 158, w: 80, label: 'CASINO' }];
+  function open(o = {}) { if (tab === 1 && window.DDCasino) window.DDCasino.open(); t = 0; back = o.onBack || null; label = o.label || 'BACK'; shown = S.pts; msgT = 0; fly = []; pop = null; tip = (tip + 1) % TIPS.length; if (o.cur !== undefined) cur = o.cur; }
   function buy(i) {
     const u = items()[i], o = own(u.id), was = revealed();
     if (!u) return false;
@@ -122,6 +124,10 @@
     shown += (S.pts - shown) * 0.18; if (Math.abs(S.pts - shown) < 0.5) shown = S.pts;
     const L = items(), n = L.length; if (cur >= n) cur = n - 1;
     if (reveal > 0) reveal++;
+    const flip = window.DDCasino && ((IN.sp && !IN.back) || (c && TABS.some((b, i) => i !== tab && inR(c, b.x, 0, b.w, 15))));
+    if (flip) { if (window.DDCasino.busy) { SFX.buzz(); return; } tab = 1 - tab; SFX.switch(); if (tab === 1) window.DDCasino.open(); return; }
+    if (c && inR(c, TABS[tab].x, 0, TABS[tab].w, 15)) return;
+    if (tab === 1) return window.DDCasino.step(IN, c);
     if (IN.ny) { cur = (cur + IN.ny + n) % n; SFX.tick(); }
     if (IN.nx) nudge(cur, IN.nx);
     if (c) {
@@ -141,19 +147,27 @@
     if (IN.back || IN.store) return 'back';
   }
 
-  function draw() {
-    const tt = t, CURT = 174;
-    rect('#120610', 0, 0, VW, VH);
-    for (let x = -CURT + (-tt * 0.05 % CURT); x < VW + CURT; x += CURT) DD.spr('w2_curtain', x + CURT / 2, 216);
-    rect('rgba(10,4,14,0.84)', 0, 0, VW, VH);
-    // header: back, title, balance
+  function header(tt) {   // back, the two tabs, the balance
     rect('#2a0e1a', 0, 0, VW, 14); rect('#c98f22', 0, 14, VW, 1);
     rect('#3a1420', 2, 2, 54, 11); text('< ' + label, 29, 5, '#ffd27a', 1, null, 'center');
-    text('HEI POINTS STORE', VW / 2, 2, '#ffe680', 2, '#7a2a10', 'center');
+    TABS.forEach((b, i) => {   // the tabs: the one you're on is lit
+      const on = i === tab, nw = i === 1 && window.DDCasino && !window.DDCasino.stats.seen;
+      rect(on ? '#4a1a24' : '#1a0810', b.x, 1, b.w, 13); if (on) rect('#c98f22', b.x, 1, b.w, 1);
+      text(b.label, b.x + b.w / 2, 3, on ? '#ffe680' : '#8a6a70', 2, on ? '#7a2a10' : null, 'center');
+      if (nw && Math.floor(tt / 12) % 2) text('NEW', b.x + b.w - 2, 1, '#ff6a4a', 1, '#000', 'right');
+    });
     const jig = poorT ? Math.round(Math.sin(poorT * 1.6) * 2) : 0;
     rect(poorT ? '#5a1420' : '#3a1420', VW - 66 + jig, 2, 64, 11); icon('rewards', VW - 63 + jig, 3, 1);
     if (UNL) text('UNLIMITED', VW - 5 + jig, 5, rainbow(0, tt), 1, null, 'right');
     else text(String(Math.round(shown)), VW - 5 + jig, 5, poorT ? '#ff8080' : '#fff6d4', 1, null, 'right');
+  }
+  function draw() {
+    const tt = t, CURT = 174;
+    if (tab === 1 && window.DDCasino) { window.DDCasino.draw(); header(tt); window.DDCasino.drawTop(); return; }
+    rect('#120610', 0, 0, VW, VH);
+    for (let x = -CURT + (-tt * 0.05 % CURT); x < VW + CURT; x += CURT) DD.spr('w2_curtain', x + CURT / 2, 216);
+    rect('rgba(10,4,14,0.84)', 0, 0, VW, VH);
+    header(tt);
     // the list
     const L = items(), rv = L.length > UP.length, six = sixOn(), ly = rv ? [18, 76] : [19, 83];
     text('PASSIVE', 8, ly[0], '#9ac8a0', 1, null); text('ACTIVE', 8, ly[1], '#9ac8a0', 1, null);
@@ -205,13 +219,14 @@
     rect('#0a0408', 0, 149, VW, 11);
     if (msgT > 0) text(msg, VW / 2, 152, msg.startsWith('NEED') || msg.endsWith('MAXED OUT') ? '#ff8080' : '#ffe680', 1, null, 'center');
     else text(TIPS[tip], VW / 2, 152, '#9a8a90', 1, null, 'center');
-    text(DD.padUsed ? 'CROSS: BUY   LEFT/RIGHT: TURN DOWN/UP   CIRCLE: ' + label : 'JUMP: BUY   LEFT/RIGHT: TURN DOWN/UP   X: ' + label, VW / 2, 167, '#ffd27a', 1, '#000', 'center');
+    text(DD.padUsed ? 'CROSS: BUY   LEFT/RIGHT: DOWN/UP   R1: CASINO   CIRCLE: ' + label : 'JUMP: BUY   LEFT/RIGHT: DOWN/UP   C: CASINO   X: ' + label, VW / 2, 167, '#ffd27a', 1, '#000', 'center');
   }
 
   window.DDStore = {
     UP, SIX, COST, MAX, perks, lvl, items, revealed, sixOn, award, icon, canBuy, open, step, draw, buy, nudge,
     own, act, setAct, reload() { load(); try { UNL = localStorage.getItem(UKEY) === '1'; } catch (e) { UNL = false; } },   // after LOAD / CLEAR DATA
     get pts() { return S.pts; }, get earned() { return S.earned; },
+    bank(n) { if (!UNL) { S.pts = Math.max(0, S.pts + n); save(); } }, poor() { poorT = 14; }, get backLabel() { return label; },   // the casino's stakes and pay-outs
     get unlimited() { return UNL; }, setUnlimited, get back() { return back; }, get cur() { return cur; }, set cur(i) { cur = i; },
   };
 })();
