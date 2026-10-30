@@ -16,13 +16,16 @@
   function record(r) {
     if (!r || r.quit || !r.id) return;
     const o = PROG[r.id] || {};
-    PROG[r.id] = { bags: Math.max(o.bags || 0, r.bags || 0), got: Math.max(o.got || 0, r.got || 0), total: r.total || o.total || 0, vhs: !!(o.vhs || r.vhs), fact: o.fact || r.fact || null, allPop: !!(o.allPop || r.allPop), six: !!(o.six || r.six) };   // six: won at six bags (the HEI store's SIX BAGS)
+    PROG[r.id] = { bags: Math.max(o.bags || 0, r.bags || 0), got: Math.max(o.got || 0, r.got || 0), total: r.total || o.total || 0, vhs: !!(o.vhs || r.vhs), sec: [...new Set([].concat(o.sec || [], r.dsec || []))], fact: o.fact || r.fact || null, allPop: !!(o.allPop || r.allPop), six: !!(o.six || r.six) };   // six: won at six bags (the HEI store's SIX BAGS)
     try { localStorage.setItem(KEY, JSON.stringify(PROG)); } catch (e) { /* storage blocked: progress lasts this session */ }
   }
   const marks = id => { const p = PROG[id] || {}; return (p.allPop ? 1 : 0) + (p.vhs ? 1 : 0) + (p.fact ? 1 : 0); };   // a stage's three goals: every kernel, the tape, the blue card
   const worldMarks = w => idsOf(w).reduce((s, id) => s + marks(id), 0), worldTapes = w => idsOf(w).filter(id => PROG[id] && PROG[id].vhs).length;
   const worldBags = w => idsOf(w).reduce((s, id) => s + ((PROG[id] && PROG[id].bags) || 0), 0);
   const worldMax = w => idsOf(w).length * 5;
+  const secOf = id => have(id) ? ['sam', 'mel', 'cloud', 'baxter'].filter(d => (LEVELS[id].THINGS || []).some(t => t[0] === 'dsec' && t[3] === d)) : [];   // the Dots with a secret in this stage
+  const secGot = id => ((PROG[id] && PROG[id].sec) || []).filter(d => secOf(id).includes(d));
+  const worldSec = w => idsOf(w).reduce((s, id) => s + secGot(id).length, 0), worldSecMax = w => idsOf(w).reduce((s, id) => s + secOf(id).length, 0);
   const worldVhs = w => idsOf(w).reduce((s, id) => s + ((PROG[id] && PROG[id].vhs) ? 1 : 0), 0);
   const worldOpen = w => idsOf(w).some(have);
   // ---- progression: worlds open in order, stages open in order, and the Dots join the cast one stage at a time
@@ -136,6 +139,10 @@
   const clipW = (str, n) => str.length > n ? str.slice(0, n) : str;
   function tubIcon(x, y, c) { rect('#000', x, y, 5, 7); rect(c, x + 1, y + 1, 3, 5); rect('#fff6d4', x + 1, y, 3, 2); }   // tiny popcorn tub, 5x7
   function vhsIcon(x, y, c) { rect('#000', x, y, 9, 6); rect(c, x + 1, y + 1, 7, 4); rect('#1a1a22', x + 2, y + 3, 5, 1); rect('#d8d8e0', x + 3, y + 2, 1, 1); rect('#d8d8e0', x + 5, y + 2, 1, 1); }   // tiny cassette, 9x6
+  function secIcon(x, y, on, col) {   // a Dot secret: a 7-px gold diamond with the Dot's colour at the heart (dark until found)
+    [[3, 1], [2, 3], [1, 5], [0, 7], [1, 5], [2, 3], [3, 1]].forEach(([o, w], r) => { rect('#000', x + o - 1, y + r, w + 2, 1); rect(on ? '#ffe680' : '#3a2a30', x + o, y + r, w, 1); });
+    if (on && col) rect(col, x + 3, y + 3, 1, 1);
+  }
   function vhsMini(x, y, on) { rect('#000', x, y, 7, 6); rect(on ? '#e8504a' : '#3a2a30', x + 1, y + 1, 5, 4); rect(on ? '#fff6d4' : '#1a1218', x + 2, y + 2, 1, 1); rect(on ? '#fff6d4' : '#1a1218', x + 4, y + 2, 1, 1); }   // 7x6 cassette, lit when that level's VHS is found
   const star4 = (x, y, c) => { rect(c, x, y - 1, 1, 3); rect(c, x - 1, y, 3, 1); };
 
@@ -165,7 +172,7 @@
   const DOTS = { y: 112, gx: 8 }, dotX = i => Math.round(VW / 2 - ((WORLDS.length - 1) * DOTS.gx) / 2) + i * DOTS.gx;   // one dot a world under the shelf, with an arrow each side
   const UNIT = { top: 22, bot: 106, post: 9 };   // the shelf unit: its top lip, its plank, and the posts at each side the row slides behind
   const sleeveSeasons = w => w.seasons.split(' + ')[0];   // what the sleeve says: SEASONS 11-12 (the Oscars and Decker ride along in the panel below)
-  const HB = { shelf: [4, 3, 44], bags: [53, 3, 44], store: [223, 3, 44], opt: [272, 3, 44] };   // the header boxes: x, y, w (11 tall), two each side of the sign
+  const HB = { shelf: [4, 3, 44], wear: [53, 3, 44], store: [223, 3, 44], opt: [272, 3, 44] };   // the header boxes: x, y, w (11 tall), two each side of the sign
   const compact = () => world && world.levels.length > 2, rowY = i => compact() ? 34 + i * 31 : 44 + i * 40;   // four stages a world get slimmer rows
 
   // ---- Gregg's shelf: every Popcorn Classic tape, one per stage, in world order (classics.js)
@@ -316,14 +323,26 @@
   function playLevel(id, all) {
     pvStop();   // the poster's footage hands the engine back first
     prepSongs(WORLDS.find(w => idsOf(w).includes(id)));
-    DD.start(LEVELS[id], { dots: all || ALL ? null : cast(), joins: all || ALL ? null : joinsOn(id), perks: perks(), store: !!window.DDStore,   // the HEI store's upgrades, and X on the results card stops there
-      onSave: r => { record(r); if (!(all || ALL)) { DD.opts.dots = cast(); DD.opts.joins = joinsOn(id); } },   // AGAIN on the results card: save the win, and the replay has whoever just joined
+    DD.start(LEVELS[id], { dots: all || ALL ? null : cast(), joins: all || ALL ? null : joinsOn(id), perks: perks(), store: !!window.DDStore, dsec: secGot(id),   // the HEI store's upgrades, and X on the results card stops there
+      onSave: r => { record(r); DD.opts.dsec = secGot(id); if (!(all || ALL)) { DD.opts.dots = cast(); DD.opts.joins = joinsOn(id); } },   // AGAIN on the results card: save the win, and the replay has whoever just joined
       onExit: r => { record(r); if (r.store) return openStore(() => afterStage(id, r, all), 'PLAY ON'); afterStage(id, r, all); } });
   }
   // ---- the HEI Points store (store.js): from the world select, the stage list, or a results card on the way to the next stage
   const perks = () => window.DDStore ? window.DDStore.perks() : null;
   let storeBack = null;
   function openStore(back, label) { pvStop(); storeBack = back || null; st = 'store'; t = 0; SFX.switch(); if (window.DDStore) window.DDStore.open({ label: label || 'BACK' }); DD.setScene(scene); }
+  // ---- the WARDROBE: the casino's prize counter (casino.js, wardrobe.js) on its own screen, straight off the world select
+  function openWardrobe() { if (!window.DDCasino || !window.DDWear) return; pvStop(); st = 'wardrobe'; t = 0; SFX.switch(); window.DDCasino.openPrizes(); DD.setScene(scene); }
+  function drawWardrobe() {   // the casino draws the counter; the header is ours: back, the sign, the balance where the coins fly
+    const S = window.DDStore;
+    rect('#120610', 0, 0, VW, 15);
+    window.DDCasino.draw();
+    hdrSign('WARDROBE', t);
+    button(4, 3, 52, '< BACK', hover && inR(hover, 2, 0, 56, 15));
+    if (S) { inset(VW - 66, 2, 62, 13); S.icon('rewards', VW - 63, 4, 1);
+      if (S.unlimited) text('UNLIMITED', VW - 6, 6, 'hsl(' + (t * 6 % 360) + ',90%,64%)', 1, null, 'right'); else text(String(S.pts), VW - 6, 6, '#fff6d4', 1, null, 'right'); }
+    window.DDCasino.drawTop();
+  }
   function closeStore() { SFX.switch(); const f = storeBack; storeBack = null; if (f) f(); else { st = 'select'; t = 0; } }
   // a won stage plays straight on into the next one; a boss win goes on through the next world's era card; a quit (or a next
   // stage that isn't there yet) lands on this world's stage list with the cursor on the stage just played
@@ -407,7 +426,7 @@
     else optBack();
   }
   const SLX = 150, SLW = 9;   // the sliders' bar: left edge and notch width
-  const OY = i => 22 + i * 10, JB = { x: [14, 166], y0: 36, dy: 12, per: 9 };
+  const OGRP = [5, 9, 12], OY = i => 22 + i * 9 + OGRP.filter(g => i >= g).length * 4, JB = { x: [14, 166], y0: 36, dy: 12, per: 9 };   // options rows in groups: sound, play, save data, then BACK
   const jPos = k => ({ x: JB.x[Math.floor(k / JB.per)], y: JB.y0 + (k % JB.per) * JB.dy });   // song k (0-based) on the jukebox page
   function jukeDo(i) {
     const m = MUS(), list = ROTL(); if (!m) return;
@@ -437,6 +456,7 @@
       return;
     }
     if (st === 'store') { if (!window.DDStore || window.DDStore.step(IN, c) === 'back') closeStore(); return; }
+    if (st === 'wardrobe') { if (window.DDCasino.step(IN, c) === 'back') { st = 'select'; t = 0; SFX.switch(); } return; }
     if (st === 'title') {
       if (t === 20) sCurtain(); if (t === 120) sTa();
       if (IN.ok || IN.start || IN.any || c) { st = 'select'; t = 0; SFX.switch(); }
@@ -450,6 +470,8 @@
       if (hover && hover.dirty) hover.dirty = false;   // pointing at a sleeve does nothing: the shelf only moves on a click or the arrow keys
       if (IN.nx) { const n = Math.max(0, Math.min(WORLDS.length - 1, cur + IN.nx)); if (n !== cur) selectTo(n); }
       if (IN.ny < 0) openShelf();   // up: Gregg's shelf
+      if (IN.ny > 0) { openWardrobe(); return; }   // down: the wardrobe
+      if (c && inR(c, HB.wear[0] - 2, 0, HB.wear[2] + 4, 15)) { openWardrobe(); return; }
       if (c && inR(c, HB.shelf[0] - 2, 0, HB.shelf[2] + 4, 15)) { openShelf(); return; }
       if ((c && inR(c, HB.opt[0] - 2, 0, HB.opt[2] + 4, 15)) || IN.opt) { openOptions(); return; }
       if ((c && inR(c, HB.store[0] - 2, 0, HB.store[2] + 4, 15)) || IN.store) { openStore(() => { st = 'select'; t = 0; }); return; }
@@ -464,8 +486,8 @@
       if (IN.ny) { ocur = (ocur + IN.ny + n) % n; if (ocur !== CLR) clearArm = 0; SFX.tick(); }
       if (IN.nx && ocur < 3) { const V = window.DDVol, k = VOLS[ocur][0]; if (V) { V.set(k, V.level(k) + IN.nx); if (k === 'sfx') SFX.tick(); else if (k === 'voice' && window.DDVoice && window.DDVoice.preview) window.DDVoice.preview(); } }
       else if (IN.nx && ocur >= 4 && ocur <= 7) optDo(ocur);
-      if (c && c.y >= OY(0) - 3 && c.y < OY(2) + 8 && c.x >= SLX && c.x < SLX + 10 * SLW) { const i = Math.floor((c.y - OY(0) + 3) / 10), V = window.DDVol; if (i >= 0 && i < 3 && V) { ocur = i; V.set(VOLS[i][0], Math.round((c.x - SLX) / SLW + 0.5)); SFX.tick(); } }
-      else if (c) { for (let i = 0; i < n; i++) if (inR(c, 40, OY(i) - 3, VW - 80, 10)) { if (i === ocur) optDo(i); else { ocur = i; if (i !== CLR) clearArm = 0; SFX.tick(); } } }
+      if (c && c.y >= OY(0) - 3 && c.y < OY(2) + 8 && c.x >= SLX && c.x < SLX + 10 * SLW) { const i = Math.floor((c.y - OY(0) + 3) / 9), V = window.DDVol; if (i >= 0 && i < 3 && V) { ocur = i; V.set(VOLS[i][0], Math.round((c.x - SLX) / SLW + 0.5)); SFX.tick(); } }
+      else if (c) { for (let i = 0; i < n; i++) if (inR(c, 40, OY(i) - 3, VW - 80, 9)) { if (i === ocur) optDo(i); else { ocur = i; if (i !== CLR) clearArm = 0; SFX.tick(); } } }
       else if (IN.ok) optDo(ocur);
       if (IN.back || IN.opt) optBack();
     } else if (st === 'jukebox') {
@@ -660,8 +682,7 @@
     button(HB.shelf[0], HB.shelf[1], HB.shelf[2], 'SHELF', hover && inR(hover, HB.shelf[0] - 2, 0, HB.shelf[2] + 4, 15), x => vhsIcon(x, 6, '#e8504a'), 9);
     button(HB.opt[0], HB.opt[1], HB.opt[2], 'OPTIONS', hover && inR(hover, HB.opt[0] - 2, 0, HB.opt[2] + 4, 15));
     storeBtn(HB.store[0], HB.store[1], HB.store[2], 'STORE', tt, hover && inR(hover, HB.store[0] - 2, 0, HB.store[2] + 4, 15));
-    const tot = WORLDS.reduce((s, x) => s + worldBags(x), 0), mx = WORLDS.reduce((s, x) => s + worldMax(x), 0);   // the total, in a sunken box the size of a button
-    { const s2 = tot + '/' + mx, gx = HB.bags[0] + Math.floor((HB.bags[2] - (7 + tw(s2, 1))) / 2); inset(HB.bags[0], HB.bags[1] - 1, HB.bags[2], 13); tubIcon(gx, 5, '#d8202c'); text(s2, gx + 7, 6, '#fff6d4', 1, null); }
+    if (window.DDWear) button(HB.wear[0], HB.wear[1], HB.wear[2], 'WARDROBE', hover && inR(hover, HB.wear[0] - 2, 0, HB.wear[2] + 4, 15));
     // the bill: a lit marquee box with the selected world's name in big type, its seasons, its line, and the run so far
     const w = WORLDS[cur], open = worldPlay(w), locked = worldOpen(w) && !open, pw = WORLDS[cur - 1], IY = 120, IH = 47, IX = 8, IW = VW - 16;
     goldPanel(IX, IY, IW, IH, tt, open ? w.accent : '#9a8a90');
@@ -676,10 +697,11 @@
     else if (open) {   // the run so far, in three little insets
       const all = worldMarks(w) === w.levels.length * 3;
       const chips = [[worldBags(w) + '/' + worldMax(w) + ' BAGS', '#ffd27a', x => tubIcon(x, IY + 36, '#d8202c'), 7], [worldVhs(w) + '/' + w.levels.length + ' VHS', '#ffd27a', x => vhsIcon(x, IY + 37, '#e8504a'), 11], [worldMarks(w) + '/' + w.levels.length * 3 + ' MARKS', all ? '#ffe680' : '#9ac8a0', null, 0]];
+      if (worldSecMax(w)) chips.splice(2, 0, [worldSec(w) + '/' + worldSecMax(w) + ' SECRETS', worldSec(w) === worldSecMax(w) ? '#ffe680' : '#ffd27a', x => secIcon(x, IY + 36, true), 7]);
       const ws = chips.map(c => tw(c[0], 1) + 6 + c[3]), gap = 6; let x = Math.round(VW / 2 - (ws.reduce((a, b) => a + b, 0) + gap * (chips.length - 1)) / 2);
       chips.forEach((c, k) => { inset(x, IY + 35, ws[k], 9); if (c[2]) c[2](x + 2); text(c[0], x + 3 + c[3], IY + 37, c[1], 1, null); x += ws[k] + gap; });
     }
-    keycaps(DD.padUsed ? [['CROSS', 'PLAY'], ['SQUARE', 'STORE'], ['CIRCLE', 'BACK']] : [['JUMP', 'PLAY'], ['H', 'STORE'], ['X', 'BACK']]);
+    keycaps(DD.padUsed ? [['CROSS', 'PLAY'], ['DOWN', 'WARDROBE'], ['SQUARE', 'STORE'], ['CIRCLE', 'BACK']] : [['JUMP', 'PLAY'], ['DOWN', 'WARDROBE'], ['H', 'STORE'], ['X', 'BACK']]);
   }
 
   function button(x, y, w, label, lit, icon, iw) {   // a brass plaque: black edge with clipped corners, a gold rim, a maroon face lit from above; brighter under the pointer. iw: the icon's width, centred with the label
@@ -730,6 +752,7 @@
   }
   function keycaps(keys, labCol) {   // the controls along the foot: [key, what it does] as little cream keycaps
     for (let y = VH - 16; y < VH; y++) rect('rgba(4,1,6,' + (0.5 * (y - VH + 16) / 16).toFixed(3) + ')', 0, y, VW, 1);
+    keys = keys.map(([k, l]) => [k === 'JUMP' ? DD.jumpKey() : k, l]);   // the jump key by its real name on this device
     const ws = keys.map(([k, l]) => tw(k, 1) + 6 + 3 + tw(l, 1)), gap = 12, y = VH - 9; let x = Math.round(VW / 2 - (ws.reduce((a, b) => a + b, 0) + gap * (keys.length - 1)) / 2);
     keys.forEach(([k, l], i) => { const kw = tw(k, 1) + 6; rect('#000', x, y - 1, kw, 9); rect('#000', x - 1, y, kw + 2, 7); rect('#8a7a68', x, y, kw, 7); rect('#e8dcc0', x, y, kw, 6); text(k, x + 3, y + 1, '#2a0e1a', 1, null); text(l, x + kw + 3, y + 1, labCol || '#d8c8d0', 1, '#000'); x += ws[i] + gap; });
   }
@@ -747,6 +770,7 @@
     curtainBg(t, 'OPTIONS');
     const O = OPTS();
     goldPanel(32, 17, VW - 64, OY(O.length - 1) - 17 + 12, t);
+    OGRP.forEach(g => rect('rgba(255,210,122,0.22)', 52, OY(g) - 4, VW - 104, 1));   // a rule between the groups
     O.forEach((o, i) => {
       const y = OY(i), on = i === ocur;
       if (on) hilite(40, y - 2, VW - 80, 9);
@@ -794,7 +818,7 @@
     ids.forEach((id, i) => {
       const on = PROG[id] && PROG[id].vhs, sel = i === scur, c = CLASSICS[id];
       const x = SH.x0 + (i % SH.n) * (SH.w + SH.gx), y = SH.y0[Math.floor(i / SH.n)] - (sel ? 3 : 0);
-      if (!on) { rect('#000', x, y + 4, SH.w, SH.h - 4); rect('#24161c', x + 1, y + 5, SH.w - 2, SH.h - 6); text('?', x + SH.w / 2 - 1, y + 24, '#5a4048', 1, null); }
+      if (!on) { rect('#000', x, y + 4, SH.w, SH.h - 4); rect('#24161c', x + 1, y + 5, SH.w - 2, SH.h - 6); const lab = id.toUpperCase().replace('BOSS', 'B'); for (let k = 0; k < lab.length; k++) text(lab[k], x + SH.w / 2 - 1, y + 10 + k * 6, sel ? '#a08890' : '#5a4048', 1, null); }   // the stage it hides in, written down the gap
       else {
         rect('#000', x, y, SH.w, SH.h); rect('#1c1c24', x + 1, y + 1, SH.w - 2, SH.h - 2); rect('#2e2e3a', x + 2, y + 1, 1, SH.h - 2);
         rect('#c8202c', x + 2, y + 2, 8, SH.h - 4); rect('#e8504a', x + 2, y + 2, 1, SH.h - 4);   // Gregg's red tape, code written down it
@@ -974,6 +998,9 @@
       for (let b = 0; b < 5; b++) { const got = p && b < p.bags, hop = got ? Math.max(0, Math.sin((tt + b * 6) / 5)) * 2 : 0; spr('tub', P.x + 9 + b * 20, sy + 22 - Math.round(hop), false, 1, 1, 0, got ? 1 : 0.2); }
       { const cx = P.x + 102, cy = sy + 9, on2 = p && p.fact; rect(on2 ? '#0e2e7a' : 'rgba(14,46,122,0.3)', cx, cy, 14, 11); rect(on2 ? '#3a78e8' : 'rgba(58,120,232,0.3)', cx + 1, cy + 1, 12, 9); if (on2) { rect('#cfe0ff', cx + 3, cy + 3, 8, 1); rect('#cfe0ff', cx + 3, cy + 6, 6, 1); } }
       spr('vhs', P.x + 128, sy + 22, false, 1, 1, 0, p && p.vhs ? 1 : 0.2);
+      { const ds = secOf(id), got = secGot(id); ds.forEach((d, k) => secIcon(P.x + 143 + (k % 2) * 8, sy + 6 + Math.floor(k / 2) * 8, got.includes(d), DD.DOTS && DD.DOTS[d] ? DD.DOTS[d].col : '#fff')); }   // the Dot secrets: a gold diamond each, two by two
+      if (have(id) && (LEVELS[id].THINGS || []).some(t => t[0] === 'gchip')) { const gx = P.x + 143 + (secOf(id).length ? 18 : 0), gy = sy + 9, on2 = window.DDCasino && window.DDCasino.hasChip(id); ctx.globalAlpha = on2 ? 1 : 0.3;   // the world's gold chip (three free bets at the casino), if it's in this stage
+        rect('#5a3008', gx, gy + 1, 9, 7); rect('#5a3008', gx + 1, gy, 7, 9); rect('#e8b030', gx + 1, gy + 1, 7, 7); rect('#b06a18', gx + 3, gy + 3, 3, 3); rect('#fff6d4', gx + 2, gy + 1, 2, 1); ctx.globalAlpha = 1; }
     }
     if (!cm) w.dots.forEach((n, i) => { const sp = w.dots.length > 2 ? [30, 60, 90, 120][i] : [50, 110][i], ph = Math.sin(tt / 11 + i * 1.9), hy = Math.abs(ph) * 6; drawDot(n, hy > 4.5 ? (Math.cos(tt / 11 + i * 1.9) * ph > 0 ? 'jump' : 'fall') : hy < 0.8 ? 'land' : 'apex', sp, 158 - Math.round(hy), i % 2 === 1, 1, 1); });
     if (noteT > 0) ctext(note, 142, '#ff8080', 1);
@@ -992,7 +1019,7 @@
     if (tr && st !== 'rewind') rwStop();
     if (pvTr && st !== 'levels') pvStop();   // the poster's footage only runs on the stage list   // never leave a trailer running under another screen
     if (st === 'load') { bg('#2a0e1a', '#0e070c'); ctext('LOADING', VH / 2 - 3, '#fff', 1); return; }
-    if (st === 'rewind') drawRewind(); else if (st === 'fork') drawFork(); else if (st === 'title') drawTitle(); else if (st === 'select') drawSelect(); else if (st === 'era') drawEra(); else if (st === 'shelf') drawShelf(); else if (st === 'options') drawOptions(); else if (st === 'jukebox') drawJukebox(); else if (st === 'store') { if (window.DDStore) window.DDStore.draw(); } else drawLevels();
+    if (st === 'rewind') drawRewind(); else if (st === 'fork') drawFork(); else if (st === 'title') drawTitle(); else if (st === 'select') drawSelect(); else if (st === 'era') drawEra(); else if (st === 'shelf') drawShelf(); else if (st === 'options') drawOptions(); else if (st === 'jukebox') drawJukebox(); else if (st === 'store') { if (window.DDStore) window.DDStore.draw(); } else if (st === 'wardrobe') drawWardrobe(); else drawLevels();
     if (wipe && wipeT < WIPE) {
       const k = wipeT / WIPE, e = k * k * (3 - 2 * k), y = -Math.round(e * (VH + 8));
       ctx.drawImage(wipe, 0, y);

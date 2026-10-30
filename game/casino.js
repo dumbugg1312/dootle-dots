@@ -15,7 +15,7 @@
   const M = { rng: Math.random };   // the pure game math (tests/casino.js swaps rng)
   const rnd = n => Math.floor(M.rng() * n);
   const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-  const BETS = [5, 10, 25, 50, 100];
+  const BETS = [5, 10, 25, 50, 100, 250, 500, 750, 1000];
 
   // ================================================================ the math
   // ---- LUCKY SEVEN: real reel strips, so payback is exact (every stop combination is counted in the test)
@@ -107,10 +107,13 @@
 
   // ================================================================ the save: stats, and the free ticket for the broke
   const CKEY = 'dootledots.casino.v1';
-  let C; function cload() { try { C = JSON.parse(localStorage.getItem(CKEY)) || {}; } catch (e) { C = {}; } C = Object.assign({ big: 0, best: 0, streak: 0, net: 0, rounds: 0, seen: 0, brokeAt: -1 }, C); }
+  let C; function cload() { try { C = JSON.parse(localStorage.getItem(CKEY)) || {}; } catch (e) { C = {}; } C = Object.assign({ big: 0, best: 0, streak: 0, net: 0, rounds: 0, seen: 0, brokeAt: -1, houseBest: 0, free: 0, gold: {} }, C); }
   const csave = () => { try { localStorage.setItem(CKEY, JSON.stringify(C)); } catch (e) {} };
   cload();
-  const unl = () => !!(ST() && ST().unlimited), pts = () => ST() ? ST().pts : 0;
+  // UNLIMITED HEI POINTS plays from the house stack: a fresh 1000 each visit, the best visit kept. A gold chip (one hidden per world,
+  // engine.js 'gchip') is three free bets; a free bet puts up to 100 of one round's stake on the house (credit, used: this round's share)
+  const HOUSE = 1000, FREE = 100; let H = HOUSE, credit = 0, used = 0;
+  const unl = () => !!(ST() && ST().unlimited), pts = () => unl() ? H : ST() ? ST().pts : 0;
   const freeTix = () => !unl() && C.brokeAt >= 0 && ST() && ST().earned > C.brokeAt;
 
   // ================================================================ shared juice: voice, coins, banner, shake, messages
@@ -126,15 +129,20 @@
   const BAL = { x: VW - 58, y: 6 };
   function flyCoins(x, y, n, spread = 6) { n = Math.max(1, Math.min(40, n)); for (let k = 0; k < n; k++) coins.push({ x0: x + (Math.random() - 0.5) * spread, y0: y + (Math.random() - 0.5) * spread, t: -k * 2, d: 20 + rnd(8), k }); }
   function fountain(x, y, n) { for (let k = 0; k < n; k++) spark.push({ x, y, vx: (Math.random() - 0.5) * 4, vy: -2 - Math.random() * 3.5, t: 0, life: 50 + rnd(30), c: Math.random() < 0.8 ? '#ffd27a' : '#fff6d4' }); }
-  function take(n) {   // pay a stake: false (and a buzz) when short
-    if (unl()) return true;
-    if (pts() < n) { say('NEED ' + (n - pts()) + ' MORE HEI POINTS', 90); SFX.buzz(); if (ST().poor) ST().poor(); return false; }
-    ST().bank(-n); return true;
+  function take(n) {   // pay a stake: false (and a buzz) when short. A free bet covers the first 100 of the round
+    if (unl()) { if (H < n) { say('THE HOUSE STACK IS DRY. COME BACK FOR A NEW ONE', 150); SFX.buzz(); return false; } H -= n; return true; }
+    const f = Math.min(credit > 0 ? credit : C.free > 0 ? FREE : 0, n), rest = n - f;
+    if (pts() < rest) { say('NEED ' + (rest - pts()) + ' MORE HEI POINTS', 90); SFX.buzz(); if (ST().poor) ST().poor(); return false; }
+    if (f) { if (credit <= 0) { C.free--; credit = FREE; csave(); say('FREE BET! THE HOUSE PUTS UP ' + FREE + (C.free ? '. ' + C.free + ' LEFT' : '. THAT WAS THE LAST ONE'), 150); } credit -= f; used += f; }
+    if (rest) ST().bank(-rest); return true;
   }
-  function give(n, x, y) { if (n <= 0) return; if (!unl()) ST().bank(n); flyCoins(x, y, Math.ceil(n / 5)); }
+  function refund(n) { const f = Math.min(n, used); used -= f; credit += f; n -= f; if (!n) return; if (unl()) H += n; else ST().bank(n); }   // chips taken back off the table
+  function goldChip(id) { const w = String(id).split('-')[0]; if (C.gold[w]) return false; C.gold[w] = 1; C.free += 3; csave(); return true; }   // engine.js: a gold chip found in a stage
+  function give(n, x, y) { if (n <= 0) return; if (unl()) H += n; else ST().bank(n); flyCoins(x, y, Math.ceil(n / 5)); }
   function settle(stake, back, big) {   // a finished round: records and the broke check. big: a loss worth a sigh
-    C.rounds++;
-    if (!unl()) {
+    C.rounds++; credit = 0; used = 0;
+    if (unl()) C.houseBest = Math.max(C.houseBest, H);
+    else {
       C.net += back - stake;
       if (back > C.big) { if (C.big > 0 && back >= 50) setTimeout(() => say('NEW BIGGEST WIN: ' + back, 150), 900); C.big = back; }
       if (back > stake) { C.streak++; C.best = Math.max(C.best, C.streak); } else if (back < stake) C.streak = 0;
@@ -195,7 +203,7 @@
   }
   // round things, lit from the top left
   function roundSpr(key, r, fn) { return bake(key, r * 2 + 1, r * 2 + 1, P => { for (let j = 0; j <= r * 2; j++) for (let i = 0; i <= r * 2; i++) { const dx = i - r, dy = j - r, d = Math.hypot(dx, dy); if (d > r + 0.35) continue; const c = fn(d, Math.atan2(dy, dx), dx, dy); if (c) P(c, i, j); } }); }
-  const CHIPC = a => a >= 1000 ? '#e8b030' : a >= 100 ? '#2a2430' : a >= 50 ? '#2a5ad8' : a >= 25 ? '#1a9a4a' : a >= 10 ? '#d8202c' : '#ece6dc';
+  const CHIPC = a => a >= 1000 ? '#e8b030' : a >= 500 ? '#7a2ab8' : a >= 100 ? '#2a2430' : a >= 50 ? '#2a5ad8' : a >= 25 ? '#1a9a4a' : a >= 10 ? '#d8202c' : '#ece6dc';
   function chip(x, y, amt, r = 5, n = 1) {   // a stack of n chips, its foot at (x, y + r)
     const col = CHIPC(amt), edge = amt >= 100 && amt < 1000 ? '#e8c060' : amt < 10 ? '#3a6ad8' : '#fff6e8';
     const img = roundSpr('chip' + col + r, r, (d, a, dx, dy) => {
@@ -346,7 +354,7 @@
   function bubble(s, x, y, w, tail) { const L = wrapT(s, Math.floor((w - 6) / 4)), h = L.length * 7 + 5; rrect(x - 1, y - 1, w + 2, h + 2, 3, '#1a1014'); rrect(x, y, w, h, 2, '#fff6d4'); rect('#ffffff', x + 2, y, w - 4, 1); if (tail) { rect('#1a1014', x - 4, y + 4, 4, 3); rect('#fff6d4', x - 3, y + 5, 4, 1); } L.forEach((l, i) => text(l, x + 3, y + 3 + i * 7, '#2a0e1a', 1, null)); }
   function betBox(x, y, lit) {   // BET with < > (clickable); the stake used by slots and blackjack
     box(x, y, 54, 26, '#2a1018'); text('BET', x + 27, y + 3, '#c89850', 1, null, 'center');
-    led(x + 12, y + 12, 30, BETS[bi], 3, lit ? '#ffd040' : '#c89040');
+    led(x + 12, y + 12, 30, BETS[bi], 4, lit ? '#ffd040' : '#c89040');
     btn(x + 2, y + 12, 8, 10, '<', false, '#c98f22', bi === 0); btn(x + 44, y + 12, 8, 10, '>', false, '#c98f22', bi === BETS.length - 1);
   }
   function betClick(c, x, y) { if (inR(c, x, y + 8, 18, 18)) { bump(-1); return true; } if (inR(c, x + 36, y + 8, 18, 18)) { bump(1); return true; } return false; }
@@ -364,6 +372,8 @@
   const CAB = i => ({ x: GX(i) - 30, y: 54, w: 60, h: 88 });
   function enter(id) {
     scr = id; t = 0; SFX.switch(); banner = null;
+    if (C.free && !unl() && ['slots', 'bj', 'bingo', 'roul'].includes(id) && BETS[bi] < FREE) { bi = BETS.indexOf(FREE); setTimeout(() => say('FREE BET WAITING: THE BET IS UP TO ' + FREE + ' ON THE HOUSE', 160), 60); }
+    if (id === 'prize') { PZ.onTabs = false; say('BUY IT ONCE AND ALL FOUR DOTS WEAR IT', 160); }
     if (id === 'slots') { S.state = 'idle'; }
     if (id === 'scratch') { K.state = 'pick'; if (freeTix()) say('FREE TICKET! TIM PICKED ONE UP ON THE WAY IN.', 200); }
     if (id === 'roul') { R.state = 'bet'; }
@@ -447,6 +457,10 @@
       text(g.name, cx, py + 3, on ? '#2a0e1a' : '#e8d0b0', 1, null, 'center');
       if (on && A) A.bulbs(px + 2, py - 3, 54, 6, tt);
     });
+    // the gold chip board, up top on the right
+    { const n = Object.keys(C.gold).length; box(228, 18, 84, 36, '#3a2408'); rect('#1a0e04', 231, 29, 78, 22);
+      text('GOLD CHIPS', 270, 21, '#ffe27a', 1, null, 'center'); coin(242, 40);
+      text(n + ' OF 12 FOUND', 252, 33, '#fff6d4', 1, null, 'left'); text(C.free ? C.free + ' FREE BETS' : 'IN THE STAGES', 252, 42, C.free ? '#9aff7a' : '#c8a8a0', 1, null, 'left'); }
     if (A) A.vignette(0.4);
   }
 
@@ -727,7 +741,7 @@
     // side cards
     box(6, 74, 70, 22, '#f4ece0'); text(K.free ? 'FREE TICKET' : unl() ? 'FREE PLAY' : 'PAID ' + TIX[tk.kind].price, 41, 78, K.free ? '#c8202c' : '#3a2a1a', 1, null, 'center'); text(tk.kind ? 'TOP PRIZE 500' : 'TOP PRIZE 1000', 41, 87, '#7a5a3a', 1, null, 'center');
     if (K.state === 'scratch') {
-      box(244, 58, 70, 38, '#f4ece0'); ['DRAG TO SCRATCH', 'OR STEER THE', 'COIN. ' + (DD.padUsed ? 'CROSS' : 'JUMP') + ':', 'SCRATCH IT ALL'].forEach((l, i) => text(l, 279, 62 + i * 8, '#3a2a1a', 1, null, 'center'));
+      box(244, 58, 70, 38, '#f4ece0'); ['DRAG TO SCRATCH', 'OR STEER THE', 'COIN. ' + DD.jumpKey() + ':', 'SCRATCH IT ALL'].forEach((l, i) => text(l, 279, 62 + i * 8, '#3a2a1a', 1, null, 'center'));
     } else {
       btn(6, 120, 66, 14, 'TICKETS', false); const again = unl() ? 'AGAIN: FREE' : (tk.kind === 0 && freeTix() ? 'AGAIN: FREE' : 'AGAIN: ' + TIX[tk.kind].price); btn(248, 120, 66, 14, again, true, '#ffd27a');
     }
@@ -756,17 +770,17 @@
   function placeBet(id, amt) { if (!take(amt)) return false; R.bets[id] = (R.bets[id] || 0) + amt; R.lastSpot = id; tone(900, 700, 0.05, 'square', 0.04); noise(0.03, 0.04, 3000); return true; }
   function rouletteAct(s) {
     if (R.state !== 'bet') return;
-    if (s.id === 'clear') { const n = tableTotal(); if (n && !unl()) ST().bank(n); R.bets = {}; SFX.tick(); if (n) say('CHIPS BACK: ' + n, 60); return; }
+    if (s.id === 'clear') { const n = tableTotal(); if (n) refund(n); R.bets = {}; SFX.tick(); if (n) say('CHIPS BACK: ' + n, 60); return; }
     if (s.id === 'less' || s.id === 'more') { bump(s.id === 'less' ? -1 : 1); return; }
     if (s.id === 'vfa') {
-      const on = R.lastSpot || 'red', all = unl() ? 1000 : pts();
+      const on = R.lastSpot || 'red', all = pts();
       if (all <= 0) { say('NOTHING LEFT TO BET', 80); SFX.buzz(); return; }
       if (!R.vfa) { R.vfa = 1; say('ALL ' + all + ' ON ' + SPOTS.find(q => q.id === on).label + '? AGAIN TO BET THE VFA', 160); tone(330, 330, 0.12, 'square', 0.05); return; }
       R.vfa = 0; placeBet(on, all); say('THE VFA IS ON ' + SPOTS.find(q => q.id === on).label + '!', 120); jingle([196, 247, 294, 392], 0.09); spinWheel(); return;
     }
     if (s.id === 'spin') {
       if (!tableTotal()) {
-        if (R.last && Object.keys(R.last).length) { const need = Object.values(R.last).reduce((a, b) => a + b, 0); if (!unl() && pts() < need) { say('NEED ' + (need - pts()) + ' MORE TO REBET', 90); SFX.buzz(); return; } for (const k in R.last) placeBet(k, R.last[k]); spinWheel(); }
+        if (R.last && Object.keys(R.last).length) { const need = Object.values(R.last).reduce((a, b) => a + b, 0); if (pts() < need) { say('NEED ' + (need - pts()) + ' MORE TO REBET', 90); SFX.buzz(); return; } for (const k in R.last) placeBet(k, R.last[k]); spinWheel(); }
         else { say('PUT A CHIP DOWN FIRST', 70); SFX.buzz(); }
         return;
       }
@@ -836,7 +850,7 @@
       if (cur) { const g = Math.floor(tt / 6) % 2 ? '#ffe680' : '#fff'; rect(g, s.x - 1, s.y - 1, s.w + 3, 1); rect(g, s.x - 1, s.y + s.h + 1, s.w + 3, 1); rect(g, s.x - 1, s.y - 1, 1, s.h + 3); rect(g, s.x + s.w + 1, s.y - 1, 1, s.h + 3); }
       if (R.bets[s.id]) chip(s.x + Math.floor(s.w / 2) + 1, s.y + Math.floor(s.h / 2), R.bets[s.id], s.w < 15 ? 4 : 5, Math.min(3, 1 + Math.floor(R.bets[s.id] / 50)));
     });
-    led(178, 106, 24, BETS[bi], 3, '#ffd040'); text('CHIP', 190, 98, '#9ac8a0', 1, null, 'center');
+    led(178, 106, 24, BETS[bi], 4, '#ffd040'); text('CHIP', 190, 98, '#9ac8a0', 1, null, 'center');
     const s = SPOTS[R.cur], on = R.bets[s.id] || 0, tot = tableTotal();
     text('ON THE TABLE', 120, 126, '#9ac8a0', 1, null); led(172, 124, 30, tot, 4, '#ffd040');
     if (!s.ctl) text(s.label + ' PAYS ' + (s.id[0] === 'n' ? '35' : s.id[0] === 'd' || s.id[0] === 'c' ? '2' : '1') + ' TO 1' + (on ? '. YOU HAVE ' + on : ''), 120, 138, '#cfe8d0', 1, null);
@@ -1087,12 +1101,131 @@
     if (A) A.vignette(0.25);
   }
 
+  // ================================================================ the PRIZE COUNTER: the wardrobe (wardrobe.js), bought with HEI Points, worn by the whole team.
+  // It lives behind the menu's WARDROBE button (menu.js openWardrobe -> openPrizes), not in the lobby; back leaves it
+  const CATS = [['outfit', 'OUTFITS'], ['tex', 'TEXTURES'], ['trail', 'TRAILS'], ['sec', 'SECRETS']];   // SECRETS: the secret stash, claimed with Dot secrets
+  const tabX = k => 130 + k * 47;   // four tabs, 45 wide
+  const PZ = { cat: 0, row: 0, col: 0, top: 0, onTabs: false, pv: { x: 20, y: 0, vy: 0, vx: 0.9, face: 1, f: 0 }, dot: 0, trail: null };
+  const PDOTS = ['sam', 'mel', 'cloud', 'baxter'];
+  const WR = () => window.DDWear;
+  const pzItems = () => !WR() ? [] : CATS[PZ.cat][0] === 'sec' ? WR().ITEMS.filter(i => i.sec) : WR().ITEMS.filter(i => i.cat === CATS[PZ.cat][0] && !i.sec);
+  const SHOWN = 3;   // shelf rows on screen; a longer shelf scrolls (PZ.top)
+  const pzCell = i => ({ x: 130 + (i % 3) * 62, y: 34 + (Math.floor(i / 3) - PZ.top) * 37, w: 58, h: 33 });
+  const pzShown = i => Math.floor(i / 3) >= PZ.top && Math.floor(i / 3) < PZ.top + SHOWN;
+  const pzSel = () => pzItems()[PZ.row * 3 + PZ.col];
+  function pzAct(it) {
+    const Wd = WR(); if (!it || !Wd) return;
+    if (it.sec && !Wd.owns(it.id)) {   // the secret stash: claimed, not bought, and claiming spends no secrets
+      if (Wd.claim(it.id) !== 'ok') { say('FIND ' + (it.sec - Wd.secFound()) + ' MORE DOT SECRETS', 100); SFX.buzz(); return; }
+      winSound(5); bannerUp(it.name + '!', '#ffe680', 2, 90); fountain(64, 100, 18);
+      Wd.wear(it.id); say('CLAIMED WITH ' + it.sec + ' DOT SECRETS. YOU KEEP THEM ALL.', 160); return;
+    }
+    if (!Wd.owns(it.id)) {
+      const r = Wd.buy(it.id);
+      if (r === 'poor') { say('NEED ' + (it.cost - pts()) + ' MORE HEI POINTS', 90); SFX.buzz(); if (ST().poor) ST().poor(); return; }
+      flyCoins(BAL.x + 20, BAL.y + 4, 1); winSound(5); bannerUp(it.name + '!', '#ffe680', 2, 90); fountain(64, 100, 18);
+      Wd.wear(it.id); say('THE WHOLE TEAM WEARS IT. SWITCH DOTS AND IT STAYS ON.', 160); return;
+    }
+    Wd.wear(it.id); SFX.switch(); say(Wd.on(it.cat) === it.id ? 'ON: ' + it.name : 'OFF: ' + it.name, 70);
+  }
+  function prizeStep(IN, c) {
+    const items = pzItems(), rows = Math.ceil(items.length / 3);
+    if (c) {
+      for (let k = 0; k < CATS.length; k++) if (inR(c, tabX(k), 18, 45, 12)) { if (PZ.cat !== k) { PZ.cat = k; PZ.row = PZ.col = PZ.top = 0; pzTab(); SFX.tick(); } PZ.onTabs = false; return; }
+      for (let i = 0; i < items.length; i++) { const R0 = pzCell(i); if (pzShown(i) && inR(c, R0.x, R0.y, R0.w, R0.h)) { if (PZ.row * 3 + PZ.col === i && !PZ.onTabs) pzAct(items[i]); else { PZ.row = Math.floor(i / 3); PZ.col = i % 3; PZ.onTabs = false; SFX.tick(); } return; } }
+    }
+    if (PZ.onTabs) {
+      if (IN.nx) { PZ.cat = mod(PZ.cat + IN.nx, CATS.length); PZ.row = PZ.col = PZ.top = 0; pzTab(); SFX.tick(); }
+      if (IN.ny > 0 || IN.ok) { PZ.onTabs = false; SFX.tick(); }
+    } else {
+      if (IN.nx) { PZ.col = mod(PZ.col + IN.nx, 3); if (PZ.row * 3 + PZ.col >= items.length) PZ.col = IN.nx > 0 ? 0 : (items.length - 1) % 3; SFX.tick(); }
+      if (IN.ny) { const r = PZ.row + IN.ny; if (r < 0) PZ.onTabs = true; else if (r < rows && r * 3 + PZ.col < items.length) PZ.row = r; SFX.tick(); }
+      if (IN.ok) pzAct(pzSel());
+    }
+    PZ.top = Math.max(0, Math.min(PZ.top, PZ.row), PZ.row - SHOWN + 1);   // keep the highlighted row on the shelf
+    if (IN.back) return 'back';
+  }
+  function pzTab() {
+    if (CATS[PZ.cat][0] !== 'sec' || !WR()) { say('BUY IT ONCE AND ALL FOUR DOTS WEAR IT', 160); return; }
+    const n = WR().secFound(); say(n + (n === 1 ? ' DOT SECRET' : ' DOT SECRETS') + ' FOUND. CLAIM A PRIZE AT EACH COUNT.', 160);
+  }
+  function pzPreview() {   // try the highlighted item on, over what the team already wears
+    const Wd = WR(), it = !PZ.onTabs && pzSel(); if (!Wd) return null;
+    return it ? { [it.cat]: it.id } : null;
+  }
+  function pzIcon(it, x, y, tt) {   // a shelf icon, 16 x 24: Sam in the outfit, a swatch of the texture, a sketch of the trail
+    const Wd = WR();
+    if (it.cat === 'outfit') { const was = Wd.preview; Wd.preview = { outfit: it.id, tex: null }; DD.drawDot('sam', 'idle', x + 8, y + 24, false, 1, 1, 0); Wd.preview = was; return; }
+    if (it.cat === 'tex') {
+      const f = Wd.TEX[it.id], T = it.id === 'wood' ? 0 : Math.floor(tt);
+      rect('#120c16', x - 1, y + 3, 18, 18);
+      for (let j = 0; j < 16; j++) for (let i = 0; i < 16; i++) { const c = f(i, j, 16, 16, T, [224, 106, 26], i === 0 || j === 0 || i === 15 || j === 15); if (c) rect('rgb(' + (c[0] | 0) + ',' + (c[1] | 0) + ',' + (c[2] | 0) + ')', x + i, y + 4 + j, 1, 1); }
+      return;
+    }
+    const k = it.id, b = y + 20, ph = tt / 8;
+    if (k === 'popcorn') for (let i = 0; i < 4; i++) { const yy = b - 4 - Math.abs(Math.sin(ph + i)) * 8; rect('#3a2010', x + 2 + i * 4, yy, 3, 3); rect('#fff6d4', x + 2 + i * 4, yy, 2, 2); }
+    if (k === 'vape') for (let i = 0; i < 3; i++) { const r = 2 + i; ctx.globalAlpha = 0.8 - i * 0.2; ell(x + 3 + i * 5, b - 6 - i * 4, r, r, '#e8e4f0'); ctx.globalAlpha = 1; }
+    if (k === 'carpet') { rect('#c8202c', x, b - 2, 14, 2); rect('#e8b030', x, b - 3, 14, 1); ell(x + 15, b - 3, 2, 2, '#9a1418'); }
+    if (k === 'tape') { for (let i = 0; i < 16; i++) rect('#2a1408', x + i, b - 8 + Math.round(Math.sin(i * 0.6 + ph) * 3), 1, 1); }
+    if (k === 'bags') for (let i = 0; i < 3; i++) { const bx = x + 2 + i * 6, by = b - Math.abs(Math.sin(ph + i)) * 3; rect('#2a0e1a', bx - 1, by - 6, 5, 6); rect('#fff6e8', bx, by - 5, 3, 5); rect('#d8202c', bx + 1, by - 5, 1, 5); rect('#ffe680', bx, by - 7, 3, 1); }
+    if (k === 'stewdog') { Wd.stewDog(x + 9, b + 2); Wd.stewDog(x + 8, b - 7 - Math.round(Math.abs(Math.sin(ph)) * 3)); }
+    if (k === 'rats') { Wd.rat(x + 9 + Math.round(Math.sin(ph) * 2), b + 3, 1, Math.floor(tt)); Wd.rat(x + 7 + Math.round(Math.sin(ph + 2) * 2), b - 6, 1, Math.floor(tt) + 2); }
+    if (k === 'stickers') { Wd.sticker(x + 9, b - 4, 0); Wd.sticker(x + 8, b + 4, 1); }
+    if (k === 'moneyzap') { Wd.bill(x + 8, b - 9 - Math.abs(Math.sin(ph)) * 2, Math.sin(ph) * 0.7); Wd.bill(x + 10, b + 1 - Math.abs(Math.sin(ph + 1)) * 2, 0.4 + Math.sin(ph + 2) * 0.6); }   // a gentle wobble: never edge-on in the icon
+    if (k === 'echo') for (let i = 2; i >= 0; i--) { ctx.save(); ctx.globalAlpha = i ? 0.35 : 1; if (i) ctx.filter = 'hue-rotate(' + (i * 120 + tt * 6) % 360 + 'deg)'; DD.drawDot('sam', 'walk1', x + 10 - i * 3, y + 24, false, 1, 1, 0); ctx.restore(); }
+  }
+  function prizeDraw(tt) {
+    room(tt, 118, 0.75);
+    const Wd = WR(); if (!Wd) { text('THE PRIZE COUNTER IS CLOSED', VW / 2, 80, '#ffe680', 1, '#000', 'center'); return; }
+    // the try-on stage: one Dot at a time walks the counter at 2x, wearing the look (and the highlighted item), trail and all
+    box(6, 18, 118, 128, '#3a0812'); rect('#1a0306', 9, 21, 112, 122);
+    logo('PRIZES', 65, 25, 2, GOLD, (tt * 1.4) % 120 + 20);
+    const pv = PZ.pv; pv.f++;
+    if (pv.f % 240 === 0) PZ.dot = (PZ.dot + 1) % PDOTS.length;
+    pv.x += pv.vx; if (pv.x > 48 || pv.x < 8) { pv.vx = -pv.vx; pv.face = Math.sign(pv.vx); }
+    if (pv.y === 0 && pv.f % 150 === 75) pv.vy = -3.2;
+    pv.vy += pv.y < 0 || pv.vy < 0 ? 0.2 : 0; pv.y = Math.min(0, pv.y + pv.vy); if (pv.y === 0 && pv.vy > 0) pv.vy = 0;
+    const dot = PDOTS[PZ.dot], gnd = pv.y === 0, pose = !gnd ? (pv.vy < -0.5 ? 'jump' : pv.vy > 0.5 ? 'fall' : 'apex') : 'walk' + (Math.floor(pv.f / 6) % 4);
+    Wd.preview = Object.assign({}, pzPreview());
+    if (!PZ.trail) PZ.trail = Wd.makeTrail();
+    const tr = Wd.preview.trail !== undefined ? Wd.preview.trail : Wd.on('trail');
+    PZ.trail.step(tr, 'shop', pv.x, 46 + pv.y, dot === 'baxter' ? 38 : 22, gnd, pv.vx, pv.face, dot, pose);
+    if (A) A.cone(9 + pv.x * 2, 21, 105, 30, '#fff2c0', 0.1);
+    ctx.save(); ctx.beginPath(); ctx.rect(9, 38, 112, 95); ctx.clip(); ctx.translate(9, 34); ctx.scale(2, 2);
+    rect('#3a0812', 0, 46, 56, 4); rect('#c98f22', 0, 46, 56, 1); ell(pv.x, 46, 8, 1, 'rgba(0,0,0,0.4)');
+    PZ.trail.draw(x => x, y => y);
+    DD.drawDot(dot, pose, pv.x, 46 + pv.y, pv.face < 0, 1, 1, 0);
+    ctx.restore();
+    Wd.preview = null;
+    text(CATS[PZ.cat][0] === 'sec' ? 'DOT SECRETS FOUND ' + Wd.secFound() : 'WORN BY ALL FOUR DOTS', 65, 135, CATS[PZ.cat][0] === 'sec' ? '#ffe680' : '#c8a8a0', 1, null, 'center');
+    // the tabs and the shelf
+    CATS.forEach(([k, n], i) => btn(tabX(i), 18, 45, 12, n, i === PZ.cat, PZ.onTabs && i === PZ.cat ? '#ffe680' : '#c98f22'));
+    pzItems().forEach((it, i) => {
+      if (!pzShown(i)) return;
+      const R0 = pzCell(i), sel = !PZ.onTabs && i === PZ.row * 3 + PZ.col, own = Wd.owns(it.id), on = Wd.on(it.cat) === it.id;
+      rbox(R0.x, R0.y, R0.w, R0.h, 2, sel ? '#7a2a10' : '#2a0e1a', sel ? '#ffe680' : '#000');
+      if (sel && A) A.bulbs(R0.x + 2, R0.y - 2, R0.w - 4, 6, tt);
+      pzIcon(it, R0.x + 3, R0.y + 4, tt);
+      const L = wrapT(it.name, 9); L.forEach((l, j) => text(l, R0.x + 22, R0.y + 4 + j * 7, '#fff6d4', 1, null, 'left'));
+      const found = it.sec ? Wd.secFound() : 0;
+      const tag = on ? 'WEARING' : own ? (unl() && !it.sec ? 'FREE' : 'OWNED') : it.sec ? (found >= it.sec ? 'CLAIM' : found + '/' + it.sec) : String(it.cost);
+      const col = on ? '#9aff7a' : own ? '#a8d0ff' : (it.sec ? found >= it.sec : pts() >= it.cost) ? '#ffe680' : '#ff9090';
+      text(tag, R0.x + R0.w - 4, R0.y + R0.h - 9, col, 1, null, 'right');
+    });
+    { const rows = Math.ceil(pzItems().length / 3), bob = Math.floor(tt / 10) % 2;   // a longer shelf: arrows where more is
+      if (PZ.top > 0) for (let k = 0; k < 3; k++) rect('#ffe680', 252 - k, 31 - k - bob, 1 + k * 2, 1);
+      if (PZ.top + SHOWN < rows) for (let k = 0; k < 3; k++) rect('#ffe680', 252 - k, 146 + k + bob, 1 + k * 2, 1); }
+  }
+
   // ================================================================ the screen
+  function openPrizes() { t = 0; banner = null; msgT = 0; enter('prize'); pzTab(); }
   function open() {
     t = 0; scr = 'lobby'; banner = null;
     if (!C.seen) { C.seen = 1; csave(); vo('CAS2.mp3', 0); say('LUCKY SEASON 7. BET HEI POINTS, WIN HEI POINTS.', 200); }
     else if (!sessOpen) vo('CAS1.mp3', 0);
     sessOpen = true;
+    if (unl()) { H = HOUSE; setTimeout(() => say('UNLIMITED: THE HOUSE STAKES YOU ' + HOUSE + '. BEST VISIT ' + C.houseBest, 200), 400); }
+    else if (C.free) say(C.free + ' FREE BETS FROM GOLD CHIPS: UP TO ' + FREE + ' EACH, ON THE HOUSE', 200);
     if (freeTix()) say('FREE TICKET WAITING AT THE SCRATCHERS!', 200);
   }
   function step(IN, c) {   // returns 'back' to leave the store
@@ -1101,27 +1234,29 @@
     coins = coins.filter(f => { f.t++; if (f.t === f.d) SFX.count(f.k % 12); return f.t < f.d; });
     spark = spark.filter(p => { p.t++; p.x += p.vx; p.y += p.vy; p.vy += 0.18; return p.t < p.life; });
     if (c && inR(c, 0, 0, 58, 14)) {   // the header's BACK button: a game goes back to the lobby, the lobby leaves the store
-      if (scr === 'lobby') return 'back';
+      if (scr === 'lobby' || scr === 'prize') return 'back';
       if (busy()) { say('FINISH THIS ONE FIRST', 70); SFX.buzz(); return; }
       scr = 'lobby'; SFX.switch(); return;
     }
     if (IN.back && busy() && scr !== 'scratch' && !(scr === 'bj' && B.walk)) { say('FINISH THIS ONE FIRST', 70); SFX.buzz(); }
     if (scr === 'lobby') return lobbyStep(IN, c);
-    if (scr === 'slots') slotsStep(IN, c); else if (scr === 'scratch') scratchStep(IN, c); else if (scr === 'roul') rouletteStep(IN, c); else if (scr === 'bj') bjStep(IN, c); else if (scr === 'bingo') bingoStep(IN, c);
+    if (scr === 'prize') return prizeStep(IN, c); else if (scr === 'slots') slotsStep(IN, c); else if (scr === 'scratch') scratchStep(IN, c); else if (scr === 'roul') rouletteStep(IN, c); else if (scr === 'bj') bjStep(IN, c); else if (scr === 'bingo') bingoStep(IN, c);
   }
   const busy = () => (scr === 'slots' && S.state === 'spin') || (scr === 'roul' && R.state === 'spin') || (scr === 'bj' && !['bet', 'done', 'play'].includes(B.state)) || (scr === 'scratch' && K.state === 'scratch') || (scr === 'bingo' && BG.state === 'play');
   function draw() {
     const tt = t;
     ctx.save(); if (shake) ctx.translate(Math.round((Math.random() - 0.5) * Math.min(6, shake / 3)), Math.round((Math.random() - 0.5) * Math.min(6, shake / 3)));
-    if (scr === 'lobby') lobbyDraw(tt); else if (scr === 'slots') slotsDraw(tt); else if (scr === 'scratch') scratchDraw(tt); else if (scr === 'roul') rouletteDraw(tt); else if (scr === 'bingo') bingoDraw(tt); else bjDraw(tt);
+    if (scr === 'lobby') lobbyDraw(tt); else if (scr === 'prize') prizeDraw(tt); else if (scr === 'slots') slotsDraw(tt); else if (scr === 'scratch') scratchDraw(tt); else if (scr === 'roul') rouletteDraw(tt); else if (scr === 'bingo') bingoDraw(tt); else bjDraw(tt);
     ctx.restore();
     // footer
     rect('#0a0408', 0, 149, VW, 31); if (A) A.trim(0, 148, VW, '#c98f22');
     rect('#000', 6, 151, VW - 12, 13); rect('#000', 5, 152, VW - 10, 11); rect('#1a0810', 6, 152, VW - 12, 11); rect('#3a1a24', 6, 152, VW - 12, 1);   // the message strip
     if (msgT > 0) text(msg, VW / 2, 155, msg.startsWith('NEED') || msg.startsWith('OUT') ? '#ff8080' : '#ffe680', 1, null, 'center');
-    else text(unl() ? 'UNLIMITED HEI POINTS: EVERYTHING PLAYS FREE, NOTHING PAYS' : scr === 'lobby' ? 'BIGGEST WIN ' + C.big + '   BEST STREAK ' + C.best + '   YOU VS THE HOUSE ' + (C.net > 0 ? '+' : '') + C.net : 'BALANCE ' + pts() + '   YOU VS THE HOUSE ' + (C.net > 0 ? '+' : '') + C.net, VW / 2, 155, '#9a8a90', 1, null, 'center');
-    const J = DD.padUsed ? 'CROSS' : 'JUMP', X = DD.padUsed ? 'CIRCLE' : 'X', SW = DD.padUsed ? 'R1' : 'C';
-    const keys = scr === 'lobby' ? [['LEFT/RIGHT', 'PICK'], [J, 'PLAY'], [SW, 'STORE'], [X, ST() ? ST().backLabel : 'BACK']]   // the controls as keycaps: [key, what it does]
+    else text(unl() ? 'HOUSE STACK ' + H + '   BEST VISIT ' + C.houseBest : scr === 'prize' ? 'BALANCE ' + pts() + '   PRIZES ARE LOOKS ONLY: NO EDGE' : scr === 'lobby' ? 'BIGGEST WIN ' + C.big + '   BEST STREAK ' + C.best + '   YOU VS THE HOUSE ' + (C.net > 0 ? '+' : '') + C.net : 'YOU VS THE HOUSE ' + (C.net > 0 ? '+' : '') + C.net, VW / 2, 155, '#9a8a90', 1, null, 'center');
+    const J = DD.jumpKey(), X = DD.padUsed ? 'CIRCLE' : 'X', SW = DD.padUsed ? 'R1' : 'C';
+    const pzIt = scr === 'prize' && !PZ.onTabs && pzSel(), pzW = WR();
+    const keys = scr === 'lobby' ? [['LEFT/RIGHT', 'PICK'], [J, 'PLAY'], [SW, 'STORE'], [X, ST() ? ST().backLabel : 'BACK']]
+      : scr === 'prize' ? [['ARROWS', 'PICK'], [J, !pzIt ? 'SHELF' : !pzW.owns(pzIt.id) ? (pzIt.sec ? (pzW.secFound() >= pzIt.sec ? 'CLAIM' : 'NEED ' + pzIt.sec) : 'BUY ' + pzIt.cost) : pzW.on(pzIt.cat) === pzIt.id ? 'TAKE OFF' : 'WEAR'], [X, 'BACK']]   // the controls as keycaps: [key, what it does]
       : scr === 'slots' ? (S.state === 'spin' ? [[J, 'STOP THE REELS']] : [[J, 'SPIN'], ['ARROWS', 'BET'], [X, 'CASINO']])
       : scr === 'scratch' ? (K.state === 'pick' ? [['LEFT/RIGHT', 'PICK'], [J, 'BUY'], [X, 'CASINO']] : K.state === 'scratch' ? [['DRAG OR ARROWS', 'SCRATCH'], [J, 'ALL'], [X, 'REVEAL']] : [[J, 'AGAIN'], [X, 'TICKETS']])
       : scr === 'roul' ? (R.state === 'spin' ? [[J, 'HURRY IT UP']] : [['ARROWS', 'MOVE'], [J, 'CHIP DOWN / PRESS'], [X, 'CASINO']])
@@ -1153,6 +1288,6 @@
     DD.setScene({ step: IN => { if (st.step(IN, IN.click) === 'back') st.open({ label: 'BACK' }); }, draw: () => st.draw() });
   }, 100); }
 
-  window.DDCasino = { open, step, draw, drawTop, M, BETS, get scr() { return scr; }, get busy() { return busy(); }, get stats() { return C; }, reload: cload,
-    test: { S, K, R, B, BG, bingoBuy, daub, get t() { return t; }, set bi(n) { bi = n; }, enter, spin, deal, buyTicket, spinWheel, placeBet, settle, freeTix } };
+  window.DDCasino = { open, openPrizes, step, draw, drawTop, M, BETS, goldChip, hasChip: id => !!C.gold[String(id).split('-')[0]], get free() { return C.free; }, get scr() { return scr; }, get busy() { return busy(); }, get stats() { return C; }, reload: cload,
+    test: { S, K, R, B, BG, PZ, get H() { return H; }, get credit() { return credit; }, bingoBuy, daub, get t() { return t; }, set bi(n) { bi = n; }, enter, spin, deal, buyTicket, spinWheel, placeBet, settle, freeTix } };
 })();

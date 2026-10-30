@@ -48,7 +48,7 @@
         { fn: () => { DD.dust(X - 44, FL - 2, 6, 1.6, '#d8cdb0'); } },
         { set: 'new', spr: 'w11_new_bald' },
         { wait: 24 },
-        { say: 'gm', hold: 100, text: "YOU DON'T HAVE TO WEAR A WIG. YOU CAN WEAR A HAT." },   // S16 premiere (the-strangers-chapter-2... captions 6:52): Gregg, after "my hair fell out, like all of it fell out within a week"
+        { say: 'gm', hold: 100, text: "YOU DON'T HAVE TO WEAR A WIG. YOU CAN WEAR A HAT.", clip: 'N3' },   // S16 premiere (the-strangers-chapter-2... captions 6:52): Gregg, after "my hair fell out, like all of it fell out within a week"
         { move: 'wig', x: X - 4, y: FL - 46, t: 26, hop: 14, walk: false },
         { gone: 'wig' },
         { set: 'new', spr: 'w11_new_a' },

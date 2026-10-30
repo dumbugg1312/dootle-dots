@@ -52,10 +52,12 @@
     return { six: sixOn(), bags: a('bags'), shield: a('shield'), takes: a('takes'), keep: 0.06 * d, life: 60 * d, star: 300 * a('star'),
       jump: 1 + 0.03 * a('jump'), speed: 1 + 0.05 * a('speed'), magnet: m ? 16 * (m + 1) + 8 : 0, foam: a('foam') };
   }
-  function award(r) {   // a won run's HEI Points: 10 for the clear, 4 a bag, 5 for the tape, 5 for the blue card, 15 for a boss, 15 the first time
+  function award(r) {   // a won run's HEI Points: 10 for the clear, 4 a bag, 5 for the tape, 5 for the blue card, 15 for a boss, 15 the first time, 10 a new Dot secret (+10 for the set)
     const P = window.__menu && window.__menu.PROG, first = !!P && !P[r.id];
     let n = 10 + 4 * (r.bags || 0) + (r.vhs ? 5 : 0) + (r.fact === 'right' ? 5 : 0) + (r.boss ? 15 : 0) + (first ? 15 : 0);
     if (r.six) n += 4;   // the sixth bag pays like the others
+    const had = (P && P[r.id] && P[r.id].sec) || [], fresh = (r.dsec || []).filter(d => !had.includes(d));   // Dot secrets: 10 each the first time, 10 more when the stage's set is complete
+    n += 10 * fresh.length; if (fresh.length && r.dsecAll && r.dsecAll.length && r.dsecAll.every(d => had.includes(d) || r.dsec.includes(d))) n += 10;
     const rw = lvl('rewards'); if (rw) n = Math.round(n * (1 + 0.1 * rw));
     S.pts += n; S.earned += n; save();
     return { n, first, can: canBuy() };
@@ -114,7 +116,7 @@
   }
   function nudge(i, d) {
     const u = items()[i], o = own(u.id), a = act(u.id), onOff = u.id === 'six';
-    if (d > 0) { if (a < o) { setAct(u.id, a + 1); SFX.tick(); say(onOff ? 'SIX BAGS IS ON' : u.name + ' SET TO LEVEL ' + (a + 1), 50); } else if (o < maxOf(u)) { SFX.buzz(); say(DD.padUsed ? 'CROSS BUYS LEVEL ' + (o + 1) : 'JUMP BUYS LEVEL ' + (o + 1), 50); } else SFX.buzz(); }
+    if (d > 0) { if (a < o) { setAct(u.id, a + 1); SFX.tick(); say(onOff ? 'SIX BAGS IS ON' : u.name + ' SET TO LEVEL ' + (a + 1), 50); } else if (o < maxOf(u)) { SFX.buzz(); say(DD.jumpKey() + ' BUYS LEVEL ' + (o + 1), 50); } else SFX.buzz(); }
     else if (a > 0) { setAct(u.id, a - 1); SFX.tick(); say(onOff ? 'SIX BAGS IS OFF. FIVE IS THE HIGHEST AGAIN.' : a - 1 ? u.name + ' SET TO LEVEL ' + (a - 1) : u.name + ' TURNED OFF', 50); }
     else SFX.buzz();
   }
@@ -213,7 +215,7 @@
     if (max) text(u.kind === 2 ? "TIM'S CALL" : 'MAXED OUT', B.x + B.w / 2, B.y + 5, '#c8b8c0', 1, null, 'center');
     else {
       const cost = UNL ? 'FREE' : String(priceOf(u, o)), ink = ok ? '#2a0e1a' : '#d8a0a0';
-      text((DD.padUsed ? 'CROSS: ' : 'JUMP: ') + (u.kind === 2 ? 'BUY SIX BAGS' : 'BUY LEVEL ' + (o + 1)), B.x + 6, B.y + 5 - hb, ink, 1, null);
+      text(ok ? DD.jumpKey() + ': ' + (u.kind === 2 ? 'BUY SIX BAGS' : 'BUY LEVEL ' + (o + 1)) : 'NOT ENOUGH POINTS', B.x + 6, B.y + 5 - hb, ink, 1, null);   // no buy prompt you can't act on
       text(cost, B.x + B.w - 6, B.y + 5 - hb, ok ? '#2a0e1a' : '#ff9090', 1, null, 'right');
       icon('rewards', B.x + B.w - 6 - cost.length * 4 - 10, B.y + 3 - hb, 1);
     }
@@ -223,7 +225,7 @@
     rect('#000', 6, 148, VW - 12, 13); rect('#000', 5, 149, VW - 10, 11); rect('#1a0810', 6, 149, VW - 12, 11); rect('#3a1a24', 6, 149, VW - 12, 1);
     if (msgT > 0) text(msg, VW / 2, 152, msg.startsWith('NEED') || msg.endsWith('MAXED OUT') ? '#ff8080' : '#ffe680', 1, null, 'center');
     else text(TIPS[tip], VW / 2, 152, '#9a8a90', 1, null, 'center');
-    window.DDUI.keycaps(DD.padUsed ? [['CROSS', 'BUY'], ['LEFT/RIGHT', 'DOWN/UP'], ['R1', 'CASINO'], ['CIRCLE', label]] : [['JUMP', 'BUY'], ['LEFT/RIGHT', 'DOWN/UP'], ['C', 'CASINO'], ['X', label]]);
+    window.DDUI.keycaps(DD.padUsed ? [['CROSS', 'BUY'], ['LEFT/RIGHT', 'LEVEL -/+'], ['R1', 'CASINO'], ['CIRCLE', label]] : [['JUMP', 'BUY'], ['LEFT/RIGHT', 'LEVEL -/+'], ['C', 'CASINO'], ['X', label]]);
   }
 
   window.DDStore = {

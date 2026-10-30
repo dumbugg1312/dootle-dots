@@ -244,7 +244,7 @@
     if (S.cap) drawCap(S, S.cap);
     if (S.hint > 0 && S.ready && !S.closing) {   // the skip prompt, in the top bar, when a key goes down
       ctx.globalAlpha = Math.min(1, S.hint / 30) * 0.9;
-      const s = 'HOLD JUMP TO SKIP', w = s.length * 4 - 1, x = VW - 8 - w;
+      const s = 'HOLD ' + (DD.jumpKey ? DD.jumpKey() : 'JUMP') + ' TO SKIP', w = s.length * 4 - 1, x = VW - 8 - w;
       text(s, x, 6, '#a8a0b8', 1, null);
       rect('#3a3446', x, 13, w, 1); if (S.skipT) rect('#ffe680', x, 13, Math.round(w * S.skipT / SKIP_HOLD), 1);
       ctx.globalAlpha = 1;
@@ -290,7 +290,7 @@
       if (c.from) text(c.from, VW / 2, Y + 11, acc, 1, '#000', 'center');
       const sc = fitScale(c.title, 216, 4);
       text(c.title, VW / 2 + 1, Y + 22 + 1, '#000', sc, null, 'center'); text(c.title, VW / 2, Y + 22, '#ffffff', sc, null, 'center');
-      if (c.sub) text(c.sub, VW / 2, Y + 24 + sc * 5 + 6, '#e8504a', 1, '#000', 'center');
+      if (c.sub) text(c.sub, VW / 2, Y + 24 + sc * 5 + 6, '#ffb4a4', 1, '#000', 'center');
       ctx.restore();
     } else if (c.kind === 'era') {   // the film-leader strip of the title wipe, in the world's colours, with the seasons and the tag
       const X = t < 16 ? -Math.round((1 - eOut(t / 16)) * (VW + 20)) : t > out ? Math.round(ease((t - out) / 16) * (VW + 20)) : 0;

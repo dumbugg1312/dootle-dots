@@ -104,7 +104,8 @@
   // taps on the canvas itself (portraits, menus, dialogue) go to the engine's pointer handlers; just keep the page from scrolling or zooming
   document.addEventListener('touchmove', e => { if (!root.contains(e.target)) e.preventDefault(); }, { passive: false });
   document.addEventListener('touchstart', () => root.classList.remove('kb'), { passive: true });
-  addEventListener('keydown', e => { if (e.isTrusted) root.classList.add('kb'); });   // a real key: a keyboard is here, step aside
+  addEventListener('keydown', e => { if (e.isTrusted) root.classList.add('kb'); });
+  window.DDTouch = { on: () => !root.classList.contains('kb') };   // prompts say JUMP (the on-screen button) while the overlay is up   // a real key: a keyboard is here, step aside
   addEventListener('blur', () => { for (const c in held) held[c] = 0; fingers.clear(); });   // the engine drops its keys on blur too
   document.addEventListener('visibilitychange', () => { if (document.hidden) releaseAll(); });
   const portrait = matchMedia('(orientation: portrait)');

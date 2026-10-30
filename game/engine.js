@@ -263,9 +263,12 @@ const P = {
   accWalk: 0.06, accRun: 0.02,     // quick to walk speed, then a slower build to a full run
   fric: 0.08, skid: 0.15,          // release slows you; reversing at speed skids
   airAcc: 0.055, airDrag: 0.995,
+  airTurn: 0.1,                    // pushing against your momentum in the air bites harder, so you can steer back onto a ledge (not during a knock-back)
   jump: 4.6, jumpRun: 0.45,        // jump strength, plus a bonus that scales with running speed
   gUp: 0.19, gApex: 0.11, gDown: 0.5, gCut: 0.6, term: 5.5,   // held rise, apex hang, fall, released-early rise, max fall
+  gEase0: 0.6, gEase1: 2.6,        // past the apex, held-jump gravity eases from gApex to gDown across this fall speed: no jolt, same airtime as the old hard switch
   coyote: 6, buffer: 7, corner: 5,
+  ledge: 4,                        // feet this many px short of a ledge top in the air: pop up onto it instead of stopping at the wall
   dj: 4.2,                         // Sam's second jump
   glide: 0.8,                      // Cloud's max fall while holding jump
   melRun: 2.4, melRoll: 1.9,       // Mel runs a little faster, and curls into a bowling ball above melRoll
@@ -310,7 +313,7 @@ function build() {
   G = {
     frame: 0, state: Q.has('warp') || Q.has('sim') ? 'play' : 'title', got: 0, vhs: false, hitstop: 0, shake: 0,
     banner: null, cp: null, cardT: (L.CARD_LANES || []).map(() => 0), gateRespawn: 0, done: null, restartReq: false, combo: 0, comboT: 0, chain: 0,
-    secrets: {}, heads: {}, cards: [], seen: { sam: true }, denyT: 0, met: {}, bq: [], things: {}, s: {}, boss: null,   // s: free scratch space for level scripts
+    secrets: {}, dsec: {}, dsecT: 0, heads: {}, cards: [], seen: { sam: true }, denyT: 0, met: {}, bq: [], things: {}, s: {}, boss: null,   // s: free scratch space for level scripts
     intro: 0, dlg: { q: [], cur: null, last: null, show: 0, gap: 0 }, lineSeen: {}, fall: null, pm: { sel: 0 }, hudGot: 0, cntT: 0, cntDir: 1, bagN: 0, bagWig: [0, 0, 0, 0, 0, 0],
     pk: K, shield: K.shield || 0, takes: K.takes || 0, star: K.star || 0, perkT: 0,   // what's left of this run's MISTRIAL hits, TAKE TWO falls and GERM FREE frames
   };
@@ -326,10 +329,13 @@ function build() {
     else if (k === 'tub') bodies.push({ kind: 'tub', x: px, y: (y + 2) * TS - 22, w: 16, h: 22, on: true, squash: 0 });
     else if (k === 'plate') bodies.push({ kind: 'plate', x: px - TS, y: (y + 1) * TS - 3, w: 3 * TS, h: 3, on: false, lit: 0 });
     else if (k === 'vhs') bodies.push({ kind: 'vhs', x: px, y: py, w: 16, h: 24, on: false, got: false });
+    else if (k === 'dsec') { const d = th[3] in DOTS ? th[3] : 'sam'; bodies.push({ kind: 'dsec', dot: d, x: px, y: py, w: 16, h: 16, on: false, got: false, had: !TR && !!DD.opts && (DD.opts.dsec || []).includes(d) }); }   // a Dot secret (args[0]: whose); had = found on an earlier run
+    else if (k === 'gchip') bodies.push({ kind: 'gchip', x: px + 1, y: py + 1, w: 14, h: 14, on: false, got: false, had: !TR && !!window.DDCasino && window.DDCasino.hasChip(L.id) });   // the world's gold chip: three free bets at the casino
     else if (k === 'goal') bodies.push({ kind: 'goal', x: px, y: py, w: 48, h: 8 * TS, on: false });
     else if (ENT[k]) spawn(k, { x: px, y: py, tx: x, ty: y, args: th.slice(3) });
     else (G.things[k] = G.things[k] || []).push({ kind: k, x: px, y: py, tx: x, ty: y, args: th.slice(3) });   // unknown kinds are kept for level scripts
   }
+  G.dsecDots = ORDER.filter(d => bodies.some(b => b.kind === 'dsec' && b.dot === d)); G.dsecHad = bodies.filter(b => b.kind === 'dsec' && b.had).map(b => b.dot);   // this stage's Dot secrets, and the ones already on the save
   for (const [x, y, n] of L.POPCORN || []) for (let i = 0; i < n; i++) addPop(x + i, y);
   for (const [x, y] of L.CLOUD_ARC || []) addPop(x, y, 'cloud');
   popsTotal = pops.length;
@@ -357,7 +363,7 @@ function unbury() {   // safety net: a kernel or pickup placed inside solid tile
       for (let d = 1; d <= 12 && solidAt(c.x, c.y); d++) { if (!solidAt(x0 - d * TS, y0)) c.x = x0 - d * TS; else if (!solidAt(x0 + d * TS, y0)) c.x = x0 + d * TS; }
     }
   }
-  for (const b of bodies) if (b.kind === 'vhs' || b.kind === 'cp') {
+  for (const b of bodies) if (b.kind === 'vhs' || b.kind === 'cp' || b.kind === 'gchip') {
     const inside = () => { for (let y = b.y; y < b.y + b.h; y += 4) for (let x = b.x; x < b.x + b.w; x += 4) if (!solidAt(x, y)) return false; return true; };
     for (let n = 0; n < 8 && inside(); n++) b.y -= TS;
   }
@@ -554,8 +560,8 @@ function drawBossHUD() {   // the boss's name and health pips, in a slim plate a
   text(B.name, VW / 2, 5, '#ffe680', 1, '#000', 'center');
   for (let i = 0; i < n; i++) {
     const full = i < B.hp, fl = B.flash > 0 && Math.floor(B.flash / 3) % 2;
-    ctx.fillStyle = '#3a1a20'; ctx.fillRect(x0 + i * 9, y0, 8, 7);
-    if (full || fl) { ctx.fillStyle = fl ? '#fff' : '#d8202c'; ctx.fillRect(x0 + i * 9 + 1, y0 + 1, 6, 5); ctx.fillStyle = '#ff9a8a'; if (!fl) ctx.fillRect(x0 + i * 9 + 1, y0 + 1, 6, 1); }
+    ctx.fillStyle = '#3a2a10'; ctx.fillRect(x0 + i * 9, y0, 8, 7);
+    if (full || fl) { ctx.fillStyle = fl ? '#fff' : '#f0a020'; ctx.fillRect(x0 + i * 9 + 1, y0 + 1, 6, 5); ctx.fillStyle = '#fff2a8'; if (!fl) ctx.fillRect(x0 + i * 9 + 1, y0 + 1, 6, 1); }   // gold, so it never reads as the red popcorn tubs beside it
   }
 }
 
@@ -608,7 +614,8 @@ function updatePlayer() {
   }
 
   // carried by a moving card
-  if (p.onGround && p.ground && p.ground.kind === 'card') moveX(p, p.ground.vx);
+  const card = p.onGround && p.ground && p.ground.kind === 'card' ? p.ground : null;
+  if (card) moveX(p, card.vx);
 
   // switch Dots any time: the switch button cycles, 1-4 or a click on a portrait picks one
   if (IN.pick) setDot(IN.pick);
@@ -642,7 +649,7 @@ function updatePlayer() {
     }
   } else {
     const max = Math.max(P.walk, p.airMax);
-    if (dir) p.vx = clamp(p.vx + dir * P.airAcc, -max, max); else p.vx *= P.airDrag;
+    if (dir) p.vx = clamp(p.vx + dir * (sign(p.vx) === -dir && !p.inv ? P.airTurn : P.airAcc), -max, max); else p.vx *= P.airDrag;
   }
 
   // crate: push it while walking into it on the ground
@@ -672,15 +679,21 @@ function updatePlayer() {
   else {
     let g;
     if (p.vy < 0) g = p.held ? (p.vy > -1.2 ? P.gApex : P.gUp) : P.gCut;
-    else g = p.held && p.vy < 1.2 ? P.gApex : P.gDown;
+    else if (p.held) { const t = clamp((p.vy - P.gEase0) / (P.gEase1 - P.gEase0), 0, 1); g = P.gApex + (P.gDown - P.gApex) * t * t * (3 - 2 * t); }
+    else g = P.gDown;
     p.vy = Math.min(p.vy + g, P.term);
     p.glide = p.dot === 'cloud' && p.held && p.vy > P.glide;
     if (p.glide) p.vy = Math.max(P.glide, p.vy - 0.4);
   }
 
   // move
-  const hx = moveX(p, p.vx);
-  if (hx) { if (p.rolling && Math.abs(p.vx) > 2) { G.shake = 2; SFX.land(2); } p.vx = 0; }
+  const x0 = p.x, hx = moveX(p, p.vx);
+  if (hx && !p.onGround && !p.slam && p.vy > -1.5) {
+    // ledge pop-up: feet just short of the top of what you flew into, and room above it: step up onto it and keep going
+    const fy = bot(p) - 0.01, top = hx === 'tile' ? Math.floor(fy / TS) * TS : hx.y;
+    if (bot(p) - top <= P.ledge && boxFree(x0 + p.vx, top - p.h, p.w, p.h)) { p.x = x0 + p.vx; p.y = top - p.h; p.vy = Math.max(p.vy, 0); }
+    else { if (p.rolling && Math.abs(p.vx) > 2) { G.shake = 2; SFX.land(2); } p.vx = 0; }
+  } else if (hx) { if (p.rolling && Math.abs(p.vx) > 2) { G.shake = 2; SFX.land(2); } p.vx = 0; }
   const preVy = p.vy, prevTop = p.y;
   p.onGround = false; p.ground = null;
   const r = moveY(p, p.vy, true, true);
@@ -692,6 +705,7 @@ function updatePlayer() {
     }
     if (!fixed) { p.vy = 0.5; SFX.land(1); }
   } else if (r) {
+    if (r.tile === 2 && !wasGround && preVy > 0) p.ledgeT = G.frame;   // landed on a one-way ledge this frame (a boss under it can be stomped through it)
     if (p.slam === 2) slamLand(r);
     if (p.slam !== 2) {
       p.onGround = true; p.ground = r.body || 'tile'; p.usedDJ = false; G.chain = 0;
@@ -705,6 +719,7 @@ function updatePlayer() {
       p.vy = 0; p.airMax = P.walk;
     }
   }
+  if (card && !p.onGround) { p.vx += card.vx; p.airMax = Math.max(p.airMax, Math.abs(p.vx)); }   // jump or step off a card and keep its speed
   if (wasGround && !p.onGround && p.vy >= 0) p.coyote = P.coyote; else if (p.coyote > 0) p.coyote--;
   if (p.onGround) p.coyote = 0;
 
@@ -964,20 +979,31 @@ function interact() {
       b.lit = true; G.safe = { x: b.x, y: bot(b) - p.h, f: bot(b) }; G.cpSafe = Object.assign({}, G.safe); SFX.cp(); vo('checkpoint'); stars(cx(b), b.y + 8, 10, '#ffe680'); float(cx(b), b.y - 8, 'CHECKPOINT', '#ffe680'); playLines('checkpoint');
     } else if (b.kind === 'vhs' && !b.got && ov(p, b)) {
       b.got = true; SFX.vhs(); vo('vhs'); stars(cx(b), b.y + 10, 14, '#ff6a6a'); gotTape();
+    } else if (b.kind === 'dsec' && !b.got && ov(p, b)) {   // a Dot secret: any Dot can take it (the placement is what needs that Dot's move)
+      b.got = true; G.dsec[b.dot] = true;
+      if (b.had) { SFX.tick(); stars(cx(b), b.y + 8, 6, '#fff2a6'); }   // found on an earlier run: just a glint
+      else { SFX.vhs(); stars(cx(b), b.y + 8, 14, DOTS[b.dot].col); stars(cx(b), b.y + 8, 8, '#fff2a6'); float(cx(b), b.y - 6, DOTS[b.dot].name + "'S SECRET!", '#ffe680'); G.dsecT = 40; G.dsecWho = b.dot; }
+    } else if (b.kind === 'gchip' && !b.got && ov(p, b)) {
+      b.got = true;
+      if (b.had || TR || !window.DDCasino) { SFX.tick(); stars(cx(b), b.y + 7, 6, '#fff2a6'); }
+      else { window.DDCasino.goldChip(L.id); SFX.vhs(); stars(cx(b), b.y + 7, 16, '#ffd24a'); stars(cx(b), b.y + 7, 8, '#fff6d4'); float(cx(b), b.y - 6, 'GOLD CHIP! 3 FREE BETS', '#ffe680'); }
     } else if (b.kind === 'fact' && !b.got && ov(p, b)) {
       b.got = true; SFX.tick(); stars(cx(b), b.y + 6, 10, '#7ab0ff'); readFact(b);
     } else if (b.kind === 'goal' && !G.done && ov(p, b)) finish(b);
   }
   // custom entities: stomp them from above (stomp returns false to refuse), otherwise they touch you
+  // A boss stunned under a one-way ledge: the ledge catches a Dot before it reaches his head, so landing on the ledge right over him is the stomp
+  const thru = b => p.ledgeT === G.frame && isBossBody(b) && p.x < b.x + b.w && p.x + p.w > b.x && bot(p) <= b.y + 7 && b.y - bot(p) <= 30;
   for (const b of bodies) {
-    const d = b.def; if (!d || b.dead || !ov(p, b)) continue;
+    const d = b.def; if (!d || b.dead) continue;
+    const hit = ov(p, b), under = thru(b); if (!hit && !under) continue;
     const prevB = bot(p) - p.vy;
-    if (d.stomp && ((p.vy > 0 && prevB <= b.y + 7) || p.slam === 2) && d.stomp(b, G, p) !== false) {
+    if (d.stomp && (under || (p.vy > 0 && prevB <= b.y + 7) || p.slam === 2) && d.stomp(b, G, p) !== false) {
       if (b.dead && !d.boss) chainStomp(cx(b), b.y);
       if (p.slam === 2) continue;
-      p.vy = -(p.held ? P.stompBounceHeld : P.stompBounce); p.y = b.y - p.h; p.usedDJ = false; p.airMax = Math.max(p.airMax, Math.abs(p.vx));
+      p.vy = -(p.held ? P.stompBounceHeld : P.stompBounce); p.y = Math.min(p.y, b.y - p.h); p.onGround = false; p.usedDJ = false; p.airMax = Math.max(p.airMax, Math.abs(p.vx));
       p.sy = 1.3; p.sx = 0.75; G.hitstop = 3; SFX.stomp(); stars(cx(b), b.y, 6);
-    } else if (d.touch) d.touch(b, G, p);
+    } else if (d.touch && hit) d.touch(b, G, p);
   }
   hook('interact', G);
   const B = G.boss; if (B && B.engaged && B.arena && !B.dead) p.x = clamp(p.x, B.arena[0], B.arena[1] - p.w);   // arena walls
@@ -1090,7 +1116,7 @@ function updateParts() {
   loose = loose.filter(c => !c.got && c.life > 0 && c.y < LH + 40);
   if (G.scuffles) { for (const s of G.scuffles) s.t--; G.scuffles = G.scuffles.filter(s => s.t > 0); }
   if (G.comboT > 0) G.comboT--;
-  if (G.cards.length && G.intro >= INTRO_T) { G.cards[0].t++; if (G.cards[0].t > 240) G.cards.shift(); }   // cards wait for the title wipe
+  if (cardGo()) { G.cards[0].t++; if (G.cards[0].t > 240) G.cards.shift(); }   // cards wait for the title wipe and for anyone talking
   if (G.banner && !dlgUp() && --G.banner.f <= 0) G.banner = null;   // a banner waits while a dialogue is up
   if (!G.banner && G.bq.length) G.banner = G.bq.shift();
   if (G.greggAlert) G.greggAlert--;
@@ -1137,7 +1163,7 @@ function portraitFor(who) { const n = (L.portraits && L.portraits[who]) || 'port
 function updateDlg() {
   const D = G.dlg, c = D.cur;
   D.show = clamp(D.show + (c || D.q.length ? 0.125 : -0.125), 0, 1);
-  if (!c) { if (D.gap > 0) D.gap--; else if (D.q.length) D.last = D.cur = D.q.shift(); return; }
+  if (!c) { if (D.gap > 0) D.gap--; else if (D.q.length) { D.last = D.cur = D.q.shift(); vo('line', { k: D.cur.lines.join(' ') }); } return; }   // a line can be read out by the show clip that says it (cues.js "lines")
   c.t++;
   if (c.n < c.len) {
     if (c.t % 2 === 0) { c.n++; if (c.n % 2 && c.n <= c.len) SFX.blip(c.pitch * (1 + (c.n % 3) * 0.06)); }
@@ -1202,7 +1228,7 @@ function introStrip() {   // film-leader strip with the level id and name slides
   const nm = (L.name || '').toUpperCase(), sc = [3, 2, 1].find(s => nm.length * 4 * s - s <= 296) || 1;
   text((L.id || '').toUpperCase(), X + VW / 2 + 2, Y + 14, '#5a1a10', 5, null, 'center'); text((L.id || '').toUpperCase(), X + VW / 2, Y + 12, fg, 5, null, 'center');
   text(nm, X + VW / 2, Y + 42, '#fff', sc, '#000', 'center');
-  if (L.sub) text(String(L.sub).toUpperCase(), X + VW / 2, Y + 42 + sc * 5 + 4, '#e8504a', 1, '#000', 'center');
+  if (L.sub) text(String(L.sub).toUpperCase(), X + VW / 2, Y + 42 + sc * 5 + 4, '#ffb4a4', 1, '#000', 'center');
 }
 function drawFallIris() {
   const f = G.fall; if (!f) return;
@@ -1260,7 +1286,7 @@ function cardSetup(d) {   // lay out the count-up timeline (card clock c, in fra
   G.dlg.q.length = 0; G.dlg.cur = null;
   if (!TR && DD.opts && DD.opts.perks && window.DDStore) d.hei = window.DDStore.award(result());   // the HEI store's pay-out (store.js award)
 }
-const HEIBTN = { x: VW - 73, y: 15, w: 70, h: 32 };   // the results card's HEI Points box, which opens the store
+const HEIBTN = { x: VW - 70, y: 15, w: 46, h: 32 };   // the results card's HEI Points box, which opens the store (inside the card, which runs x 20 to VW - 20, and right of the SIX BAGS sixth tub at x 229-247)
 function updateResults() {
   const d = G.done; if (!d) return;
   if (!d.card) { if (d.t >= 50 && (!(G.dlg.cur || G.dlg.q.length) || d.t >= 300)) cardSetup(d); return; }   // goal lines get to play over the closed iris first
@@ -1312,7 +1338,11 @@ function drawResults() {
   }
   const cl = classic(), two = d.rl.length > 1;
   if (c >= d.tally) text('POPCORN CLASSIC  ' + (G.vhs && cl ? cl.title + ' (' + cl.year + ')' : G.vhs ? 'FOUND' : 'STILL OUT THERE'), VW / 2, 84, G.vhs ? '#ffe680' : '#9aa8d8', 1, '#000', 'center');
-  if (c >= d.tally + 18) text('FOAM HEADS  GREGG ' + (G.heads.gh || 0) + '   TIM ' + (G.heads.th || 0), VW / 2, 93, '#fff', 1, '#000', 'center');
+  if (c >= d.tally + 18) {   // foam heads, and the stage's Dot secrets beside them when it has any
+    const fh = 'FOAM HEADS  GREGG ' + (G.heads.gh || 0) + '   TIM ' + (G.heads.th || 0), ds = G.dsecDots || [];
+    if (!ds.length) text(fh, VW / 2, 93, '#fff', 1, '#000', 'center');
+    else { const sw = 46 + ds.length * 8, x0 = Math.round(VW / 2 - (sw + 14 + fh.length * 4) / 2); text('DOT SECRETS', x0, 93, '#ffe680', 1, '#000'); ds.forEach((q, k) => secPip(x0 + 47 + k * 8, 93, DOTS[q].col, !!G.dsec[q] || G.dsecHad.includes(q), 0)); text(fh, x0 + sw + 14, 93, '#fff', 1, '#000'); }
+  }
   if (c >= d.tally + 18 && cl) text('BLUE CARD  ' + (G.factGot === 'right' ? 'YOU CALLED IT +25' : G.factGot ? 'YOU CALLED IT WRONG' : 'STILL OUT THERE'), VW / 2, 102, G.factGot ? '#7ab0ff' : '#9aa8d8', 1, '#000', 'center');
   if (hit) { ctx.fillStyle = 'rgba(255,240,200,' + (0.25 * (1 - (c - rEnd) / 10)) + ')'; ctx.fillRect(24, two ? 110 : 115, VW - 48, two ? 28 : 16); }
   if (c >= d.r0) { let t0 = d.r0; d.rl.forEach((l, i) => { text(typed(l, t0), VW / 2 - Math.floor((l.length * 8 - 2) / 2), (two ? 113 : 118) + i * 13, '#ffd27a', 2, '#000'); t0 += l.length * 2 + 2; }); }
@@ -1329,14 +1359,14 @@ function drawResults() {
     if (c === d.tally + 18) SFX.bag();
     const B = HEIBTN, sto2 = DD.opts && DD.opts.store, lit = sto2 && Math.floor(d.t / 24) % 2;
     if (sto2) { ctx.fillStyle = '#000'; ctx.fillRect(B.x - 1, B.y - 1, B.w + 2, B.h + 3); ctx.fillStyle = lit ? '#3a2a6a' : '#2a1e52'; ctx.fillRect(B.x, B.y, B.w, B.h); ctx.fillStyle = '#6a5ab0'; ctx.fillRect(B.x, B.y, B.w, 1); ctx.fillStyle = '#140c30'; ctx.fillRect(B.x, B.y + B.h - 1, B.w, 1); }   // a raised button: click it to spend
-    if (S) S.icon('rewards', VW - 70, 18, 1, d.t);
-    text('+' + n, VW - 59, 18, '#ffe680', 2, '#0a1a4a'); text('HEI POINTS', VW - 70, 30, '#fff6d4', 1, '#0a1a4a');
-    if (sto2) text('SPEND >', VW - 70, 39, lit ? '#ffe680' : '#c8b8f0', 1, '#0a1a4a');
-    if (d.hei.first) text('FIRST CLEAR', VW - 70, sto2 ? 50 : 39, '#94e0cc', 1, '#0a1a4a');
+    if (S) S.icon('rewards', B.x + 3, 18, 1, d.t);
+    text('+' + n, B.x + 14, 18, '#ffe680', 2, '#0a1a4a'); text('HEI POINTS', B.x + 3, 30, '#fff6d4', 1, '#0a1a4a');
+    if (sto2) text('SPEND >', B.x + 3, 39, lit ? '#ffe680' : '#c8b8f0', 1, '#0a1a4a');
+    if (d.hei.first) text('FIRST CLEAR', B.x + 3, sto2 ? 50 : 39, '#94e0cc', 1, '#0a1a4a');
   }
   const sto = DD.opts && DD.opts.store;
-  if (c > d.END - 24 && Math.floor(d.t / 30) % 2) text(padUsed ? (DD.opts && DD.opts.onExit ? (sto ? 'CROSS: CONTINUE  SQUARE: STORE  TRIANGLE: AGAIN' : 'CROSS: CONTINUE   TRIANGLE: AGAIN') : 'TRIANGLE: PLAY AGAIN') : DD.opts && DD.opts.onExit ? (sto ? 'JUMP: CONTINUE   X: HEI STORE   R: AGAIN' : 'JUMP: CONTINUE   R: AGAIN') : 'PRESS R TO PLAY AGAIN', VW / 2, 156, '#fff', 1, '#000', 'center');
-  else if (c <= d.END - 24 && Math.floor(d.t / 30) % 2) text('JUMP: SKIP', VW / 2, 156, '#7a90d8', 1, null, 'center');
+  if (c > d.END - 24 && Math.floor(d.t / 30) % 2) text(padUsed ? (DD.opts && DD.opts.onExit ? (sto ? 'CROSS: CONTINUE  SQUARE: STORE  TRIANGLE: AGAIN' : 'CROSS: CONTINUE   TRIANGLE: AGAIN') : 'TRIANGLE: PLAY AGAIN') : DD.opts && DD.opts.onExit ? (sto ? jumpKey() + ': CONTINUE   X: HEI STORE   R: AGAIN' : jumpKey() + ': CONTINUE   R: AGAIN') : 'PRESS R TO PLAY AGAIN', VW / 2, 156, '#fff', 1, '#000', 'center');
+  else if (c <= d.END - 24 && Math.floor(d.t / 30) % 2) text(jumpKey() + ': SKIP', VW / 2, 156, '#7a90d8', 1, null, 'center');
   ctx.restore(); ctx.globalAlpha = 1;
 }
 
@@ -1452,6 +1482,8 @@ function drawBodies() {
         break;
       }
       case 'vhs': if (!b.got) { const turn = Math.cos(G.frame / 26); spr('vhs', X + 8, Y + 24 + Math.round(Math.sin(G.frame / 14) * 2), turn < 0, Math.max(0.15, Math.abs(turn)), 1); if (G.frame % 40 < 4) { ctx.fillStyle = '#fff'; ctx.fillRect(X + 12, Y + 2, 2, 2); } } break;
+      case 'dsec': if (!b.got) drawSecret(b, X, Y); break;
+      case 'gchip': if (!b.got) drawGoldChip(b, X, Y); break;
       case 'fact': if (!b.got) { const yy = Y + Math.round(Math.sin(G.frame / 12 + 1) * 2); ctx.fillStyle = '#0e2e7a'; ctx.fillRect(X, yy, 14, 11); ctx.fillStyle = '#3a78e8'; ctx.fillRect(X + 1, yy + 1, 12, 9); ctx.fillStyle = '#cfe0ff'; ctx.fillRect(X + 3, yy + 3, 8, 1); ctx.fillRect(X + 3, yy + 5, 8, 1); ctx.fillRect(X + 3, yy + 7, 5, 1); if (G.frame % 50 < 4) { ctx.fillStyle = '#fff'; ctx.fillRect(X + 11, yy - 1, 2, 2); } } break;
       case 'goal': {
         if (L.drawGoal && L.drawGoal(ctx, G, b, X, Y)) break;   // a level can draw its own finish (return true to skip the default tape)
@@ -1569,7 +1601,9 @@ function drawDot(dot, pose, X, Y, flip, sx, sy, rot, alpha = 1, rim = 0) {   // 
   ctx.scale(flip ? -sx : sx, sy);
   const rs = rim > 0.02 && rimStrip(n);
   if (rs) { const a = ctx.globalAlpha; ctx.globalAlpha = a * rim; ctx.drawImage(rs, fi * (fw + 2), 0, fw + 2, im.height + 2, -Math.round(fw / 2) - 1, -im.height - 1, fw + 2, im.height + 2); ctx.globalAlpha = a; }
-  ctx.drawImage(im, fi * fw, 0, fw, im.height, -Math.round(fw / 2), -im.height, fw, im.height);
+  const dz = window.DDWear && window.DDWear.frame(dot, im, fi, fw);   // the casino wardrobe's outfit and texture (wardrobe.js), or the plain frame
+  if (dz) ctx.drawImage(dz.c, 0, 0, dz.w, dz.h, -Math.round(fw / 2) - dz.ox, -im.height - dz.oy, dz.w, dz.h);
+  else ctx.drawImage(im, fi * fw, 0, fw, im.height, -Math.round(fw / 2), -im.height, fw, im.height);
   ctx.restore();
 }
 function groundBelow(p) {   // world y of the surface under the Dot (within 6 tiles), or null over a pit
@@ -1577,6 +1611,16 @@ function groundBelow(p) {   // world y of the surface under the Dot (within 6 ti
   const tx = Math.floor(cx(p) / TS);
   for (let ty = Math.max(0, Math.floor((bot(p) - 1) / TS) + 1), n = 0; n < 7 && ty < L.H; ty++, n++) { const t = T(tx, ty); if (t && ty * TS >= bot(p) - 1) return ty * TS; }
   return null;
+}
+function drawGoldChip(b, X, Y) {   // a gold casino chip turning in the air; one found on an earlier run is a faint ghost of it
+  const turn = Math.cos(G.frame / 18), w = Math.max(1, Math.round(Math.abs(turn) * 6)), cx0 = Math.round(X + 7), cy0 = Math.round(Y + 7 + Math.sin(G.frame / 14) * 2);
+  ctx.save(); if (b.had) ctx.globalAlpha = 0.35;
+  const row = (dy, hw, c) => { ctx.fillStyle = c; ctx.fillRect(cx0 - hw, cy0 + dy, hw * 2, 1); };
+  for (let dy = -6; dy <= 6; dy++) { const hw = Math.round(w * Math.sqrt(1 - (dy / 6.5) ** 2)); if (hw <= 0) continue; row(dy, hw + 1, '#5a3008'); }
+  for (let dy = -5; dy <= 5; dy++) { const hw = Math.round(w * Math.sqrt(1 - (dy / 6.5) ** 2)); if (hw <= 0) continue; row(dy, hw, turn > 0 ? '#e8b030' : '#c8902a'); }
+  if (w >= 3) { for (let dy = -5; dy <= 5; dy += 2) { ctx.fillStyle = '#fff6d4'; ctx.fillRect(cx0 - w + 1, cy0 + dy, 1, 1); ctx.fillRect(cx0 + w - 2, cy0 + dy, 1, 1); } ctx.fillStyle = '#b06a18'; ctx.fillRect(cx0 - Math.max(1, w - 3), cy0 - 2, Math.max(2, (w - 3) * 2), 4); ctx.fillStyle = '#fff0a0'; ctx.fillRect(cx0 - 1, cy0 - 1, 2, 1); }
+  if (!b.had && G.frame % 40 < 6) { ctx.fillStyle = '#ffffff'; ctx.fillRect(cx0 + 3, cy0 - 7, 1, 3); ctx.fillRect(cx0 + 2, cy0 - 6, 3, 1); }
+  ctx.restore();
 }
 function drawShadow(p, X) {   // a soft oval on the floor that shrinks and fades as the Dot rises
   if (p.rolling) return;
@@ -1611,6 +1655,7 @@ function shadowAt(x, footY, w, onGround) {   // world x (centre), world y of the
 function drawPlayer() {   // GERM FREE wraps the Dot in a cycling rainbow (a hue filter, and a glow behind for browsers without canvas filters)
   const st = G.star > 0 && !G.done && (G.star > 120 || Math.floor(G.star / 6) % 2);   // it flickers out over the last two seconds
   { const p = G.pl; if (!G.done || p.onGround) shadowAt(cx(p), bot(p), p.dot === 'baxter' ? 12 : 16, p.onGround); }
+  if (window.DDWear && !G.pl.rolling) window.DDWear.trail(G, G.pl, cx(G.pl), bot(G.pl), wx, wy, dotPose(G.pl));   // the wardrobe's running trail, behind the Dot
   if (!st) return drawDotNow();
   const p = G.pl, X = wx(cx(p)), Y = wy(p.y + p.h / 2), hue = (G.frame * 14) % 360;
   ctx.save(); const gl = ctx.createRadialGradient(X, Y, 2, X, Y, p.h * 0.9);
@@ -1727,8 +1772,9 @@ function drawBag(x, y, fill = 1, empty = 0.22, rot = 0, sc = 1, dim = 0.35) {   
   const im = IMG.tub, w = im.width, h = im.height, from = Math.round(h - fill * h);
   ctx.save();
   if (rot || sc !== 1) { ctx.translate(Math.round(x + w / 2), y + h); ctx.rotate(rot); ctx.scale(sc, sc); ctx.translate(-w / 2, -h); x = 0; y = 0; }
-  ctx.save(); ctx.globalAlpha *= empty; ctx.filter = 'brightness(' + dim + ')'; ctx.drawImage(im, x, y); ctx.restore();
+  ctx.save(); ctx.globalAlpha *= empty; ctx.filter = 'grayscale(1) brightness(' + dim + ')'; ctx.drawImage(im, x, y); ctx.restore();   // grey: an empty tub never reads as a full red one
   if (fill > 0) ctx.drawImage(im, 0, from, w, h - from, x, y + from, w, h - from);
+  if (fill > 0.02 && fill < 1) { ctx.fillStyle = 'rgba(255,246,212,0.9)'; ctx.fillRect(x + 2, y + from - 1, w - 4, 2); }   // the fill line, so a part-full tub shows how far it has to go
   ctx.restore();
 }
 function updateHUD() {   // the popcorn counter bounces when it changes; a bag wiggles (and dings) when it fills
@@ -1886,7 +1932,37 @@ function hudWanted() {   // the HUD steps aside for the title card, the level wi
   if (!NOPAUSE && (G.dlg.cur || G.dlg.q.length || G.fact)) return false;
   return true;
 }
+const cardGo = () => G.cards.length && G.intro >= INTRO_T && !CUT && (G.cards[0].t > 0 || (!dlgUp() && !G.dlg.q.length && !G.fact));   // a NEW FAN card starts only once nobody is talking
+const perkRow = () => G.shield > 0 || G.takes > 0 || G.star > 0;
+function cardK() { if (!G.cards.length || !G.cards[0].t) return 0; const t = G.cards[0].t; return 1 - Math.pow(1 - Math.min(1, t / 14, (240 - t) / 14), 3); }
+function leftStack() { return (perkRow() ? 13 : 0) + Math.round(32 * cardK()); }   // how far below y 24 the left column (popcorn strip, perk row, NEW FAN card) reaches
+function rightStack() { return G.dsecDots && G.dsecDots.length ? 7 : 0; }   // the Dot plate grows when the stage has Dot secrets
+function readout(x, y, w, h, fn, accent) {   // a stage's own readout (counters, pips): one plate style, pushed down past the HUD so nothing ever covers it
+  ctx.save(); ctx.translate(0, Math.max(x < VW / 2 ? leftStack() : 0, x + w > VW / 2 ? rightStack() : 0));   // a wide one clears both
+  pill(x, y, w, h, 0.72); ctx.fillStyle = accent || 'rgba(255,240,210,0.18)'; ctx.fillRect(x + 1, y, w - 2, 1);
+  fn(); ctx.restore();
+}
+function jumpKey() { return padUsed ? 'CROSS' : window.DDTouch && window.DDTouch.on() ? 'JUMP' : 'Z'; }   // what every prompt calls the jump button: the key itself on a keyboard
 function pill(x, y, w, h, a = 0.45) { ctx.fillStyle = `rgba(10,4,8,${a})`; ctx.fillRect(x + 1, y, w - 2, h); ctx.fillRect(x, y + 1, w, h - 2); }
+function secDisc(x, y, r, sx, col) {   // a pixel disc, squeezed to sx wide (a coin turning)
+  ctx.fillStyle = col;
+  for (let dy = -r; dy <= r; dy++) { const hw = Math.max(0, Math.round(Math.sqrt(r * r - dy * dy + r * 0.6) * sx)); if (hw) ctx.fillRect(x - hw, y + dy, hw * 2, 1); }
+}
+function drawSecret(b, X, Y) {   // a Dot secret: a turning gold medallion with that Dot's face in a soft halo. Faint once it's on the save; dimmer while that Dot isn't in the cast yet
+  const D = DOTS[b.dot], turn = Math.cos(G.frame / 30 + b.x * 0.01), sx = Math.max(0.15, Math.abs(turn)), x = Math.round(X + 8), y = Math.round(Y + 8 + Math.sin(G.frame / 14 + b.x) * 2);
+  ctx.save(); ctx.globalAlpha = b.had ? 0.35 : G.owned.includes(b.dot) ? 1 : 0.5;
+  if (!b.had) secDisc(x, y, 11, 1, 'rgba(255,236,150,' + (0.16 + 0.08 * Math.sin(G.frame / 10)).toFixed(3) + ')');
+  secDisc(x, y, 8, sx, '#4a2e06'); secDisc(x, y, 7, sx, turn < 0 ? '#c8962a' : '#f0c84a'); secDisc(x, y, 5, sx, turn < 0 ? '#a87a1e' : D.col);
+  if (turn > 0.55 && ready(b.dot)) { const im = IMG[b.dot], k = Math.min(10 / im.width, 10 / im.height); ctx.save(); ctx.translate(x, y + 5); ctx.scale(k * sx, k); ctx.drawImage(im, -im.width / 2, -im.height); ctx.restore(); }
+  ctx.restore();
+  if (!b.had && G.frame % 50 < 5) { ctx.fillStyle = '#fff'; ctx.fillRect(x - 4, y - 5, 2, 1); ctx.fillRect(x - 4, y - 6, 1, 3); }   // a glint
+}
+function secPip(x, y, col, on, pop) {   // the HUD's Dot-secret mark: a 5-px gold diamond (dark and hollow until found)
+  const rows = [[2, 1], [1, 3], [0, 5], [1, 3], [2, 1]], s = pop > 0 ? -Math.round(Math.sin(pop / 40 * Math.PI) * 3) : 0;
+  ctx.fillStyle = '#140a10'; rows.forEach(([o, w], r) => ctx.fillRect(x + o - 1, y + r + s, w + 2, 1)); ctx.fillRect(x + 1, y - 1 + s, 3, 7);
+  ctx.fillStyle = on ? '#ffe680' : '#4a3640'; rows.forEach(([o, w], r) => ctx.fillRect(x + o, y + r + s, w, 1));
+  if (on) { ctx.fillStyle = col; ctx.fillRect(x + 2, y + 2 + s, 1, 1); }
+}
 function dotPip(x, y, col, on) {   // a tiny Dot: a 7-px disc in the Dot's colour with a dark rim (dim and hollow if it isn't in the cast yet)
   const rows = [[2, 3], [1, 5], [0, 7], [0, 7], [0, 7], [1, 5], [2, 3]];
   ctx.fillStyle = '#140a10'; rows.forEach(([o, w], r) => { ctx.fillRect(x + o, y + r, w + 2, 1); ctx.fillRect(x + o + 1, y + r - 1, w, 3); });
@@ -1909,18 +1985,19 @@ function drawHUDCore() {
   // the Dots, top right: the one you are is a framed portrait, the rest are little coloured pips (click one, press 1-4, or switch)
   const P = PORTRAITS, wOf = q => G.pl.dot === q.dot ? 18 : 11, total = P.reduce((s, q) => s + wOf(q), 0) + 2 * (P.length - 1);
   let x = VW - 3 - total;
-  pill(x - (!padUsed && !G.done ? 18 : 3), 2, VW - x + (!padUsed && !G.done ? 17 : 2), 22, 0.62);   // a plate behind the Dots (and pause), so they read over any set
-  if (!padUsed && !G.done) { const B = PAUSEBTN; B.x = x - 15; B.y = 3; B.w = 12; B.h = 12; pill(B.x, B.y, B.w, B.h); ctx.fillStyle = '#fff6d4'; ctx.fillRect(B.x + 4, B.y + 3, 1, 6); ctx.fillRect(B.x + 7, B.y + 3, 1, 6); }   // pause, for the mouse
+  pill(x - (!padUsed && !G.done ? 21 : 3), 2, VW - x + (!padUsed && !G.done ? 20 : 2), G.dsecDots && G.dsecDots.length ? 30 : 22, 0.62);   // taller when the stage has Dot secrets: their marks sit under the Dots   // a plate behind the Dots (and pause), so they read over any set
+  if (!padUsed && !G.done) { const B = PAUSEBTN; B.x = x - 18; B.y = 3; B.w = 12; B.h = 12; pill(B.x, B.y, B.w, B.h); ctx.fillStyle = '#fff6d4'; ctx.fillRect(B.x + 4, B.y + 3, 1, 6); ctx.fillRect(B.x + 7, B.y + 3, 1, 6); }   // pause, for the mouse
   for (const q of P) {
     const on = G.pl.dot === q.dot, D = DOTS[q.dot], lk = G.lockT[q.dot] || 0, shake = on && G.denyT ? Math.round(Math.sin(G.denyT * 2) * 2) : lk ? Math.round(Math.sin(lk * 2) * 2) : 0;
     if (lk) G.lockT[q.dot]--;
     q.x = x; q.y = 3; q.w = wOf(q); q.h = on ? 20 : 11; x += q.w + 2;
-    if (!on) { dotPip(q.x + 1 + shake, q.y + 2, D.col, G.owned.includes(q.dot)); continue; }
+    if (!on) { const own = G.owned.includes(q.dot); dotPip(q.x + 1 + shake, q.y + 2, D.col, own); if (!padUsed) text(String(ORDER.indexOf(q.dot) + 1), q.x + 6 + shake, q.y + 12, own ? '#fff6d4' : '#715864', 1, null, 'center'); continue; }   // its number key underneath
     ctx.fillStyle = D.col; ctx.fillRect(q.x + 1 + shake, q.y, q.w - 2, q.h); ctx.fillRect(q.x + shake, q.y + 1, q.w, q.h - 2);
     ctx.fillStyle = 'rgba(10,4,8,0.78)'; ctx.fillRect(q.x + 1 + shake, q.y + 1, q.w - 2, q.h - 2);
     const im = IMG[q.dot];
     if (ready(q.dot)) { const k = Math.min(1, 14 / im.width, 17 / im.height); ctx.save(); ctx.translate(q.x + q.w / 2 + shake, q.y + q.h - 2); ctx.scale(k, k); ctx.drawImage(im, -im.width / 2, -im.height); ctx.restore(); }
   }
+  if (G.dsecDots && G.dsecDots.length) { if (G.dsecT > 0) G.dsecT--; for (const q of P) if (G.dsecDots.includes(q.dot)) secPip(q.x + Math.floor(q.w / 2) - 2, 25, DOTS[q.dot].col, !!G.dsec[q.dot] || G.dsecHad.includes(q.dot), G.dsecWho === q.dot ? G.dsecT : 0); }   // each Dot's secret, under that Dot
 }
 function drawPerkHUD() {   // under the popcorn strip: MISTRIAL hits and TAKE TWO falls left, and the GERM FREE clock
   const S = window.DDStore, items = [];
@@ -1942,8 +2019,8 @@ function drawHUD() {
   const want = hudWanted();
   hudA += ((want ? 1 : 0) - hudA) * 0.2; if (!want && hudA < 0.03) hudA = 0;
   if (hudA > 0) { ctx.save(); ctx.globalAlpha = hudA; drawHUDCore(); drawBossHUD(); ctx.restore(); }
-  if (G.cards.length && G.intro >= INTRO_T && !CUT) {   // NEW FAN card: slides in under the popcorn counter, holds, slides out
-    const c = G.cards[0], k = Math.min(1, c.t / 14, (240 - c.t) / 14), X = Math.round(-176 + 180 * (1 - Math.pow(1 - k, 3))), Y = 22;   // play never stops for it
+  if (G.cards.length && G.cards[0].t > 0 && !CUT) {   // NEW FAN card: slides in under the popcorn counter (and the perk row), holds, slides out; a stage readout steps down for it
+    const c = G.cards[0], X = Math.round(-176 + 180 * cardK()), Y = perkRow() ? 35 : 22;   // play never stops for it
     const [name, sub] = INTRO[c.type], [l1, l2] = sub.split('. ');
     ctx.fillStyle = 'rgba(10,4,8,0.82)'; ctx.fillRect(X, Y, 172, 30);
     ctx.fillStyle = c.type === 'gh' ? '#f0c030' : '#94e0cc'; ctx.fillRect(X, Y, 172, 1); ctx.fillRect(X, Y + 29, 172, 1); ctx.fillRect(X + 171, Y, 1, 30);
@@ -1954,7 +2031,7 @@ function drawHUD() {
   if (G.banner && !dlgUp()) {   // a banner never shows through a dialogue: it waits its turn
     const b = G.banner, a = Math.min(1, b.f / 15, (b.max - b.f) / 10);
     ctx.globalAlpha = a;
-    const by = G.cards.length ? 62 : (G.boss && G.boss.engaged ? 34 : 30);   // below a NEW FAN card or the boss plate
+    const by = G.cards.length && G.cards[0].t ? (perkRow() ? 75 : 62) : (G.boss && G.boss.engaged ? 34 : 30);   // below a NEW FAN card or the boss plate
     text(b.t, VW / 2, by, '#ffe680', 2, '#000', 'center');
     if (b.sub) text(b.sub, VW / 2, by + 14, '#fff', 1, '#000', 'center');
     ctx.globalAlpha = 1;
@@ -1979,7 +2056,7 @@ function drawFact() {   // the blue card slides in under the banner; a wrong one
     ctx.fillStyle = lit ? (f.ans ? '#2a8a5a' : '#ffe680') : '#1e52bc'; ctx.fillRect(bx, bY, 68, 12);
     text(lab, bx + 34, bY + 3, lit && !f.ans ? '#0a1a4a' : '#fff', 1, null, 'center');
   });
-  if (!f.ans) { if (f.t > 24) text(f.pick ? 'JUMP TO LOCK IT IN' : 'LEFT: TRUE   RIGHT: FALSE', VW / 2, bY + 16, '#ffe680', 1, '#000', 'center'); }
+  if (!f.ans) { if (f.t > 24) text(f.pick ? jumpKey() + ' TO LOCK IT IN' : 'LEFT: TRUE   RIGHT: FALSE', VW / 2, bY + 16, '#ffe680', 1, '#000', 'center'); }
   else { const s = f.ans === 'right' ? 'YOU CALLED IT! +25' : 'NOPE. NO POPCORN.'; text(s, X + 180 - s.length * 4, Y + 3, f.ans === 'right' ? '#94e0cc' : '#ff5a5a', 1, '#000'); }
   ctx.globalAlpha = 1;
 }
@@ -1993,16 +2070,32 @@ function drawTitle() {
     ['DOWN', 'BAXTER SLAMS IN THE AIR'], ['OPTIONS', 'PAUSE']]
     : [['ARROWS', 'MOVE. HOLD TO BUILD SPEED'], ['Z', 'JUMP. HOLD FOR HIGHER'], ['X', 'SWITCH DOT  (OR 1-4, OR CLICK)'],
     ['DOWN', 'BAXTER SLAMS IN THE AIR'], ['ENTER', 'PAUSE']];
-  if (!showControls()) { text('PRESS JUMP TO START', VW / 2, 100, '#fff', 1, '#000', 'center'); ORDER.forEach((n, i) => drawDot(n, 'idle', VW / 2 - 48 + i * 32, 130)); return; }
+  if (!showControls()) { text('PRESS ' + jumpKey() + ' TO START', VW / 2, 100, '#fff', 1, '#000', 'center'); ORDER.forEach((n, i) => drawDot(n, 'idle', VW / 2 - 48 + i * 32, 130)); return; }
   rows.forEach(([k, v], i) => { text(k, 50, 60 + i * 11, '#ffd27a', 1, '#000'); text(v, 92, 60 + i * 11, '#fff', 1, '#000'); });
   ORDER.forEach((n, i) => { const ph = Math.sin(G.frame / 10 + i); drawDot(n, ph < -0.4 ? 'jump' : ph > 0.85 ? 'land' : 'idle', VW / 2 - 48 + i * 32, 158 + Math.round(ph * 2)); });
-  if (Math.floor(G.frame / 30) % 2) text('PRESS JUMP TO START', VW / 2, 168, '#fff', 1, '#000', 'center');
+  if (Math.floor(G.frame / 30) % 2) text('PRESS ' + jumpKey() + ' TO START', VW / 2, 168, '#fff', 1, '#000', 'center');
 }
 function cutLive() {   // a live cutscene: the stage keeps running around a Dot who stands still
   for (const k of ['l', 'r', 'd', 'j', 'jp', 'dp', 'sp']) IN[k] = false; IN.pick = null; IN.nx = 0;
   if (!G.done) updatePlayer(); updateWorld(); updateFans();
 }
+// the simulation runs at 60Hz, the display at whatever it runs at: the Dot and the camera are drawn between their last two steps,
+// so a 120Hz or 144Hz screen (or a 60Hz one drifting against the step clock) gets smooth motion instead of doubled or dropped steps
+let lerpG = null, lerpA = 1;
+const LERP = [];   // [x, y] of the Dot then the camera, before the latest step
+function keepPrev() {
+  if (!G || !G.pl) { lerpG = null; return; }
+  lerpG = G; LERP[0] = G.pl.x; LERP[1] = G.pl.y; LERP[2] = G.cam.x; LERP[3] = G.cam.y;
+}
 function render() {
+  const p = G.pl, c = G.cam;
+  if (lerpG !== G || lerpA >= 1) return renderNow();
+  const real = [p.x, p.y, c.x, c.y], a = lerpA;
+  const mix = (i, v) => Math.abs(v - LERP[i]) > 24 ? v : LERP[i] + (v - LERP[i]) * a;   // a big jump is a teleport (respawn, door, snap): draw it where it is
+  p.x = mix(0, p.x); p.y = mix(1, p.y); c.x = mix(2, c.x); c.y = mix(3, c.y);
+  try { renderNow(); } finally { p.x = real[0]; p.y = real[1]; c.x = real[2]; c.y = real[3]; }
+}
+function renderNow() {
   ctx.imageSmoothingEnabled = false;
   const sh = G.shake > 0.3 ? G.shake : 0, ox = (Math.random() - 0.5) * sh * 2, oy = (Math.random() - 0.5) * sh * 2;
   ctx.save(); ctx.translate(Math.round(ox), Math.round(oy));
@@ -2011,7 +2104,7 @@ function render() {
   drawGrade(); drawHitFlash();
   if (!CUT) introIris(); drawFallIris(); drawEndIris();
   drawHUD();
-  if (!CUT) drawDialog();
+  if (!CUT && G.state !== 'pause') drawDialog();   // the pause menu covers the scene, not a half-hidden dialogue box
   if (!CUT) introStrip();
   if (CUT) CUT.drawOver(ctx);   // letterbox, captions and cards
   if (G.state === 'title' && !CUT) drawTitle();
@@ -2065,8 +2158,8 @@ function frame(now) {
   requestAnimationFrame(frame);   // ask for the next frame first: an error in one frame is logged, and the game never freezes on it
   try {
     acc += Math.min(100, now - last); last = now;
-    while (acc >= 1000 / 60) { acc -= 1000 / 60; if (scene) { readInput(); scene.step(IN); } else step(); }
-    if (scene) scene.draw(ctx); else render();
+    while (acc >= 1000 / 60) { acc -= 1000 / 60; if (scene) { readInput(); scene.step(IN); } else { keepPrev(); step(); } }
+    if (scene) { lerpG = null; scene.draw(ctx); } else { lerpA = acc / (1000 / 60); render(); }
     stockTick(); drawPadNote(now);
   } catch (e) { if (frameErrs++ < 20) console.error('[frame]', e); }
 }
@@ -2083,7 +2176,7 @@ function leave(quit, extra) {   // level over (or quit from pause): hand the res
   G.left = true;
   o(quit ? { id: L.id, quit: true } : Object.assign(result(), extra));
 }
-const result = () => ({ id: L.id, six: !!(G.pk && G.pk.six) && bagFrac() >= 1, got: G.got, total: popsTotal, bags: Math.floor(5 * bagFrac()), vhs: G.vhs, fact: G.factGot || null, allPop: pops.length > 0 && pops.every(c => c.got), boss: !!(G.done && G.done.boss) });
+const result = () => ({ id: L.id, six: !!(G.pk && G.pk.six) && bagFrac() >= 1, got: G.got, total: popsTotal, bags: Math.floor(5 * bagFrac()), vhs: G.vhs, dsec: Object.keys(G.dsec), dsecAll: (G.dsecDots || []).slice(), fact: G.factGot || null, allPop: pops.length > 0 && pops.every(c => c.got), boss: !!(G.done && G.done.boss) });
 function restart() {   // play it again: a won run is saved first (opts.onSave), so AGAIN on the results card never throws the win away
   if (G.done && !G.left && DD.opts && DD.opts.onSave) DD.opts.onSave(result());
   build(); G.state = 'play';
@@ -2373,7 +2466,7 @@ Object.defineProperties(DD, Object.getOwnPropertyDescriptors({
   drop: o => loose.push(Object.assign({ vx: 0, vy: 0, life: 240, wait: 0 }, o)),   // loose popcorn: {x, y, vx, vy, life, wait}
   part: o => parts.push(o),
   T, setTile, boxFree, moveX, moveY, ov, cx, bot, clamp, sign, wx, wy, setDot, door,
-  defineEntity, collectDefs, addEntity, spawn, hitBoss, endLevel, start, setScene, leave, trailer,
+  defineEntity, collectDefs, addEntity, spawn, hitBoss, endLevel, start, setScene, leave, trailer, readout, jumpKey,
   setCut: c => { CUT = c; }, get cut() { return CUT; },   // cutscenes (game/cutscene.js)
   get trailing() { return !!TR; },   // a trailer is running (DD.trailer)
   get padUsed() { return padUsed; }, rumble,

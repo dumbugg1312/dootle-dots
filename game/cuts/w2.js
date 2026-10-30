@@ -15,9 +15,9 @@
         { fade: 0, t: 40 },
         { third: 'SEASON ONE', sub: 'NOVEMBER 2012. ON CINEMA AT THE CINEMA', t: 230, and: true },
         { wait: 30 },
-        { clip: 'X4', and: true },                                  // S1 intro: "Should I see a movie this weekend? Ahh!"
-        { wait: 40 },
-        { move: 'dot', y, t: 34, ease: 'in' },                      // the drop lands on the "Ahh!"
+        { clip: 'F8', and: true },                                  // S1 intro: "Should I see a movie this weekend?" (F8: X4 was the same take, dropped in the ear pass's dedupe)
+        { wait: 58 },
+        { move: 'dot', y, t: 34, ease: 'in' },                      // the drop lands as the line ends
         { fn: () => { DD.dust(x, y, 10); DD.SFX.land(3); } },
         { shake: 4 },
         { set: 'dot', pose: 'land' }, { wait: 8 }, { set: 'dot', pose: 'idle' },

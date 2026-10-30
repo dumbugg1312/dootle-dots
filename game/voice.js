@@ -8,25 +8,25 @@
 // card says the rating it shows. Nothing plays at random or on a timer: a moment with no line stays quiet.
 // The engine calls DDVoice.say(moment, opts); V toggles voices (remembered).
 (function () {
-  const Q = new URLSearchParams(location.search), UNCUT = Q.has('uncut'), LOG = Q.has('voicelog');
-  const BY = {}; (window.VOICE_CLIPS || []).forEach(c => { if (c.ok && (UNCUT || !(c.x || []).some(f => f === 'explicit' || f === 'political'))) BY[c.id] = c; });
+  const Q = new URLSearchParams(location.search), LOG = Q.has('voicelog');
+  const BY = {}; (window.VOICE_CLIPS || []).forEach(c => { if (c.ok) BY[c.id] = c; });   // no content filter: the user curates the clips by ear (ear.html)
   const CUES = window.VOICE_CUES || { levels: {}, worlds: {}, title: [] };
   let on = true; try { on = localStorage.getItem('dd-voice') !== '0'; } catch (e) {}
   // Three kinds of moment. MUST: the beats that always land (a boss arriving or falling, the clear, the menu and results lines);
   // they wait out a line still playing. PLACED: lines written for something that just happened in this stage (its opening,
   // a scripted story beat, a set-piece banner, a boss phase, the first sight of a fandom, the tape, the blue card, the last
   // kernel); they skip the quiet gap, wait out a line still playing, and each speaks once a run. REACTIVE: things the player
-  // does that can happen again and again (a hit, a pit, a checkpoint, switching Dots, standing idle); they speak once a run,
+  // does that can happen again and again (a hit, a pit, a checkpoint, switching Dots, standing idle); they speak up to REPEAT times a run,
   // only after GAP seconds of quiet, and never spend a line a placed spot is waiting for. BUDGET caps a stage's lines.
-  const BUDGET = 6, GAP = 12, MUST = { boss_intro: 1, boss_defeat: 1, clear: 1, perfect: 1, rating: 1, six: 1, world: 1, title: 1 };
+  const BUDGET = 16, GAP = 5, MUST = { boss_intro: 1, boss_defeat: 1, clear: 1, perfect: 1, rating: 1, six: 1, world: 1, title: 1 };
   ['sam', 'mel', 'cloud', 'baxter'].forEach(d => { MUST['join_' + d] = 1; });   // a Dot joining always gets its intro
-  const PLACED = /^(level_start|beat:|banner:|boss_phase|fan_|brawl|vhs|fact_|allpop)/;
+  const PLACED = /^(level_start|beat:|banner:|line:|boss_phase|fan_|brawl|vhs|fact_|allpop)/;
   const SKIPBEAT = /^(start|goal|checkpoint|boss|bossDefeat|bossPhase\d*)$/;   // beats that already have their own moment
-  const TAUNTS = 2;   // boss_taunt: the boss gloats when it hits you, twice a fight at most
-  const anySaid = {};   // game-wide fallback lines (CUES.any) speak once a session, so they don't open every stage
+  const TAUNTS = 2;
+  const REPEAT = { hurt: 3, death: 3, checkpoint: 3, idle: 2, boss_hit: 3 };   // reactions that can speak again in a stage (each time the next take)   // boss_taunt: the boss gloats when it hits you, twice a fight at most
   const used = {}, now = () => performance.now() / 1000;
   let cur = null, curKey = null, curEnd = 0, lastAt = -99, levelId = null, spots = [], titled = false, still = { x: 0, y: 0, t: 0 };
-  let run = { spoken: 0, said: {}, damage: 0, taunts: 0 }, pending = null;
+  let run = { spoken: 0, said: {}, heard: {}, damage: 0, taunts: 0 }, pending = null;
 
   const level = () => { const D = window.DD, L = window.LEVEL; return D && !D.inMenu && L ? L : null; };
   const ids = l => (l || []).filter(id => BY[id]);
@@ -58,11 +58,13 @@
     if (moment === 'six') return next('six', wc.six || CUES.six);
     if (moment === 'world') return next('world' + o.world, wc.pick);
     if (moment === 'title') return next('title', CUES.title);
+    if (moment.startsWith('line:')) return next(moment, (CUES.lines || {})[moment.slice(5)]);   // a narrator line read out by the show clip that says it
     return next(L && L.id + ':' + moment, lc[moment] || wc[moment] || (CUES.any || {})[moment]);   // the level's own cue, else the world's, else the game-wide one
   }
   function spotsAhead() { return spots.filter(s => !s.done && BY[s.id]).length; }
   function keyOf(moment, o) {   // the cue key: banner:<TEXT>, beat:<name>, boss_phase<N>, dot_<dot>, or the moment itself
     if (moment === 'banner' || moment === 'beat') return o.k ? moment + ':' + o.k : null;
+    if (moment === 'line') return o.k ? 'line:' + String(o.k).toUpperCase().replace(/[^A-Z0-9 ]/g, '').replace(/\s+/g, ' ').trim() : null;
     if (moment === 'boss_phase') return 'boss_phase' + o.ph;
     if (moment === 'dot') return 'dot_' + o.dot;
     if (moment === 'join') return 'join_' + o.dot;   // a Dot joining the cast on the results card introduces itself
@@ -71,7 +73,7 @@
   function allowed(key) {   // the pacing rules
     if (MUST[key]) return true;
     if (key === 'boss_taunt') { if (run.taunts >= TAUNTS) return false; }
-    else if (run.said[key]) return false;
+    else if ((run.said[key] || 0) >= (REPEAT[key] || 1)) return false;
     if (BUDGET - run.spoken <= 0) return false;
     if (PLACED.test(key)) return true;
     if (now() - lastAt < GAP || now() < curEnd) return false;
@@ -85,17 +87,13 @@
     const key = keyOf(moment, o); if (!key || !on) return false;
     if (/^dot_/.test(key) && cur && /^dot_/.test(curKey || '')) { cur.pause(); cur = null; curEnd = 0; lastAt = -99; if (pending && /^dot_/.test(pending.key || '')) pending = null; }   // switching again cuts the last Dot's line, so a Dot never speaks over another Dot
     if (!allowed(key)) return false;
-    const L = level(), w = (o.world) || (L && L.world), mine = L && (CUES.levels[L.id] || {})[key], era = (CUES.worlds[w] || {})[key], own = mine || era;
-    if (!own && !MUST[key] && (CUES.any || {})[key]) { if (anySaid[key]) return false; }
-    // a world-wide reaction (a hit, a pit, idling...) covers every stage of that world, so it speaks once a session, not once
-    // a stage: otherwise the same line greets the first hit of every stage in the world
-    const eraOnce = !mine && era && !MUST[key] && !PLACED.test(key) ? 'w' + w + ':' + key : null;
-    if (eraOnce && anySaid[eraOnce]) return false;
+    // world-wide and game-wide reactions used to speak once a SESSION, which is why the game went quiet after a few stages;
+    // now every stage can use them, and next() walks their takes in order so the same line doesn't open every stage
     if (now() < curEnd && pending && !MUST[key]) return false;   // one line waits at a time (a must-land beat takes the slot)
     const c = cueFor(key, o); if (!c) return false;
-    run.said[key] = 1; if (key === 'boss_taunt') run.taunts++;
-    if (!own && (CUES.any || {})[key]) anySaid[key] = 1;
-    if (eraOnce) anySaid[eraOnce] = 1;
+    if (run.heard[c.id]) return false;   // never the same clip twice in a stage: a reaction speaks again only with another take
+    run.heard[c.id] = 1;
+    run.said[key] = (run.said[key] || 0) + 1; if (key === 'boss_taunt') run.taunts++;
     if (now() < curEnd) { pending = { c, key, t: now(), count: !MUST[key] }; return true; }   // wait out the line playing
     if (!MUST[key]) run.spoken++;
     curKey = key; return play(c);
@@ -106,7 +104,7 @@
     const L = level(); if (!on || !L || !D) return;
     const G = D.G; if (!G || !G.pl) return;
     if (L.id !== levelId || G.__voRun !== run) {   // a new stage, or a restart: fresh budget, re-armed spots
-      levelId = L.id; run = { spoken: 0, said: {}, damage: 0, taunts: 0 }; G.__voRun = run;
+      levelId = L.id; run = { spoken: 0, said: {}, heard: {}, damage: 0, taunts: 0 }; G.__voRun = run;
       spots = ((CUES.levels[L.id] || {}).at || []).map(s => ({ ...s, done: false }));
     }
     const tx = (G.pl.x + G.pl.w / 2) / 16;
@@ -117,7 +115,7 @@
       const s = reached[reached.length - 1];
       if (BY[s.id] && BUDGET - run.spoken > 0) { run.spoken++; curKey = 'spot'; play(BY[s.id]); }
     }
-    // standing still for 8 s in open play: the hosts notice (once a run)
+    // standing still for 8 s in open play: the hosts notice (REPEAT.idle times a run)
     const dl = D.dialog, busy = G.state !== 'play' || G.done || G.fall || (dl && (dl.cur || dl.q.length)) || (G.boss && G.boss.engaged);
     if (busy || Math.abs(G.pl.x - still.x) > 2 || Math.abs(G.pl.y - still.y) > 2) still = { x: G.pl.x, y: G.pl.y, t: now() };
     else if (now() - still.t > 8) { still.t = now(); say('idle'); }

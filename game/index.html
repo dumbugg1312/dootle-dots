@@ -19,7 +19,7 @@
   var hover = matchMedia('(any-hover: hover)').matches;
   var mobile = !kb && !Q.has('desktop') && touch && (phone || !hover);
   var list = Q.has('card') ? ['engine.js', 'desktop.js']
-    : ['classics.js', 'engine.js', 'cutscene.js', 'worlds.js', 'bonus.js', 'posters.js', 'store.js', 'casino.js', 'menu.js', 'music/cues.js', 'music.js', 'voice/clips.js', 'voice/cues.js', 'voice.js', 'cuts/w1.js', 'cuts/w2.js', 'cuts/w3.js', 'cuts/w4.js', 'cuts/w5.js', 'cuts/w6.js', 'cuts/w7.js', 'cuts/w8.js', 'cuts/w9.js', 'cuts/w10.js', 'cuts/w11.js', 'cuts/w12.js'].concat(mobile ? ['touch.js'] : []);
+    : ['classics.js', 'engine.js', 'wardrobe.js', 'cutscene.js', 'worlds.js', 'bonus.js', 'posters.js', 'store.js', 'casino.js', 'menu.js', 'music/cues.js', 'music.js', 'voice/clips.js', 'voice/cues.js', 'voice.js', 'cuts/w1.js', 'cuts/w2.js', 'cuts/w3.js', 'cuts/w4.js', 'cuts/w5.js', 'cuts/w6.js', 'cuts/w7.js', 'cuts/w8.js', 'cuts/w9.js', 'cuts/w10.js', 'cuts/w11.js', 'cuts/w12.js'].concat(mobile ? ['touch.js'] : []);
   for (var i = 0; i < list.length; i++) { var s = document.createElement('script'); s.src = list[i]; s.async = false; document.body.appendChild(s); }
 })();
 </script>

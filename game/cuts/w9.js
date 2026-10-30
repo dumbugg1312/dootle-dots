@@ -128,7 +128,7 @@
         { shake: 5 }, { sfx: 'slam' }, { flash: '#ffffff', t: 6 },
         { move: 'house', y: camY + 74, t: 8, walk: false },
         { third: 'THE SETTLEMENT LEASED A HOUSE', sub: 'MOVIE HOUSE. SEASON 15 PREMIERES DECEMBER 25, 2024.', t: 300, and: true },   // lore, World 3: Gregg uses the AmatoCon settlement to take a stake in HEI and lease Movie House; S15 Dec 25, 2024
-        { clip: 'X1', wait: true },                                        // S15 cold open (season-15/84-charing-cross-road): "It's Movie House! If a house could be a movie, this would be it."
+        { clip: 'D4', wait: true },                                        // "It's Movie House!" (D4: X1 was the same audio, dropped in the ear pass's dedupe)
         { wait: 30 },
       ];
     },
