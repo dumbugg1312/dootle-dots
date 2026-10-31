@@ -1380,7 +1380,7 @@ function step() {
   if (!G.cutOpen) { G.cutOpen = true; if (cue('open')) return; }   // the stage's opening scene, before the controls card and the title wipe
   if (G.state === 'title') { if (IN.jp || IN.start || IN.sp || IN.click || IN.any) { G.state = 'play'; try { localStorage.setItem('dd_controls_seen', '1'); } catch (e) {} } return; }   // the level title wipe (introStrip) takes over from here
   if (G.state === 'pause') { updatePause(); return; }
-  if ((IN.start || (IN.click && inBox(IN.click, PAUSEBTN.x - 2, PAUSEBTN.y - 2, PAUSEBTN.w + 4, PAUSEBTN.h + 4))) && !G.done) { G.state = 'pause'; G.pm.sel = 0; SFX.tick(); return; }
+  if ((IN.start || (IN.click && inBox(IN.click, PAUSEBTN.x - 2, PAUSEBTN.y - 2, PAUSEBTN.w + 4, PAUSEBTN.h + 4))) && !G.done) { G.state = 'pause'; G.pm.sel = 0; SFX.tick(); if (window.DDVoice && !TR) window.DDVoice.menu('pause'); return; }
   if (G.intro < INTRO_T) { if (++G.intro === 60) playLines('start'); }
   if (talking()) return;
   updateDlg();

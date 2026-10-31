@@ -140,6 +140,7 @@
   function goldChip(id) { const w = String(id).split('-')[0]; if (C.gold[w]) return false; C.gold[w] = 1; C.free += 3; csave(); return true; }   // engine.js: a gold chip found in a stage
   function give(n, x, y) { if (n <= 0) return; if (unl()) H += n; else ST().bank(n); flyCoins(x, y, Math.ceil(n / 5)); }
   function settle(stake, back, big) {   // a finished round: records and the broke check. big: a loss worth a sigh
+    if (back >= Math.max(50, stake * 5) && performance.now() / 1000 - vAt > 3 && window.DDVoice) setTimeout(() => { if (performance.now() / 1000 - vAt > 2) window.DDVoice.menu('casino_win'); }, 700);   // a big win the casino's own lines didn't cover
     C.rounds++; credit = 0; used = 0;
     if (unl()) C.houseBest = Math.max(C.houseBest, H);
     else {
@@ -518,7 +519,7 @@
       give(back, 160, 86);
       tier(back, S.bet, 160, 90, jack ? 'LUCKY SEVEN!' : wild3 ? 'WILD CARD!' : null);
       if (jack) vo('CAS10.mp3', 0); else if (wild3) vo('CAS7.mp3', 0);
-      else if (boss) { const w = BOSSES[S.face][1], L = (window.VOICE_CLIPS || []).filter(c => c.ok && c.w === w && c.hooks && c.hooks.includes('boss_taunt') && !(c.x && c.x.length)); if (L.length) vo(L[rnd(L.length)].f, 20); bannerUp('BOSS LINE! +' + back, '#ff8a6a', 2, 140); }
+      else if (boss) { const w = BOSSES[S.face][1], L = (window.VOICE_CLIPS || []).filter(c => c.ok && c.w === w && c.hooks && c.hooks.includes('boss_taunt')); if (L.length) vo(L[rnd(L.length)].f, 20); bannerUp('BOSS LINE! +' + back, '#ff8a6a', 2, 140); }
       else if (ev.grid.some(col => col.includes(WILD)) && ev.wins.length && Math.random() < 0.35) vo('CAS7.mp3', 120);
     } else { tone(200, 150, 0.12, 'triangle', 0.03); if (LINES.some(L => { const a = cellOf(0, S.stops[0], L[0]), b = cellOf(1, S.stops[1], L[1]); return a === SEV && b === SEV; })) say('SO CLOSE. TWO SEVENS AND A NOTHING.', 90); }
     settle(S.bet, back, S.bet >= 50);
@@ -1121,7 +1122,7 @@
       Wd.wear(it.id); say('CLAIMED WITH ' + it.sec + ' DOT SECRETS. YOU KEEP THEM ALL.', 160); return;
     }
     if (!Wd.owns(it.id)) {
-      const r = Wd.buy(it.id);
+      const r = Wd.buy(it.id); if (window.DDVoice) window.DDVoice.menu(r === 'ok' ? 'wear_buy' : r === 'poor' ? 'store_poor' : '');
       if (r === 'poor') { say('NEED ' + (it.cost - pts()) + ' MORE HEI POINTS', 90); SFX.buzz(); if (ST().poor) ST().poor(); return; }
       flyCoins(BAL.x + 20, BAL.y + 4, 1); winSound(5); bannerUp(it.name + '!', '#ffe680', 2, 90); fountain(64, 100, 18);
       Wd.wear(it.id); say('THE WHOLE TEAM WEARS IT. SWITCH DOTS AND IT STAYS ON.', 160); return;
@@ -1223,6 +1224,7 @@
     t = 0; scr = 'lobby'; banner = null;
     if (!C.seen) { C.seen = 1; csave(); vo('CAS2.mp3', 0); say('LUCKY SEASON 7. BET HEI POINTS, WIN HEI POINTS.', 200); }
     else if (!sessOpen) vo('CAS1.mp3', 0);
+    else if (window.DDVoice) window.DDVoice.menu('casino_open');   // back in the lobby: a show line, on its own cooldown
     sessOpen = true;
     if (unl()) { H = HOUSE; setTimeout(() => say('UNLIMITED: THE HOUSE STAKES YOU ' + HOUSE + '. BEST VISIT ' + C.houseBest, 200), 400); }
     else if (C.free) say(C.free + ' FREE BETS FROM GOLD CHIPS: UP TO ' + FREE + ' EACH, ON THE HOUSE', 200);

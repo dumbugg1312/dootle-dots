@@ -97,18 +97,18 @@
 
   let tab = 0;   // 0 the store, 1 the casino (casino.js); C / R1 or a click on the tab flips it, and it stays put between visits
   const TABS = [{ x: 62, w: 92, label: 'HEI STORE' }, { x: 158, w: 80, label: 'CASINO' }];
-  function open(o = {}) { if (tab === 1 && window.DDCasino) window.DDCasino.open(); t = 0; back = o.onBack || null; label = o.label || 'BACK'; shown = S.pts; msgT = 0; fly = []; pop = null; tip = (tip + 1) % TIPS.length; if (o.cur !== undefined) cur = o.cur; }
+  function open(o = {}) { if (tab === 1 && window.DDCasino) window.DDCasino.open(); else if (window.DDVoice) window.DDVoice.menu('store_open'); t = 0; back = o.onBack || null; label = o.label || 'BACK'; shown = S.pts; msgT = 0; fly = []; pop = null; tip = (tip + 1) % TIPS.length; if (o.cur !== undefined) cur = o.cur; }
   function buy(i) {
     const u = items()[i], o = own(u.id), was = revealed();
     if (!u) return false;
     if (o >= maxOf(u)) { say(u.id === 'six' ? 'TIM ALREADY MADE HIS CALL' : u.name + ' IS MAXED OUT'); SFX.buzz(); return false; }
     const cost = priceOf(u, o);
-    if (!UNL && S.pts < cost) { say('NEED ' + (cost - S.pts) + ' MORE HEI POINTS'); SFX.buzz(); poorT = 14; return false; }
+    if (!UNL && S.pts < cost) { say('NEED ' + (cost - S.pts) + ' MORE HEI POINTS'); SFX.buzz(); poorT = 14; if (window.DDVoice) window.DDVoice.menu('store_poor'); return false; }
     if (!UNL) S.pts -= cost;
     S.own[u.id] = o + 1; S.on[u.id] = o + 1; save();
     pop = { i, k: o, t: 0 };
     for (let k = 0; k < 8; k++) fly.push({ x0: VW - 58, y0: 6, x1: PIPX + o * 6 + 2, y1: rowY(i) + 2, t: -k * 2, d: 18 });   // coins fly from the balance to the new pip
-    SFX.bag(); DD.tone(784, 784, 0.08, 'square', 0.05, 0.12); DD.tone(1175, 1175, 0.14, 'triangle', 0.05, 0.2);
+    SFX.bag(); DD.tone(784, 784, 0.08, 'square', 0.05, 0.12); DD.tone(1175, 1175, 0.14, 'triangle', 0.05, 0.2); if (window.DDVoice && u.id !== 'six') window.DDVoice.menu('store_buy');
     if (u.id === 'six') { reveal = 0; say("SIX BAGS. TIM'S CALL.", 150); [523, 659, 784, 1046, 1318, 1568].forEach((f, k) => DD.tone(f, f, 0.12, 'square', 0.05, 0.3 + k * 0.08)); }
     else say(u.name + ' LEVEL ' + (o + 1) + (o + 1 === MAX ? '. MAXED OUT!' : '!'), 80);
     if (!was && revealed()) { reveal = 1; say('ALL TEN MAXED. SOMETHING ELSE IS FOR SALE...', 200); [392, 494, 587, 784].forEach((f, k) => DD.tone(f, f, 0.2, 'triangle', 0.06, 0.4 + k * 0.15)); }   // the secret row appears
