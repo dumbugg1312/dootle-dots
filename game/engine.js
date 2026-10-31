@@ -167,8 +167,9 @@ function noise(dur, vol = 0.1, freq = 800, delay = 0) {
   s.connect(f); f.connect(g); g.connect(MASTER); s.start(t);
 }
 let CUT = null;   // the cutscene playing (game/cutscene.js, DD.setCut): it holds the stage while it runs and draws over it
-const cue = (kind, o) => { const C = window.DDCut; return !!(C && !TR && !NOPAUSE && L && G && C.cue(kind, o)); };   // a stage moment that may open a cutscene: 'open', 'boss_in', 'boss_out', 'goal', 'tick'
-const vo = (h, o) => { const V = window.DDVoice; if (V && !TR) V.say(h, o); };   // the trailer never talks   // soundbites (game/voice.js)
+const RUN = () => !TR && DD.opts && DD.opts.run || null;   // speedrun mode (speedrun.js): the run that owns this stage, if any
+const cue = (kind, o) => { const C = window.DDCut; return !!(C && !TR && !NOPAUSE && !RUN() && L && G && C.cue(kind, o)); };   // a stage moment that may open a cutscene: 'open', 'boss_in', 'boss_out', 'goal', 'tick'
+const vo = (h, o) => { const V = window.DDVoice; if (V && !TR && !RUN()) V.say(h, o); };   // the trailer never talks   // soundbites (game/voice.js)
 const SFX = {
   jump: () => tone(260, 620, 0.13, 'square', 0.06),
   dj: () => { tone(420, 980, 0.12, 'square', 0.06); tone(840, 1400, 0.08, 'triangle', 0.04, 0.04); },
@@ -300,6 +301,7 @@ const cx = e => e.x + e.w / 2, bot = e => e.y + e.h;
 
 function build() {
   Object.assign(P, P0);
+  if (RUN()) RUN().seed(L.id);   // a speedrun deals every stage the same enemy luck
   const K = (!TR && DD.opts && DD.opts.perks) || {};   // the HEI store's upgrades (store.js perks()); never in a trailer or the node tests
   if (K.speed > 1) for (const k of ['walk', 'run', 'melRun', 'accWalk', 'accRun', 'airAcc']) P[k] *= K.speed;
   if (K.jump > 1) { P.jump *= K.jump; P.dj *= K.jump; }
@@ -356,6 +358,7 @@ function build() {
   const s0 = { x: G.pl.x, y: G.pl.y, f: bot(G.pl) }; G.safe = Object.assign({}, s0); G.cpSafe = Object.assign({}, s0); G.startSafe = s0; G.landed = true;
   placeFact();
   G.cam = { x: clamp(cx(G.pl) - VW / 2, 0, LW - VW), y: clamp(bot(G.pl) - VH * CAM_FEET, 0, LH - VH), look: 0 };
+  if (RUN()) { G.state = 'play'; G.intro = INTRO_T; G.cutOpen = true; ORDER.forEach(d => { G.seen[d] = true; }); G.met = { gh: true, th: true }; }   // a speedrun drops straight into play: no title card, wipe, first-time banners or NEW FAN cards
   hook('init', G); if (!TR) setTimeout(() => vo('level_start'), 600);
 }
 function unbury() {   // safety net: a kernel or pickup placed inside solid tiles is lifted to the first open space above it
@@ -993,7 +996,7 @@ function interact() {
       else { SFX.dsec(b.dot); stars(cx(b), b.y + 8, 14, DOTS[b.dot].col); stars(cx(b), b.y + 8, 8, '#fff2a6'); float(cx(b), b.y - 6, DOTS[b.dot].name + "'S SECRET!", '#ffe680'); G.dsecT = 40; G.dsecWho = b.dot; }
     } else if (b.kind === 'gchip' && !b.got && ov(p, b)) {
       b.got = true;
-      if (b.had || TR || !window.DDCasino) { SFX.tick(); stars(cx(b), b.y + 7, 6, '#fff2a6'); }
+      if (b.had || TR || !window.DDCasino || RUN()) { SFX.tick(); stars(cx(b), b.y + 7, 6, '#fff2a6'); }
       else { window.DDCasino.goldChip(L.id); SFX.chip(); stars(cx(b), b.y + 7, 16, '#ffd24a'); stars(cx(b), b.y + 7, 8, '#fff6d4'); float(cx(b), b.y - 6, 'GOLD CHIP! 3 FREE BETS', '#ffe680'); }
     } else if (b.kind === 'fact' && !b.got && ov(p, b)) {
       b.got = true; SFX.tick(); stars(cx(b), b.y + 6, 10, '#7ab0ff'); readFact(b);
@@ -1025,6 +1028,7 @@ function finish(goal) {
 }
 function endLevel(frac = 1, bonus = 0, boss = false) {   // the level is won: bonus popcorn, results card
   if (G.done || TR) return;   // a trailer never finishes a stage
+  if (RUN() && RUN().full && !boss) { const m = missing(); if (m.length) { if (!(G.runNag > 0)) { banner('NOT 100% YET', 110, 'STILL NEED ' + m.join(', ')); SFX.buzz(); } G.runNag = 90; return; } }   // a 100% run: the goal waits for everything in the stage
   const p = G.pl;
   G.got += bonus; G.done = { t: 0, frac, bonus, boss };
   p.vx = 0; p.vy = 0; p.slam = 0; p.rolling = false;
@@ -1033,6 +1037,15 @@ function endLevel(frac = 1, bonus = 0, boss = false) {   // the level is won: bo
   else if (!G.vhs && classic()) { SFX.vhs(); gotTape(); }   // a beaten boss drops the stage's tape
 }
 
+function missing() {   // what a 100% speedrun still needs in this stage: every kernel, the tape, the blue card, each Dot's secret, the gold chip
+  const m = [], k = pops.filter(c => !c.got).length, s = (G.dsecDots || []).filter(d => !G.dsec[d]).length;
+  if (k) m.push(k + (k > 1 ? ' KERNELS' : ' KERNEL'));
+  if (bodies.some(b => b.kind === 'vhs') && !G.vhs) m.push('THE TAPE');
+  if (bodies.some(b => b.kind === 'fact') && !G.factGot) m.push('THE BLUE CARD');
+  if (s) m.push(s + (s > 1 ? ' DOT SECRETS' : ' DOT SECRET'));
+  if (bodies.some(b => b.kind === 'gchip' && !b.got)) m.push('THE GOLD CHIP');
+  return m;
+}
 function gotTape() {   // a Popcorn Classic: title, year, runtime, director and red-tape code, then Gregg's take
   if (G.vhs) return;
   G.vhs = true; const c = classic();
@@ -1048,7 +1061,7 @@ function answerFact(pick) {   // lock in the call; when Tim's card is wrong, Gre
   const f = G.fact; if (!f || f.ans) return;
   const c = f.c, right = (pick === 'F') === !!c.wrong;
   f.pick = pick; f.ans = right ? 'right' : 'missed'; f.at = f.t; G.factGot = f.ans;
-  if (right) { addGot(25, cx(G.pl), G.pl.y); SFX.vhs(); } else SFX.buzz();
+  if (right) { addGot(25, cx(G.pl), G.pl.y); SFX.vhs(); } else { SFX.buzz(); if (RUN()) { RUN().penalty(300); float(cx(G.pl), G.pl.y - 14, '+5 SECONDS', '#ff9a8a'); } }   // a speedrun charges five seconds for a wrong call
   vo(c.wrong ? 'fact_wrong' : 'fact_true');
   if (c.wrong) sayLine('gregg', c.truth, { now: true });
 }
@@ -1156,7 +1169,8 @@ function updateCamera(snap = false) {
 // ---------------------------------------------------------------- narrators: DD.say(who, text, opts) queues a line in the dialogue box. Play pauses while a line, a NEW FAN card or a blue card is up; jump advances
 const SPEAK = { tim: { col: '#6cc8b4', pitch: 200 }, gregg: { col: '#e8707a', pitch: 285 } };   // box colour and blip pitch per narrator; others get a default
 const speaker = who => SPEAK[who] || { col: '#ffe680', pitch: 230 + (String(who).length * 17 % 5) * 22 };
-function sayLine(who, txt, o = {}) {   // queue one line: who 'tim' | 'gregg' | a key of LEVEL.portraits. o: { name, hold (frames after typing), col, now (cut in front) }
+function sayLine(who, txt, o = {}) {
+  if (RUN()) return;   // a speedrun has no dialogue holds   // queue one line: who 'tim' | 'gregg' | a key of LEVEL.portraits. o: { name, hold (frames after typing), col, now (cut in front) }
   if (!G || !G.dlg) return;
   txt = String(txt).replace(/[‘’]/g, "'").replace(/[“”"]/g, '').replace(/[—–]/g, '-').replace(/…/g, '...').replace(/;/g, ',').toUpperCase();
   const lines = []; let cur = '';
@@ -1166,7 +1180,8 @@ function sayLine(who, txt, o = {}) {   // queue one line: who 'tim' | 'gregg' | 
   q.len = q.lines.reduce((a, l) => a + l.length, 0);
   if (o.now) { G.dlg.q.unshift(q); G.dlg.cur = null; G.dlg.gap = 0; } else G.dlg.q.push(q);
 }
-function playLines(name, again) {   // play LEVEL.lines[name] (an array of [who, text]); each name plays once per run unless `again`
+function playLines(name, again) {
+  if (RUN()) return;   // play LEVEL.lines[name] (an array of [who, text]); each name plays once per run unless `again`
   const ls = L && L.lines && L.lines[name]; if (!ls || !G || (G.lineSeen[name] && !again)) return false;
   G.lineSeen[name] = true; vo('beat', { k: name }); for (const [who, t, o] of ls) sayLine(who, t, o); return true;   // the beat can have a voice line ("beat:<name>")
 }
@@ -1191,7 +1206,7 @@ function talking() {   // the game is paused for a card or a line: run that inst
     if (!f.ans && f.t > 24 && IN.click) { if (inBox(IN.click, fX + 16, fY - 2, 68, 16)) answerFact('T'); else if (inBox(IN.click, fX + 100, fY - 2, 68, 16)) answerFact('F'); }
     else if (f.ans && IN.click) IN.jp = true;   // after the call, a click closes the card
     if (!f.ans) { if (f.t <= 24) {} else if ((IN.l || IN.nx < 0) && f.pick !== 'T') { f.pick = 'T'; SFX.tick(); } else if ((IN.r || IN.nx > 0) && f.pick !== 'F') { f.pick = 'F'; SFX.tick(); } else if (f.t > 24 && IN.jp && f.pick) answerFact(f.pick); }
-    else if (f.t - f.at > 20 && IN.jp) { G.fact = null; SFX.tick(); }
+    else if ((f.t - f.at > 20 && IN.jp) || (RUN() && f.t - f.at > 30)) { G.fact = null; SFX.tick(); }   // a speedrun closes it for you
     return true;
   }
   if (G.dlg.cur || G.dlg.q.length) { updateDlg(); return true; }   // (any banner waits for the dialogue)
@@ -1251,7 +1266,7 @@ function drawEndIris() {   // the level is won: the iris closes on the player, t
   const [px, py] = playerScreen(); drawIris(IRIS_MAX * (1 - ease((d.t - 4) / 44)), px, py);
 }
 const pauseOpts = () => window.__menu && window.__menu.pauseOptions;   // the menu's options screen (volumes, jukebox, unlocks, save data), opened over the paused level
-const pauseItems = () => ['RESUME', 'RESTART'].concat(pauseOpts() ? ['OPTIONS'] : [], DD.opts && DD.opts.onExit ? ['QUIT TO MAP'] : []);
+const pauseItems = () => RUN() ? ['RESUME', 'RESTART', 'RESET RUN', 'QUIT RUN'] : ['RESUME', 'RESTART'].concat(pauseOpts() ? ['OPTIONS'] : [], DD.opts && DD.opts.onExit ? ['QUIT TO MAP'] : []);   // a speedrun: RESTART is the stage (the clock keeps going), RESET RUN is back to 1-1 at zero
 function updatePause() {
   const m = G.pm, items = pauseItems(), n = items.length;
   if (m.opt) { pauseOpts().step(IN); return; }   // the options are up: they close themselves back to this menu
@@ -1259,7 +1274,7 @@ function updatePause() {
   if (IN.ny) { m.sel = (m.sel + (IN.ny > 0 ? 1 : n - 1)) % n; SFX.tick(); }
   let ok = IN.ok;
   if (IN.click) { const i = items.findIndex((it, k) => inBox(IN.click, VW / 2 - 70, 74 + k * 20, 140, 17)); if (i >= 0) { m.sel = i; ok = true; } else { G.state = 'play'; return; } }   // click an item to pick it; click outside to resume
-  if (ok) { const it = items[m.sel]; if (it === 'OPTIONS') { m.opt = true; pauseOpts().open(() => { m.opt = false; }); return; } SFX.switch(); if (it === 'RESUME') G.state = 'play'; else if (it === 'RESTART') G.restartReq = true; else leave(true); }
+  if (ok) { const it = items[m.sel]; if (it === 'OPTIONS') { m.opt = true; pauseOpts().open(() => { m.opt = false; }); return; } SFX.switch(); if (it === 'RESUME') G.state = 'play'; else if (it === 'RESTART') G.restartReq = true; else if (it === 'RESET RUN') { const R = RUN(); setTimeout(() => R.reset(), 0); } else leave(true); }
   else if (IN.start || IN.back) G.state = 'play';
 }
 function drawPause() {
@@ -1301,6 +1316,7 @@ function cardSetup(d) {   // lay out the count-up timeline (card clock c, in fra
 const HEIBTN = { x: VW - 70, y: 15, w: 46, h: 32 };   // the results card's HEI Points box, which opens the store (inside the card, which runs x 20 to VW - 20, and right of the SIX BAGS sixth tub at x 229-247)
 function updateResults() {
   const d = G.done; if (!d) return;
+  if (RUN()) { if (d.t >= 12) leave(false); return; }   // a speedrun skips the card: on to the next stage
   if (!d.card) { if (d.t >= 50 && (!(G.dlg.cur || G.dlg.q.length) || d.t >= 300)) cardSetup(d); return; }   // goal lines get to play over the closed iris first
   const sto = DD.opts && DD.opts.store;   // the menu's stages can stop at the HEI store on the way to the next one
   if (IN.click && sto && d.hei && d.c >= d.hei0 && IN.click.x >= HEIBTN.x && IN.click.y >= HEIBTN.y && IN.click.x < HEIBTN.x + HEIBTN.w && IN.click.y < HEIBTN.y + HEIBTN.h) { leave(false, { store: true }); return; }   // the HEI Points on the card are a button: spend them, then on to the next stage
@@ -1391,6 +1407,8 @@ function drawResults() {
 
 // ---------------------------------------------------------------- the step
 function step() {
+  if (RUN() && G.state !== 'pause' && !G.done) RUN().tick();   // the speedrun clock
+  if (G.runNag > 0) G.runNag--;
   if (G.fall) { if (G.fall.t + 1 < FALL_OUT) { G.fall.t++; return; } updateFall(); }   // the iris is closing after a pit: nothing runs, not even the script clock or input, so a fall costs the simulation nothing
   readInput();
   if (G.restartReq) { restart(); return; }
@@ -2127,6 +2145,7 @@ function renderNow() {
   if (!CUT) introStrip();
   if (CUT) CUT.drawOver(ctx);   // letterbox, captions and cards
   if (G.state === 'title' && !CUT) drawTitle();
+  if (RUN()) RUN().draw(ctx, G);
   if (G.state === 'pause') drawPause();
   drawResults();
 }
@@ -2177,7 +2196,7 @@ function frame(now) {
   requestAnimationFrame(frame);   // ask for the next frame first: an error in one frame is logged, and the game never freezes on it
   try {
     acc += Math.min(100, now - last); last = now;
-    while (acc >= 1000 / 60) { acc -= 1000 / 60; if (scene) { readInput(); scene.step(IN); } else { keepPrev(); step(); } }
+    while (acc >= 1000 / 60) { acc -= 1000 / 60; if (scene) { readInput(); scene.step(IN); } else { keepPrev(); simStep(); } }
     if (scene) { lerpG = null; scene.draw(ctx); } else { lerpA = acc / (1000 / 60); render(); }
     stockTick(); drawPadNote(now);
   } catch (e) { if (frameErrs++ < 20) console.error('[frame]', e); }
@@ -2188,6 +2207,7 @@ function drawPadNote(now) {   // over the menu and the game alike, fading out at
   ctx.globalAlpha = Math.min(1, left / 300); ctx.fillStyle = '#0a0408'; ctx.fillRect(0, VH - 13, VW, 13);
   text(padNote.s, VW / 2, VH - 10, '#9ac8a0', 1, null, 'center'); ctx.globalAlpha = 1;
 }
+function simStep() { const R = RUN(); if (!R) return step(); const m = Math.random; Math.random = R.rand; try { step(); } finally { Math.random = m; } }   // a speedrun's luck comes from its own seeded numbers
 function run() { if (!looping) { looping = true; last = performance.now(); requestAnimationFrame(frame); } }
 function setScene(s) { scene = s; run(); }   // a menu scene {step(IN), draw(ctx)} replaces the game until start() is called
 function leave(quit, extra) {   // level over (or quit from pause): hand the result to opts.onExit (extra: { store: true } stops at the HEI store)

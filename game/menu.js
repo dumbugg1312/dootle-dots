@@ -41,6 +41,8 @@
   const skipped = () => { try { return localStorage.getItem(SKIPKEY) === '1'; } catch (e) { return false; } };
   const cast = () => ['sam', 'mel', 'cloud', 'baxter'].filter(d => ALLD || skipped() || !JOIN[d] || beaten(JOIN[d]));
   const joinsOn = id => ALLD || skipped() ? null : Object.keys(JOIN).find(d => JOIN[d] === id && !beaten(id)) || null;
+  const runOpen = () => !!window.DDRun && (ALL || beaten('12-boss'));   // SPEEDRUN opens on the title once the game is beaten, or with every level unlocked
+  let tsel = 0;
   const worldUnlocked = w => { const i = WORLDS.indexOf(w); if (ALL || i <= 0 || (i === 1 && skipped()) || idsOf(w).some(beaten)) return true; const pv = WORLDS[i - 1].levels; return beaten(pv[pv.length - 1].id); };   // beat the boss before it; anything already beaten stays open
   const stageUnlocked = (w, i) => worldUnlocked(w) && (ALL || i === 0 || beaten(w.levels[i].id) || beaten(w.levels[i - 1].id));
   const worldPlay = w => worldOpen(w) && worldUnlocked(w);
@@ -379,6 +381,14 @@
     if (st === 'wardrobe') { if (window.DDCasino.step(IN, c) === 'back') { st = 'select'; t = 0; SFX.switch(); } return; }
     if (st === 'title') {
       if (t === 20) sCurtain(); if (t === 120) sTa();
+      if (runOpen()) {   // beaten (or UNLOCK ALL LEVELS): the plaque offers PLAY or SPEEDRUN; a press during the curtain just opens it
+        if (IN.nx) { tsel = IN.nx > 0 ? 1 : 0; if (t < 101) t = 101; SFX.tick(); return; }
+        if (t <= 100) { if (IN.ok || IN.start || IN.any || c) t = 101; return; }
+        if (c && inR(c, 94, 160, 132, 17)) tsel = c.x >= 146 ? 1 : 0;
+        if (tsel && (IN.ok || IN.start || c)) { if (window.DDRun) window.DDRun.open({ LEVELS, WORLDS, prepSongs, back: () => { st = 'title'; t = 130; DD.setScene(scene); } }); return; }
+        if (IN.ok || IN.start || c) { st = 'select'; t = 0; SFX.switch(); }
+        return;
+      }
       if (IN.ok || IN.start || IN.any || c) { st = 'select'; t = 0; SFX.switch(); }
       return;
     }
@@ -536,7 +546,8 @@
     if (tt > 100) {
       rect('#2a1408', 94, 160, 132, 17); rect('#c98f22', 94, 160, 132, 1); rect('#c98f22', 94, 176, 132, 1); rect('#c98f22', 94, 160, 1, 17); rect('#c98f22', 225, 160, 1, 17);
       rect('#4f0f24', 96, 162, 128, 13);
-      if (blink(tt, 28)) text('PRESS ANY BUTTON', 160, 164, '#fff6c0', 2, '#7a2a10', 'center');
+      if (runOpen()) [['PLAY', 120, 96, 50], ['SPEEDRUN', 186, 146, 78]].forEach(([s, x, bx, bw], i) => { const on = i === tsel; if (on) rect('#7a1f3a', bx, 162, bw, 13); text(s, x, 164, on ? '#ffffff' : '#9a7a70', 2, on ? '#7a2a10' : null, 'center'); });   // left / right picks
+      else if (blink(tt, 28)) text('PRESS ANY BUTTON', 160, 164, '#fff6c0', 2, '#7a2a10', 'center');
     }
     if (tt > 100 && tt < 124) rect('rgba(255,248,214,' + ((124 - tt) / 24 * 0.5).toFixed(2) + ')', 0, 0, VW, VH);
     if (msg && tt > 100) ctext(msg, 150, '#ff8080', 1);
