@@ -38,6 +38,7 @@ function spill(e) {   // the briefcase pops open: popcorn
   for (let i = 0; i < 4; i++) DD.drop({ x: DD.cx(e), y: e.y - 4, vx: (i - 1.5) * 1.1, vy: -3 - (i % 2), life: 300, wait: 8 });
 }
 DD.defineEntity('abdulfan', {   // phase-2 reinforcements: the little red-keffiyeh walker
+  bowl: true,   // a person: Mel's roll knocks them over
   spawn: t => ({ x: t.x, y: t.y, w: 14, h: 28, vx: 0.9, vy: 0, t: 0 }),
   update(e, G) {
     e.t++; const d = DD.cx(G.pl) - DD.cx(e); e.vx = Math.sign(d || 1) * 0.95;

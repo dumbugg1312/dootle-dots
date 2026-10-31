@@ -409,6 +409,7 @@ window.LEVEL.dialogTop = true;   // a news ticker runs along the bottom, so dial
 ;(function () {
   const TS = 16;
   DD.defineEntity('server', {
+    bowl: true,   // a person: Mel's roll knocks them over
     spawn: t => ({ x: t.x + 1, y: t.y - 6, w: 14, h: 38, vx: 0, vy: 0, x0: t.x, st: 'walk', t: 0, face: -1, a: 0 }),
     update(e, G) {
       e.a++; e.t++;

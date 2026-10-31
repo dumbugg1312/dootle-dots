@@ -36,13 +36,14 @@
     NOISE = AC.createBuffer(1, AC.sampleRate * 0.3, AC.sampleRate);
     const d = NOISE.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   }
-  const unlock = () => { init(); if (AC && AC.state === 'suspended') AC.resume(); if (deck) deck.blocked = false; };
+  const unlock = () => { init(); if (AC && AC.state !== 'running') AC.resume().catch(() => {}); if (deck) deck.blocked = false; };   // Safari can also report 'interrupted'
   addEventListener('keydown', e => {
     unlock();
     if (e.code === 'KeyM') { muted = !muted; try { localStorage.setItem('dd-mute', muted ? '1' : '0'); } catch (er) {} if (OUT) OUT.gain.value = muted ? 0 : 0.32 * MV(); }
   });
-  addEventListener('pointerdown', unlock);
-  init();   // created up front (allowed without a gesture); it stays suspended until the first key or click where the browser requires that
+  addEventListener('pointerdown', unlock); addEventListener('click', unlock); addEventListener('touchend', unlock);
+  // the context is made inside the first key or click, like the sound effects' (engine.js initAudio): Safari never lets one made
+  // at page load start on a first visit (only after a reload), so the music stayed silent
 
   const hz = m => 440 * Math.pow(2, (m - 69) / 12);
   function note(part, m, t, dur, vel) {

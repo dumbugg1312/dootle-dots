@@ -256,6 +256,7 @@ window.LEVEL = {"id": "7-2", "name": "MARKIVES", "sub": "ON CINEMA MARKIVES", "w
 (function () {
   const TS = 16, CFG = { mainH: 26, name: 'THE GUTS', bg: ['#05060c', '#0e1424', 'rgba(255,90,70,0.06)'] };
   DD.defineEntity('w7rig', {
+    bowl: true,   // a person: Mel's roll knocks them over
     spawn: t => ({ x: t.x, y: t.y + 32 - 28, w: 16, h: 28, vx: 0, vy: 0, dir: -1, st: 'roll', t: 0, x0: t.x, cool: 0, lens: 0 }),
     update(e, G) {
       const p = G.pl; e.t++; if (e.cool > 0) e.cool--;

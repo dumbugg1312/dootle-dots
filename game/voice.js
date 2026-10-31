@@ -30,7 +30,8 @@
   const ASIDE = [18, 30], ASIDE_FIRST = 12, BOSS_QUIET = 35;   // seconds of quiet before the hosts chime in: a random wait in this range, and never in a stage's first seconds
   let PLAYS = {}; try { PLAYS = JSON.parse(localStorage.getItem('dd-voice-plays') || '{}') || {}; } catch (e) {}
   let RECENT = []; try { RECENT = JSON.parse(localStorage.getItem('dd-voice-recent') || '[]') || []; } catch (e) {}
-  const FRESH = 60;   // a reaction or an aside never repeats a clip from the last FRESH lines heard: quiet beats a rehash
+  const FRESH = 400;   // no line repeats a clip from the last FRESH lines heard (about two thirds of a playthrough): with ~900 clips, quiet beats a rehash
+  const ENCORE = /^(clear|perfect|boss_defeat|join_)/;   // the payoff beats rather repeat a take than go unsaid; every other placed line (a retry's opener, beats, the boss intro, the blue card) stays quiet once heard
   let saveT = 0; const savePlays = () => { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem('dd-voice-plays', JSON.stringify(PLAYS)); localStorage.setItem('dd-voice-recent', JSON.stringify(RECENT)); } catch (e) {} }, 500); };
   let cur = null, curKey = null, curEnd = 0, endAt = -99, lastAt = -99, asideWait = 24, stageAt = 0, levelId = null, spots = [], titled = false, still = { x: 0, y: 0, t: 0 };
   let run = { spoken: 0, said: {}, heard: {}, damage: 0, taunts: 0 }, pending = null;
@@ -70,7 +71,11 @@
     if (moment === 'world') return next('world' + o.world, wc.pick, 1);
     if (moment === 'title') return next('title', CUES.title, 1);
     if (moment.startsWith('line:')) return next(moment, (CUES.lines || {})[moment.slice(5)], 1);   // a narrator line read out by the show clip that says it
-    if (PLACED.test(moment) || MUST[moment]) return next(moment, lc[moment] || wc[moment] || (CUES.any || {})[moment], 1);   // the level's own cue, else the world's, else the game-wide one
+    if (PLACED.test(moment) || MUST[moment]) {   // the level's own cue, else the world's, else the game-wide one; all of them wait out the last FRESH lines unless the beat must land
+      const c = next(moment, lc[moment] || wc[moment] || (CUES.any || {})[moment], ENCORE.test(moment));
+      if (c || moment !== 'level_start') return c;
+      moment = 'aside';   // a retry: the stage's opener was just heard, so the hosts open with fresh chatter from this era instead
+    }
     if (moment === 'aside' || moment === 'idle') {   // chatter and standing around share one pool, so the idle lines get heard by players who never stand still
       const mine = moment === 'aside' ? both(both(lc.aside, wc.aside), both(lc.idle, wc.idle)) : both(both(lc.idle, wc.idle), both(lc.aside, wc.aside));
       const me = +((o && o.world) || (L && L.world)) || 1;
@@ -133,7 +138,7 @@
     if (reached.length && now() >= curEnd) {
       reached.forEach(s => { s.done = true; });
       const s = reached[reached.length - 1];
-      if (BY[s.id] && BUDGET - run.spoken > 0) { run.spoken++; curKey = 'spot'; play(BY[s.id]); }
+      if (BY[s.id] && !RECENT.includes(s.id) && BUDGET - run.spoken > 0) { run.spoken++; curKey = 'spot'; play(BY[s.id]); }
     }
     // standing still for 8 s in open play: the hosts notice (REPEAT.idle times a run)
     const dl = D.dialog, fight = !!(G.boss && G.boss.engaged), busy = G.state !== 'play' || G.done || G.fall || (dl && (dl.cur || dl.q.length));

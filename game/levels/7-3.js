@@ -188,6 +188,7 @@ window.LEVEL = {"id": "7-3", "name": "PACKS OF EIGHT", "sub": "ON CINEMA ON LOCA
 (function () {
   const TS = 16, CFG = { mainH: 24, name: 'STOCKROOM', bg: ['#05080e', '#0c1a26', 'rgba(154,208,255,0.07)'] };
   DD.defineEntity('w7rig', {
+    bowl: true,   // a person: Mel's roll knocks them over
     spawn: t => ({ x: t.x, y: t.y + 32 - 28, w: 16, h: 28, vx: 0, vy: 0, dir: -1, st: 'roll', t: 0, x0: t.x, cool: 0, lens: 0 }),
     update(e, G) {
       const p = G.pl; e.t++; if (e.cool > 0) e.cool--;

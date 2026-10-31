@@ -221,6 +221,7 @@ window.LEVEL = {"id": "3-3", "name": "DON'T TOUCH MY CARD", "sub": "WHERE'S MY L
   // and pays 3 popcorn. Same block lives in 3-1, 3-2 and 3-3.
 window.LEVEL.sprites = (window.LEVEL.sprites || []).concat(['w3_courier_0', 'w3_courier_1', 'w3_courier_2']);
   DD.defineEntity('courier', {
+    bowl: true,   // a person: Mel's roll knocks them over
     spawn: t => ({ x: t.x, y: t.y + 16 - 26, w: 16, h: 26, vx: 0, vy: 0, dir: -1, st: 'walk', t: 0, wk: 0, home: t.x, air: false }),
     update(e, G) {
       const p = G.pl, dx = DD.cx(p) - DD.cx(e);

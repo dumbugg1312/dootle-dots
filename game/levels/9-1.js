@@ -487,6 +487,7 @@ window.LEVEL = {"id": "9-1", "name": "THE MORNING SHOW", "sub": "HAPPY. HEALTHY.
   // AMATOCON ATTENDEE (the deliberately bored crowd in the ballroom at AmatoCon, Oscar 11): a person with a lanyard badge and a tote bag, standing around. He sits low and his badge flashes
   // for a third of a second, then he lunges once at you (a low hop, about two tiles up). Stomp him for popcorn; touching him from the side costs popcorn. He never lunges off a ledge. (kind kept as w9ball)
   DD.defineEntity('w9ball', {
+    bowl: true,   // a person: Mel's roll knocks them over
     spawn: t => ({ x: t.x + 2, y: t.y + 1, w: 12, h: 15, vx: 0, vy: 0, dir: -1, wait: 50 + (t.tx * 17) % 40, sq: 0, n: (t.tx * 7) % 3, air: false, t: 0 }),
     update(e, G) {
       const p = G.pl, dx = DD.cx(p) - DD.cx(e), near = Math.abs(dx) < 150 && Math.abs(DD.bot(p) - DD.bot(e)) < 48;

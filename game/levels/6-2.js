@@ -259,9 +259,11 @@ window.LEVEL = {"id": "6-2", "name": "ANSWER THE QUESTION", "sub": "THE TRIAL OF
       if (R && p.dot === 'baxter' && s.prevSlam === 2 && !p.slam && p.onGround) {
         R.pews.forEach((pw, i) => {
           if (s.fell[s.r][i] !== 'stand') return;
-          const [z0, z1, row] = pw.zone;
-          if (cx(p) > z0 * TS - 6 && cx(p) < (z1 + 1) * TS + 6 && Math.abs(bot(p) - row * TS) < 4) {
-            s.fell[s.r][i] = 'fall'; const [sx, sy, sw, sh] = pw.stand;
+          const [z0, z1, row] = pw.zone, [sx, sy, sw, sh] = pw.stand;
+          const onLedge = cx(p) > z0 * TS - 6 && cx(p) < (z1 + 1) * TS + 6 && Math.abs(bot(p) - row * TS) < 4;
+          const onPew = cx(p) > sx * TS - 4 && cx(p) < (sx + sw) * TS + 4 && Math.abs(bot(p) - sy * TS) < 4;   // the sign points at the pew itself, so a slam on its top counts too
+          if (onLedge || onPew) {
+            s.fell[s.r][i] = 'fall';
             for (let x = sx; x < sx + sw; x++) for (let y = sy; y < sy + sh; y++) DD.setTile(x, y, null);
             s.anim.push({ r: s.r, i, t: 0 }); G.shake = 10; DD.SFX.slam(); DD.dust(sx * TS + 32, (sy + sh) * TS, 8, 1.8, '#c89a60'); DD.float(sx * TS + 32, sy * TS - 14, 'TIMBER', '#ffe680');
           }
@@ -344,6 +346,7 @@ window.LEVEL = {"id": "6-2", "name": "ANSWER THE QUESTION", "sub": "THE TRIAL OF
 ;(function () {
   const TS = 16;
   DD.defineEntity('procserver', {
+    bowl: true,   // a person: Mel's roll knocks them over
     spawn: t => ({ x: t.x + 1, y: t.y - 2, w: 14, h: 34, vx: 0, vy: 0, x0: t.x, st: 'walk', t: 0, face: -1, a: 0 }),
     update(e, G) {
       e.a++; e.t++;

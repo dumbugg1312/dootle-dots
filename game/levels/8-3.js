@@ -314,6 +314,7 @@ DD.defineEntity('w83guard', {   // a Decker heavy in the low lane: patrols his s
 (function () {
   const TS = 16, CFG = { mainH: 12, name: 'THE HOLLOW', bg: ['#10060e', '#200a1a', 'rgba(255,90,70,0.07)'] };
   DD.defineEntity('w8crew', {
+    bowl: true,   // a person: Mel's roll knocks them over
     spawn: t => ({ x: t.x + 1, y: t.y + 32 - 26, w: 14, h: 26, vx: 0, vy: 0, dir: -1, st: 'walk', t: 0, x0: t.x, cool: 0, ext: 0 }),
     update(e, G) {
       const p = G.pl; e.t++; if (e.cool > 0) e.cool--;

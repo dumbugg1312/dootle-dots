@@ -222,6 +222,7 @@ window.LEVEL = {"id": "6-3", "name": "APPROACH THE BENCH", "sub": "MAY I APPROAC
 ;(function () {
   const TS = 16;
   DD.defineEntity('procserver', {
+    bowl: true,   // a person: Mel's roll knocks them over
     spawn: t => ({ x: t.x + 1, y: t.y - 2, w: 14, h: 34, vx: 0, vy: 0, x0: t.x, st: 'walk', t: 0, face: -1, a: 0 }),
     update(e, G) {
       e.a++; e.t++;

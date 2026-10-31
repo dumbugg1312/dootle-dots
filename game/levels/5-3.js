@@ -14,10 +14,12 @@ const LANES = [
   { roof: 15, v: 0.8, kinds: ['bus', 'flatbed', 'sedan'], gap: [56, 112] },
   { roof: 12, v: 0.55, kinds: ['bus', 'flatbed', 'pickup'], gap: [48, 96] },
 ];
-const KIND = {   // segments left to right (width px, how many rows the roof drops); the cab is on the right, the way they drive
-  sport: { segs: [[44, 0]] }, sedan: { segs: [[52, 0]] }, van: { segs: [[68, 0]] }, pickup: { segs: [[44, 1], [32, 0]] },
-  flatbed: { segs: [[88, 1], [32, 0]] }, bus: { segs: [[132, 0]] },
+const KIND = {   // segments left to right (width px, how far the roof drops, in rows: 3/16 is 3px); the cab is on the right, the way they drive.
+  // Cars sit lower than vans and buses, and their trunks and hoods lower than their cabins, so the roof you stand on is the roof you see.
+  sport: { segs: [[9, 13 / 16], [21, 6 / 16], [14, 13 / 16]] }, sedan: { segs: [[11, 11 / 16], [27, 3 / 16], [14, 11 / 16]] }, van: { segs: [[56, 0], [12, 10 / 16]] },
+  pickup: { segs: [[40, 1], [24, 2 / 16], [12, 11 / 16]] }, flatbed: { segs: [[88, 1], [32, 0]] }, bus: { segs: [[132, 0]] },
 };
+const WAGON = [[40, 3 / 16], [12, 11 / 16]];   // one sedan in three is a station wagon (CAR.bake draws it from the same id)
 const COLS = ['#c8302c', '#2a5ab0', '#e0a030', '#e8e0d0', '#1a8a6a', '#8a30b0', '#d86a2a', '#4a4e60', '#d048b0'];
 const LOOP = 260 * TS, OFFS = -20 * TS;
 const genCars = () => {
@@ -28,7 +30,8 @@ const genCars = () => {
     while (x < LOOP) {
       const kind = ln.kinds[Math.floor(rnd() * ln.kinds.length)], k = KIND[kind], w = k.segs.reduce((a, s) => a + s[0], 0);
       if (x + w + 20 > LOOP) break;
-      cars.push({ id: id++, lane: li, kind, w, segs: k.segs, b: x, x: 0, px: 0, col: COLS[Math.floor(rnd() * COLS.length)], win: kind !== 'bus' && kind !== 'flatbed' && rnd() < 0.34, v: ln.v, ph: Math.floor(rnd() * 180) });
+      const cid = id++;
+      cars.push({ id: cid, lane: li, kind, w, segs: kind === 'sedan' && cid % 3 === 1 ? WAGON : k.segs, b: x, x: 0, px: 0, col: COLS[Math.floor(rnd() * COLS.length)], win: kind !== 'bus' && kind !== 'flatbed' && rnd() < 0.34, v: ln.v, ph: Math.floor(rnd() * 180) });
       x += w + ln.gap[0] + rnd() * (ln.gap[1] - ln.gap[0]);
     }
   });
@@ -40,9 +43,164 @@ const roofAt = (c, x0, x1) => {   // the highest roof (smallest y) of this car u
   for (const [w, drop] of c.segs) { if (x1 > sx + 1 && x0 < sx + w - 1) { const yy = LANES[c.lane].roof * TS + drop * TS; if (y === null || yy < y) y = yy; } sx += w; }
   return y;
 };
+// the traffic art: each look (kind, paint, window, variant) is baked once to a little canvas (body, glass, chrome, lights, drivers),
+// then drawn with live spinning wheels. The roofs stay flat and full width, because they are the platforms.
+const CAR = (() => {
+  const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const mix = (a, b, t) => { const A = hex(a), B = hex(b); return 'rgb(' + A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(',') + ')'; };
+  const lum = h => { const [r, g, b] = hex(h); return 0.3 * r + 0.59 * g + 0.11 * b; };
+  const FONT = { H: '101101111101101', O: '010101101101010', L: '100100100100111', Y: '101101010010010', W: '101101111111101', D: '110101101101110' };
+  const BUS = ['#d8582a', '#c8302c', '#d8582a', '#e8e0d0'];   // LA Metro: Local orange, Rapid red, and the odd white charter
+  const WHEELS = { sport: [9, 35], sedan: [10, 42], van: [12, 56], pickup: [12, 64], flatbed: [14, 28, 104], bus: [22, 112] };
+  const GLASS = '#1e2040', GLT = '#4a5a88', CHR = '#d8d4e2', CHH = '#f6f2fa', CHD = '#6a6678', INK = '#0a0610', B = 25;
+  const cache = new Map();
+  const bake = cr => {
+    const kind = cr.kind, w = cr.w, v = cr.id % 3, col = kind === 'bus' ? BUS[cr.id % BUS.length] : cr.col;
+    const c = document.createElement('canvas'); c.width = w + 4; c.height = 36; const g = c.getContext('2d'); g.translate(2, 1);
+    const R = (x, y, ww, hh, f) => { g.fillStyle = f; g.fillRect(x, y, ww, hh); };
+    const lt = mix(col, '#ffe2c8', 0.32), hl = mix(col, '#fff4e8', 0.62), dk = mix(col, '#140a1c', 0.38), dk2 = mix(col, '#140a1c', 0.62);
+    const ins = (a, y, T) => a[y - T] || 0;
+    const block = (x, ww, T, rear, front) => {   // a body panel with shaped top corners; the sunset on the roof; the rocker in shade
+      for (let y = T; y < B; y++) R(x + ins(rear, y, T), y, ww - ins(rear, y, T) - ins(front, y, T), 1, y === T ? hl : y === T + 1 ? lt : y >= B - 4 ? (y === B - 1 ? dk2 : dk) : col);
+      for (let y = T + 2; y < B - 4; y++) R(x + ins(rear, y, T), y, 1, 1, dk);   // the rear edge turns away from the sun
+    };
+    const glass = (x0, x1, T, rear, front, y0 = 3, y1 = 11) => {   // the greenhouse: glass following the slant of the pillars, a sky band, a diagonal glint
+      for (let y = T + y0; y <= T + y1; y++) {
+        const a = x0 + ins(rear, y, T) + 2, b = x1 - ins(front, y, T) - 2; if (b <= a) continue;
+        R(a, y, b - a, 1, y === T + y0 ? GLT : GLASS);
+        for (let x = a; x < b; x++) if ((x + y + cr.id * 5) % 23 < 2) R(x, y, 1, 1, 'rgba(210,222,255,0.3)');
+      }
+    };
+    const belt = (x, ww, T) => { R(x, T + 12, ww, 1, CHR); R(x, T + 13, ww, 1, dk); };
+    const seam = (x, T, y0 = 3) => R(x, T + y0, 1, B - 5 - T - y0, dk2);
+    const handle = (x, T) => { R(x, T + 15, 3, 1, CHR); R(x, T + 16, 3, 1, dk2); };
+    const head = (x, T, open) => {   // a driver: a silhouette against the glass, or in the warm light of the open window
+      const hc = open ? '#c88a6a' : INK;
+      R(x - 1, T + 5, 3, 1, open ? '#2a1a1a' : INK); R(x - 2, T + 6, 5, 4, hc); R(x - 1, T + 10, 3, 2, hc);
+      if (open) { R(x - 2, T + 6, 5, 1, '#2a1a1a'); R(x + 1, T + 7, 1, 1, INK); }
+    };
+    const openWin = (a, b, T) => { R(a, T + 4, b - a, 8, '#4a3048'); R(a, T + 4, b - a, 1, '#6a4a5a'); };   // the window is down
+    const tail = (x, y, h = 4) => { R(x, y, 2, h, '#d02030'); R(x, y, 1, h, '#ff6a6a'); };
+    const lamp = (x, y) => { R(x, y, 2, 2, '#fff4c8'); R(x, y + 2, 2, 1, '#ffa030'); };
+    const bumper = (x, y, ww, dark) => { R(x, y, ww, 4, dark ? '#24202c' : CHR); R(x, y, ww, 1, dark ? '#4a4656' : CHH); R(x, y + 3, ww, 1, dark ? INK : CHD); };
+    const T0 = 0, T1 = 16;
+    // cars: a cabin (roof row r) on a body (shoulder row h); the glass raked a little more than the roof, so the pillars have some weight
+    const low = (x, ww, h, rr = [], ff = []) => {
+      for (let y = h; y < B; y++) { const a = rr[y - h] || 0, b = ff[y - h] || 0; R(x + a, y, ww - a - b, 1, y === h ? hl : y === h + 1 ? lt : y >= B - 4 ? (y === B - 1 ? dk2 : dk) : col); }
+      for (let y = h + 2; y < B - 4; y++) R(x + (rr[y - h] || 0), y, 1, 1, dk);
+    };
+    const cab = (x, ww, r, h, rr, ff, gr, gf) => {
+      for (let y = r; y < h; y++) { const a = rr[y - r] || 0, b = ff[y - r] || 0; R(x + a, y, ww - a - b, 1, y === r ? hl : y === r + 1 ? lt : col); }
+      for (let y = r + 2; y < h; y++) {
+        const a = x + (gr[y - r] || 0) + 2, b = x + ww - (gf[y - r] || 0) - 2; if (b <= a) continue;
+        R(a, y, b - a, 1, y === r + 2 ? GLT : GLASS);
+        for (let q = a; q < b; q++) if ((q + y + cr.id * 5) % 23 < 2) R(q, y, 1, 1, 'rgba(210,222,255,0.3)');
+      }
+    };
+    const post = (x, r, h, ww = 2) => { R(x, r + 2, ww, h - r - 2, col); R(x, r + 2, 1, h - r - 2, lt); };
+    const rider = (x, h, open) => {   // a driver or passenger: a silhouette against the glass, or in the warm light of an open window
+      const hc = open ? '#c88a6a' : INK, hair = open ? '#2a1a1a' : INK;
+      R(x - 1, h - 6, 3, 1, hair); R(x - 2, h - 5, 5, 3, hc); R(x - 2, h - 5, 5, 1, hair); R(x - 1, h - 2, 3, 2, hc); if (open) R(x + 1, h - 4, 1, 1, INK);
+    };
+    const down = (a, b, r, h) => { R(a, r + 3, b - a, h - r - 3, '#4a3048'); R(a, r + 3, b - a, 1, '#6a4a5a'); };   // the window is down
+    const seam2 = (x, h, y1 = 20) => R(x, h + 2, 1, y1 - h - 2, dk2);
+    const knob = (x, h) => { R(x, h + 3, 3, 1, CHR); R(x, h + 4, 3, 1, dk2); };
+    const trim = (x0, x1, y) => { R(x0, y, x1 - x0, 1, CHR); R(x0, y + 1, x1 - x0, 1, dk); };
+    if (kind === 'sport') {   // a low coupe: a short deck, a fastback cabin, a long hood, a stripe, a little wing
+      const r = 6, h = 13;
+      low(0, w, h, [2, 1], [3, 1]); cab(9, 21, r, h, [2, 1, 1], [2, 1, 1], [5, 4, 3, 2, 1], [5, 4, 3, 2, 1]);
+      if (cr.win) { down(17, 26, r, h); rider(22, h, 1); } else rider(22, h, 0);
+      seam2(13, h); seam2(30, h); knob(15, h); R(1, h + 5, w - 3, 2, lum(col) > 150 ? dk2 : '#f4ecdc');
+      R(0, h - 2, 6, 2, dk2); R(3, h, 1, 1, dk2);
+      tail(0, h + 1, 3); lamp(w - 2, h + 1); bumper(-1, 19, 4, 1); bumper(w - 2, 19, 3, 1);
+    } else if (kind === 'sedan' && v === 1) {   // the station wagon: one long roof, a wood-grain flank
+      const r = 3, h = 11;
+      low(0, w, h, [1], [3, 1]); cab(0, 40, r, h, [1], [2, 1, 1], [1], [5, 4, 3, 2, 1, 1]); post(13, r, h); post(26, r, h, 3);
+      if (cr.win) { down(30, 38, r, h); rider(34, h, 1); } else rider(34, h, 0);
+      rider(20, h, 0);
+      seam2(13, h); seam2(27, h); seam2(40, h); knob(15, h); knob(29, h);
+      R(2, h + 3, w - 6, 6, '#7a4a2a'); R(2, h + 3, w - 6, 1, '#b07a48'); R(2, h + 8, w - 6, 1, '#4a2a18'); for (let x = 8; x < w - 6; x += 9) R(x, h + 4, 1, 4, '#5a341e');
+      tail(0, h + 1, 4); lamp(w - 2, h + 1); bumper(-1, 19, 4); bumper(w - 2, 19, 3);
+    } else if (kind === 'sedan') {   // a four-door: trunk, cabin, hood
+      const r = 3, h = 11;
+      low(0, w, h, [2, 1], [3, 1]); cab(11, 27, r, h, [2, 1, 1], [2, 1, 1], [4, 3, 2, 1, 1], [5, 4, 3, 2, 1, 1]); post(24, r, h);
+      if (cr.win) { down(27, 34, r, h); rider(31, h, 1); } else rider(31, h, 0);
+      if (cr.id % 2) rider(19, h, 0);
+      seam2(12, h); seam2(25, h); seam2(39, h); knob(14, h); knob(27, h); trim(2, w - 3, h + 5);
+      tail(0, h + 1, 3); lamp(w - 2, h + 1); bumper(-1, 19, 4); bumper(w - 2, 19, 3);
+    } else if (kind === 'van') {   // a minivan, or (one in three) a windowless panel van; a stubby hood either way
+      const r = 0, h = 10, panel = v === 0;
+      low(0, w, h, [1], [3, 1]); cab(0, 56, r, h, [2, 1], [3, 2, 1, 1], panel ? [42] : [2, 1], [7, 6, 5, 4, 3, 2, 1, 1]);
+      if (panel) { R(3, 2, 39, 8, col); R(3, 2, 39, 1, lt); R(4, h + 3, 36, 4, lt); R(4, h + 4, 36, 2, hl); }
+      else { post(17, r, h); post(31, r, h); rider(25, h, 0); }
+      post(42, r, h, 3);
+      if (cr.win) { down(46, 52, r, h); rider(50, h, 1); } else rider(50, h, 0);
+      seam2(19, h); seam2(42, h); R(19, h + 1, 23, 1, dk2); knob(21, h); knob(44, h);
+      tail(0, 3, 8); lamp(w - 2, h + 2); bumper(-1, 19, 4, 1); bumper(w - 2, 19, 3, 1);
+    } else if (kind === 'pickup') {   // the bed (you can stand down in it), the cab, the hood
+      const r = 2, h = 11;
+      low(0, 40, T1, [1]); R(0, T1 + 1, 40, 1, lt); R(0, T1 + 2, 40, 1, dk);
+      seam(3, T1, 2); R(1, T1 + 3, 1, 1, CHR); for (const x of [14, 27]) R(x, T1 + 1, 2, 1, dk2);
+      low(40, w - 40, h, [], [3, 1]); cab(40, 24, r, h, [], [2, 1, 1], [1], [5, 4, 3, 2, 1, 1]); R(40, r, 1, T1 - r, dk2);
+      if (cr.win) { down(46, 58, r, h); rider(52, h, 1); } else rider(52, h, 0);
+      seam2(41, h); seam2(62, h); knob(44, h); R(w - 2, h + 2, 2, 4, dk2);
+      tail(0, T1 + 1, 3); lamp(w - 2, h + 1); bumper(-1, 20, 3); bumper(w - 2, 19, 3);
+    } else if (kind === 'flatbed') {   // a stake-bed truck: a plank deck on a bare chassis, a toolbox between the wheels, a tall cab
+      const ff = [4, 3, 2, 1, 1];
+      R(0, T1, 88, 3, '#5a3e26'); R(0, T1, 88, 1, '#a07a4c'); for (let x = 9; x < 88; x += 11) R(x, T1, 1, 3, '#3a2616');
+      R(0, T1 + 3, 88, 2, '#2a2230'); R(0, T1 + 3, 88, 1, '#4a4258');
+      R(40, T1 + 5, 40, 4, col); R(40, T1 + 5, 40, 1, lt); R(40, T1 + 8, 40, 1, dk2); R(59, T1 + 5, 1, 4, dk2); R(48, T1 + 6, 3, 1, CHR); R(68, T1 + 6, 3, 1, CHR);
+      R(4, T1 + 5, 2, 5, INK); R(86, T1 + 5, 2, 5, INK);   // mud flaps
+      block(88, w - 88, T0, [1], ff); glass(88, w, T0, [1], ff, 3, 12); R(88, T0 + 2, 1, B - 2, dk2);
+      if (cr.win) { openWin(96, w - 6, T0); head(104, T0, 1); } else head(104, T0, 0);
+      belt(89, w - 90, T0 + 1); seam(93, T0, 14); handle(95, T0 + 1); R(w + 1, 5, 1, 8, INK); R(w - 1, 7, 2, 1, INK);   // a west-coast mirror
+      tail(0, T1 + 3, 2); lamp(w - 2, 15); bumper(w - 2, 19, 3, 1);
+    } else {   // the bus: a row of passenger windows, the front door, the destination sign
+      const rr = [2, 1], ff = [3, 2, 1, 1];
+      block(0, w, T0, rr, ff);
+      const sx = w - 66;
+      for (let x = 6, i = 0; x + 14 < sx; x += 17, i++) {
+        glass(x - 2, x + 16, T0, [], [], 4, 13);
+        if ((i * 7 + cr.id) % 3) head(x + 4 + (i * 5 + cr.id) % 7, T0 + 1, 0);
+      }
+      R(sx, 4, 38, 9, INK); R(sx, 4, 38, 1, '#2a2436');
+      'HOLLYWOOD'.split('').forEach((ch, i) => { const gl = FONT[ch]; for (let p = 0; p < 15; p++) if (gl[p] === '1') R(sx + 2 + i * 4 + (p % 3), 6 + Math.floor(p / 3), 1, 1, '#ffb43a'); });
+      glass(w - 26, w - 4, T0, [], [], 4, 13);
+      R(w - 24, 4, 12, 19, CHD); R(w - 23, 5, 4, 17, GLASS); R(w - 17, 5, 4, 17, GLASS); R(w - 23, 5, 4, 1, GLT); R(w - 17, 5, 4, 1, GLT);   // the bifold door
+      R(w - 4, 3, 3, 12, GLASS); R(w - 4, 3, 3, 1, GLT);   // the wraparound windshield
+      R(1, 14, w - 26, 1, CHR); R(1, 15, w - 26, 1, dk);
+      R(36, 16, 60, 6, '#1e1428'); R(36, 16, 60, 1, '#f0c84a'); R(38, 18, 22, 1, '#f4ecdc'); R(38, 20, 14, 1, '#8a7a9a'); R(82, 17, 10, 4, '#d048b0');   // an ad for some movie
+      tail(0, 12, 6); lamp(w - 2, 17); bumper(-1, 20, 3, 1); bumper(w - 2, 20, 3, 1);
+    }
+    for (const cx of WHEELS[kind] || []) for (let y = 19; y < B; y++) for (let x = cx - 8; x <= cx + 8; x++) {   // the wheel arches
+      const d = (x - cx) * (x - cx) + (y - 28) * (y - 28);
+      if (d <= 49) R(x, y, 1, 1, INK); else if (d <= 72 && g.getImageData(x + 2, y + 1, 1, 1).data[3]) R(x, y, 1, 1, dk2);
+    }
+    return c;
+  };
+  const wheel = (ctx, X, Y, a) => {
+    ctx.fillStyle = '#0c0a10'; ctx.beginPath(); ctx.arc(X, Y, 5, 0, 7); ctx.fill();
+    ctx.fillStyle = '#2a2632'; ctx.fillRect(X - 2, Y - 5, 5, 1);
+    ctx.fillStyle = '#7a7e8c'; ctx.beginPath(); ctx.arc(X, Y, 3, 0, 7); ctx.fill();
+    ctx.fillStyle = '#b8bcc8'; ctx.fillRect(X - 2, Y - 3, 3, 1);
+    ctx.fillStyle = '#2e3240'; for (const k of [0, 2.1, 4.2]) ctx.fillRect(Math.round(X + Math.cos(a + k) * 2), Math.round(Y + Math.sin(a + k) * 2), 1, 1);   // lug nuts, turning with the road
+    ctx.fillStyle = '#d8dce4'; ctx.fillRect(X, Y, 1, 1);
+  };
+  return {
+    draw(ctx, cr, X, Y0, f) {
+      if (typeof document === 'undefined' || !document.createElement) return;
+      const key = cr.kind + cr.col + (cr.win ? 1 : 0) + (cr.id % 3) + (cr.kind === 'bus' ? cr.id % BUS.length : '');
+      let cv = cache.get(key); if (!cv) cache.set(key, cv = bake(cr));
+      ctx.drawImage(cv, X - 2, Y0 - 1);
+      for (const cx of WHEELS[cr.kind] || []) wheel(ctx, X + cx, Y0 + 28, cr.x / 5);
+      const pf = (f + cr.ph) % 36;   // a little exhaust
+      ctx.fillStyle = 'rgba(200,190,215,' + (0.22 * (1 - pf / 36)).toFixed(2) + ')'; ctx.fillRect(X - 3 - Math.round(pf / 3), Y0 + 22 - Math.round(pf / 9), 2 + Math.round(pf / 12), 2);
+    },
+  };
+})();
 
 Object.assign(window.LEVEL, {
-  LANES, TUNE: { gust: 0.55, inertia: 0.994, reach: 96 },
+  LANES, CAR, TUNE: { gust: 0.55, inertia: 0.994, reach: 96 },
   names: { tim: 'TIM', gregg: 'GREGG' },
   portraits: { tim: 'w5_portrait_tim', gregg: 'w5_portrait_gregg' },
   sprites: ['w5_server_0', 'w5_server_1', 'w5_server_o0', 'w5_server_o1', 'w5_server_rest', 'w5_portrait_tim', 'w5_portrait_gregg'],
@@ -78,20 +236,8 @@ Object.assign(window.LEVEL, {
       // the traffic, behind the piers
       for (const cr of c.x > 3300 ? [] : s.cars || []) {
         const X = Math.round(wx(cr.x)); if (X > VW + 30 || X + cr.w < -30) continue; const Y0 = wy(LANES[cr.lane].roof * TS);
-        let sx = X;
-        for (const [w, drop] of cr.segs) {
-          const Y = Math.round(Y0 + drop * TS), H = 32 - drop * 16, right = sx + w;
-          ctx.fillStyle = cr.col; ctx.fillRect(sx, Y, w, H - 7); ctx.fillStyle = 'rgba(255,255,255,0.28)'; ctx.fillRect(sx, Y, w, 1); ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(sx, Y + H - 9, w, 2);
-          if (cr.kind === 'flatbed' && drop) { ctx.fillStyle = '#3a2a1e'; ctx.fillRect(sx, Y, w, 3); ctx.fillStyle = '#6a4a2a'; ctx.fillRect(sx + 6, Y - 0, 20, 2); ctx.fillRect(sx + 40, Y, 28, 2); ctx.fillStyle = cr.col; ctx.fillRect(sx, Y + 3, w, H - 10); }
-          else if (cr.kind === 'bus') { ctx.fillStyle = '#10080e'; for (let k = 8; k < w - 14; k += 18) ctx.fillRect(sx + k, Y + 4, 13, 9); ctx.fillStyle = 'rgba(180,220,255,0.35)'; for (let k = 8; k < w - 14; k += 18) ctx.fillRect(sx + k, Y + 4, 13, 2); }
-          else if (!drop) { ctx.fillStyle = '#10080e'; ctx.fillRect(sx + 4, Y + 3, Math.max(8, w - 10), 8); ctx.fillStyle = 'rgba(180,220,255,0.35)'; ctx.fillRect(sx + 4, Y + 3, Math.max(8, w - 10), 2); ctx.fillStyle = cr.col; ctx.fillRect(sx + w * 0.45, Y + 3, 2, 8); }
-          if (cr.win && !drop && cr.kind !== 'bus') { ctx.fillStyle = '#3a2a40'; ctx.fillRect(sx + w - 18, Y + 3, 12, 5); }   // the window is down
-          sx = right;
-        }
-        // wheels, lights
-        ctx.fillStyle = '#07050a'; for (const wxo of cr.kind === 'bus' || cr.kind === 'flatbed' ? [16, cr.w - 40, cr.w - 14] : [10, cr.w - 14]) { ctx.beginPath(); ctx.arc(X + wxo + 3, Y0 + 28, 5, 0, 7); ctx.fill(); ctx.fillStyle = '#6a6e7a'; ctx.fillRect(X + wxo + 2, Y0 + 27, 2, 2); ctx.fillStyle = '#07050a'; }
-        ctx.fillStyle = '#ffe8a0'; ctx.fillRect(X + cr.w - 3, Y0 + (cr.segs[cr.segs.length - 1][1] ? 4 : 17), 3, 3); ctx.fillStyle = '#d02030'; ctx.fillRect(X, Y0 + (cr.segs[0][1] ? 20 : 17), 2, 3);
-        glow(ctx, X + cr.w + 8, Y0 + 20, 20, '255,230,160', 0.22);
+        CAR.draw(ctx, cr, X, Y0, f);
+        glow(ctx, X + cr.w + 8, Y0 + 16, 20, '255,230,160', 0.22);
         if (cr.win && Math.floor((f + cr.ph) % 180) < 70) { ctx.fillStyle = 'rgba(255,255,255,0.35)'; for (let i = 0; i < 4; i++) ctx.fillRect(X + cr.w + 6 + ((f * 2 + i * 22) % 80), Y0 - 6 + i * 7, 14, 1); }
       }
     },
@@ -191,6 +337,7 @@ Object.assign(window.LEVEL, {
 ;(function () {
   const TS = 16;
   DD.defineEntity('server', {
+    bowl: true,   // a person: Mel's roll knocks them over
     spawn: t => ({ x: t.x + 1, y: t.y - 6, w: 14, h: 38, vx: 0, vy: 0, x0: t.x, st: 'walk', t: 0, face: -1, a: 0 }),
     update(e, G) {
       e.a++; e.t++;
@@ -332,7 +479,7 @@ Object.assign(window.LEVEL, {
     }
     for (const cr of G.s.cars || []) {   // red tail lights on the traffic
       const X = DD.wx(cr.x), Y0 = DD.wy((24 - 3 * cr.lane) * 16); if (X > VW + 20 || X + cr.w < -20) continue;
-      A.glow(X + 1, Y0 + 18, 15, '#ff3040', 0.28); A.R(X + 2, Y0 - 1, cr.w - 3, 1, 'rgba(255,196,130,0.55)'); A.R(X + 1, Y0 + 24, cr.w - 2, 2, 'rgba(0,0,0,0.3)');   // a sunset rim on the roof, a shadow under the chassis
+      A.glow(X + 1, Y0 + 18, 15, '#ff3040', 0.28); let sx = X; for (const [w, drop] of cr.segs) { A.R(sx + 3, Y0 + drop * 16 - 1, w - 6, 1, 'rgba(255,196,130,0.45)'); sx += w; } A.R(X + 2, Y0 + 32, cr.w - 4, 2, 'rgba(0,0,0,0.35)');   // a sunset rim on each roof, a shadow on the road under the tyres
     }
     lay(0.35, 90, (X, i) => { const y = hy + 20 + (i & 3) * 6; A.R(X, y, 24, 1, 'rgba(255,200,140,' + (0.05 + 0.04 * Math.sin(f / 30 + i)) + ')'); });   // heat shimmer off the asphalt
   },

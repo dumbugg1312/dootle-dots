@@ -99,13 +99,13 @@
         v({ w: 'nz', n: 9, vol: [11, 8, 5, 3, 1], at: FR });
         v({ w: 'p12', n: 86 + c, pit: [0, 5], vol: [6, 4, 2], at: 5 * FR });
       },
-      pop: (p = 1) => {   // popcorn: a kernel "pok", a grace note, then the ding. The engine's combo walks it up a pentatonic scale
+      pop: (p = 1) => {   // popcorn: a kernel "pok", a grace note, then the ding. The engine's combo climbs it a semitone per popcorn, 20 in a row
         if (gap('pop', 25)) return;
-        const up = penta(Math.min(8, Math.max(0, Math.round(12 * Math.log2(p)))));
+        const up = Math.min(19, Math.max(0, Math.round(12 * Math.log2(p)))), g = 1 - up * 0.015;   // high notes read louder, so the top of the climb eases off a little
         v({ w: 'nz', n: 14, vol: [13, 5, 1] });
-        v({ w: 'p25', n: 81 + up, vol: [11, 12], at: FR });
-        v({ w: 'p25', n: 88 + up, arp: [0, 0, 0, 0, 0.1, 0, -0.1, 0], vol: [13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1], at: 3 * FR });
-        v({ w: 'p12', n: 88 + up, det: 0.08, vol: [5, 5, 4, 4, 3, 3, 2, 2, 1], at: 6 * FR });
+        v({ w: 'p25', n: 81 + up, g, vol: [11, 12], at: FR });
+        v({ w: 'p25', n: 88 + up, g, arp: [0, 0, 0, 0, 0.1, 0, -0.1, 0], vol: [13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1], at: 3 * FR });
+        v({ w: 'p12', n: 88 + up, g, det: 0.08, vol: [5, 5, 4, 4, 3, 3, 2, 2, 1], at: 6 * FR });
       },
       star: () => {   // GERM FREE starts: a two-octave run, then a trill
         const A = [72, 76, 79, 84, 88, 91, 96];

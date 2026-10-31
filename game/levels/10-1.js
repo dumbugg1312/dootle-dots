@@ -70,6 +70,7 @@ window.LEVEL = {"id": "10-1", "name": "THE LOBBY", "sub": "MOVIE HOUSE: COMING S
   });
 
   DD.defineEntity('w10zg', {   // Zombie Gregg (Zombie 2 2): two stomps. Shuffles toward you, arms out, quicker once his first stomp lands.
+    bowl: true,   // a person: Mel's roll knocks them over
     spawn: t => ({ x: t.x, y: t.y + 4, w: 18, h: 28, vx: 0, vy: 0, hp: 2, dir: -1, flash: 0, an: 0 }),
     update(e, G) {
       const p = G.pl, dx = DD.cx(p) - DD.cx(e);

@@ -500,7 +500,7 @@ function chainStomp(x, y) {   // a stomp kill: the chain grows until the Dot lan
   tone(520 * Math.pow(2, Math.min(n, 8) / 12), 520 * Math.pow(2, Math.min(n, 8) / 12 + 0.5), 0.1, 'square', 0.05, 0.03);   // the stomp climbs a note per link
 }
 function popSound() {
-  G.combo = G.comboT > 0 ? Math.min(G.combo + 1, 12) : 0; G.comboT = 24;
+  G.combo = G.comboT > 0 ? Math.min(G.combo + 1, 19) : 0; G.comboT = 24;   // the pitch climbs for 20 popcorn in a row, then holds at the top
   SFX.pop(Math.pow(2, G.combo / 12));
 }
 
@@ -727,7 +727,8 @@ function updatePlayer() {
     }
   }
   if (card && !p.onGround) { p.vx += card.vx; p.airMax = Math.max(p.airMax, Math.abs(p.vx)); }   // jump or step off a card and keep its speed
-  if (wasGround && !p.onGround && p.vy >= 0) p.coyote = P.coyote; else if (p.coyote > 0) p.coyote--;
+  if (wasGround && !p.onGround && p.vy >= 0) { p.coyote = P.coyote; if (p.rolling) p.airMax = Math.max(p.airMax, Math.abs(p.vx)); }   // Mel rolling off a ledge stays a ball in the air
+  else if (p.coyote > 0) p.coyote--;
   if (p.onGround) p.coyote = 0;
 
   // standing on things
@@ -937,9 +938,9 @@ function gone(f) { f.state = 'gone'; }
 function interact() {
   const p = G.pl;
   for (const f of fans) {
+    if (f.state === 'gone' || f.state === 'flung' || !ov(p, f)) continue;
+    if (p.rolling) { fling(f, sign(p.vx) || p.face); continue; }   // Mel's roll bowls over anyone still on their feet, the headless ones running off included
     if (f.state !== 'walk' && f.state !== 'scuffle') continue;
-    if (!ov(p, f)) continue;
-    if (p.rolling) { fling(f, sign(p.vx) || p.face); continue; }
     const prevB = bot(p) - p.vy;
     if ((p.vy > 0 && prevB <= f.y + 7) || p.slam === 2) {
       stompFan(f); addGot(1, cx(f), f.y); popSound(); chainStomp(cx(f), f.y);
@@ -1010,6 +1011,9 @@ function interact() {
       if (p.slam === 2) continue;
       p.vy = -(p.held ? P.stompBounceHeld : P.stompBounce); p.y = Math.min(p.y, b.y - p.h); p.onGround = false; p.usedDJ = false; p.airMax = Math.max(p.airMax, Math.abs(p.vx));
       p.sy = 1.3; p.sx = 0.75; G.hitstop = 3; SFX.stomp(); stars(cx(b), b.y, 6);
+    } else if (hit && p.rolling && d.bowl && !isBossBody(b) && d.stomp && d.stomp(b, G, p) !== false) {   // a person (bowl: true) takes Mel's roll like a stomp
+      SFX.ko(1); G.hitstop = Math.max(G.hitstop, 2); stars(cx(b), b.y + 8, 6);
+      if (!b.dead) { p.vx = -(sign(p.vx) || p.face) * 2.2; p.vy = -2.4; p.onGround = false; }   // still standing (a two-hit enemy): she bounces off instead of grinding into him
     } else if (d.touch && hit) d.touch(b, G, p);
   }
   hook('interact', G);
@@ -1282,14 +1286,15 @@ function nextTease() {   // the next level's name from the menu's manifest (wind
     return nm ? String(nm).toUpperCase() : null;
   } catch (e) { return null; }
 }
-const SIX_T = 100;   // frames of the six-bag gag
-function cardSetup(d) {   // lay out the count-up timeline (card clock c, in frames)
-  const bags = Math.floor(5 * bagFrac()), cdur = clamp(Math.round(G.got * 0.4), 16, 80), cnt0 = 8, bag0 = cnt0 + cdur + 14;
-  const six = bags === 5, g0 = bag0 + bags * 20 + 4, tally = g0 + 6 + (six ? SIX_T : 0), cl = classic();   // five bags: Tim tries to add a sixth, Gregg cites the VFA maximum
+const SIX_T = 100, BAG_GAP = 30, BAG_FILL = 18, ROW_GAP = 18, TYPE = 3;   // frames: the six-bag gag, one bag to the next, a bag filling, one ledger row to the next, per typed letter
+function cardSetup(d) {   // lay out the count-up timeline (card clock c, in frames): popcorn counts, the tape row, the bags one by one, then the ledger rows one by one, the HEI pay-out, and the verdict last
+  const bags = Math.floor(5 * bagFrac()), cdur = clamp(Math.round(G.got * 0.6), 30, 110), cnt0 = 24, tape0 = cnt0 + cdur + 16, bag0 = tape0 + 26;
+  const six = bags === 5, g0 = bag0 + bags * BAG_GAP + 6, tally = g0 + 6 + (six ? SIX_T : 0), cl = classic();
+  const rt = { vhs: tally }; let t = tally; if (cl) rt.card = t += ROW_GAP; if ((G.dsecDots || []).length) rt.dsec = t += ROW_GAP; rt.foam = t += ROW_GAP; const hei0 = t + ROW_GAP + 4;   // five bags: Tim tries to add a sixth, Gregg cites the VFA maximum
   const sixWin = six && !!(G.pk && G.pk.six);   // the HEI store's SIX BAGS: this time the sixth bag stays
-  const rating = sixWin ? (cl ? 'SIX BAGS AND ' + cl.garnish : "SIX BAGS. TIM'S CALL.") : bags === 5 && cl ? 'FIVE BAGS AND ' + cl.garnish : RATINGS[bags], nxt = nextTease(), r0 = tally + 40, n0 = r0 + rating.length * 2 + 16;
+  const rating = sixWin ? (cl ? 'SIX BAGS AND ' + cl.garnish : "SIX BAGS. TIM'S CALL.") : bags === 5 && cl ? 'FIVE BAGS AND ' + cl.garnish : RATINGS[bags], nxt = nextTease(), r0 = hei0 + 40, n0 = r0 + rating.length * TYPE + 24;
   let rl = [rating]; if (rating.length > 34) { const k = / BAGS AND /.test(rating) ? rating.indexOf(' AND ') + 4 : rating.lastIndexOf(' ', 34); rl = [rating.slice(0, k), rating.slice(k + 1)]; }   // two lines when the extra runs long
-  Object.assign(d, { card: true, c: 0, bags, cnt0, cdur, bag0, six, sixWin, g0, tally, rating, rl, r0, next: nxt, n0, END: (nxt ? n0 + (nxt.length + 6) * 2 : r0 + rating.length * 2) + 24 + (DD.opts && DD.opts.joins ? 130 : 0) });
+  Object.assign(d, { card: true, c: 0, bags, cnt0, cdur, tape0, bag0, six, sixWin, g0, tally, rt, hei0, rating, rl, r0, next: nxt, n0, END: (nxt ? n0 + (nxt.length + 6) * TYPE : r0 + rating.length * TYPE) + 30 + (DD.opts && DD.opts.joins ? 130 : 0) });
   G.dlg.q.length = 0; G.dlg.cur = null;
   if (!TR && DD.opts && DD.opts.perks && window.DDStore) d.hei = window.DDStore.award(result());   // the HEI store's pay-out (store.js award)
 }
@@ -1298,62 +1303,69 @@ function updateResults() {
   const d = G.done; if (!d) return;
   if (!d.card) { if (d.t >= 50 && (!(G.dlg.cur || G.dlg.q.length) || d.t >= 300)) cardSetup(d); return; }   // goal lines get to play over the closed iris first
   const sto = DD.opts && DD.opts.store;   // the menu's stages can stop at the HEI store on the way to the next one
-  if (IN.click && sto && d.hei && d.c >= d.tally + 18 && IN.click.x >= HEIBTN.x && IN.click.y >= HEIBTN.y && IN.click.x < HEIBTN.x + HEIBTN.w && IN.click.y < HEIBTN.y + HEIBTN.h) { leave(false, { store: true }); return; }   // the HEI Points on the card are a button: spend them, then on to the next stage
+  if (IN.click && sto && d.hei && d.c >= d.hei0 && IN.click.x >= HEIBTN.x && IN.click.y >= HEIBTN.y && IN.click.x < HEIBTN.x + HEIBTN.w && IN.click.y < HEIBTN.y + HEIBTN.h) { leave(false, { store: true }); return; }   // the HEI Points on the card are a button: spend them, then on to the next stage
   if (IN.click) { if (d.c > d.END && IN.click.y > VH - 30 && IN.click.x > VW * (sto ? 0.62 : 0.5)) { G.restartReq = true; return; } if (sto && d.c > d.END && IN.click.y > VH - 30 && IN.click.x > VW * 0.38) { leave(false, { store: true }); return; } IN.jp = true; }   // click: skip, then continue (bottom right: play it again)
   if (d.c > d.END) { if (sto && (IN.sp || IN.store)) leave(false, { store: true }); else if (IN.jp || IN.start) leave(false); return; }
   if (IN.jp && d.c > 12) { d.c = d.END + 1; return; }   // jump skips the count-up
   const c = ++d.c;
   if (c === d.r0 && !d.sixWin) vo('rating', { bags: d.bags, bonus: d.rating !== RATINGS[d.bags] }); if (d.six && c === d.g0 + 6) vo('six');   // Tim reads the rating out
   if (c > d.cnt0 && c <= d.cnt0 + d.cdur && (c - d.cnt0) % 3 === 0) SFX.count((c - d.cnt0) / 3);
-  for (let i = 0; i < d.bags; i++) if (c === d.bag0 + i * 20 + 12) { SFX.bag(); d.pop = { i, t: 0 }; }
+  for (let i = 0; i < d.bags; i++) if (c === d.bag0 + i * BAG_GAP + BAG_FILL) { SFX.bag(); d.pop = { i, t: 0 }; }
   if (d.pop) d.pop.t++;
   if (d.six) { const t = c - d.g0; if (t === 18) SFX.bag(); if (d.sixWin) { if (t === 50) SFX.goal(); } else if (t === 50 || t === 64) SFX.tick(); }
-  if (c === d.tally) G.vhs ? SFX.vhs() : SFX.tick(); if (c === d.tally + 18) SFX.tick();
-  if (c >= d.r0 && c < d.r0 + d.rating.length * 2 && c % 4 === 0) SFX.tick();
-  if (d.next && c >= d.n0 && c < d.n0 + (d.next.length + 6) * 2 && c % 4 === 0) SFX.tick();
+  if (c === d.tally) G.vhs ? SFX.vhs() : SFX.tick(); if (c === d.tape0 || c === d.rt.card || c === d.rt.dsec || c === d.rt.foam) SFX.tick();
+  if (c >= d.r0 && c < d.r0 + d.rating.length * TYPE && c % (TYPE * 2) === 0) SFX.tick();
+  if (d.next && c >= d.n0 && c < d.n0 + (d.next.length + 6) * TYPE && c % (TYPE * 2) === 0) SFX.tick();
 }
 function drawResults() {
   const d = G.done; if (!d || !d.card) return;
-  const c = d.c > d.END ? 1e6 : d.c, a = Math.min(1, d.c / 8), typed = (s, t0) => s.slice(0, Math.max(0, Math.floor((c - t0) / 2)));
+  const c = d.c > d.END ? 1e6 : d.c, a = Math.min(1, d.c / 12), typed = (s, t0) => s.slice(0, Math.max(0, Math.floor((c - t0) / TYPE)));
   ctx.globalAlpha = a;
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, VW, VH);
-  const rEnd = d.r0 + d.rating.length * 2, hit = c >= rEnd && c < rEnd + 10 ? Math.sin((c - rEnd) * 2.2) * 2 * (1 - (c - rEnd) / 10) : 0;   // the rating lands with a thump
-  const pk = backOut(clamp(d.c / 16, 0, 1)), pz = 0.7 + 0.3 * pk;   // the card swings up into place, overshooting a touch
+  const rEnd = d.r0 + d.rating.length * TYPE, hit = c >= rEnd && c < rEnd + 10 ? Math.sin((c - rEnd) * 2.2) * 2 * (1 - (c - rEnd) / 10) : 0;   // the rating lands with a thump
+  const pk = backOut(clamp(d.c / 22, 0, 1)), pz = 0.7 + 0.3 * pk;   // the card swings up into place, overshooting a touch
   ctx.save(); ctx.translate(VW / 2 + Math.round(hit), VH / 2 + Math.round((1 - pk) * 30)); ctx.scale(pz, pz); ctx.translate(-VW / 2, -VH / 2);
   ctx.fillStyle = '#1e52bc'; ctx.fillRect(20, 8, VW - 40, 164);
   ctx.fillStyle = '#0e2e7a'; for (let x = 26; x < VW - 26; x += 12) { ctx.fillRect(x, 11, 6, 4); ctx.fillRect(x, 165, 6, 4); }
+  // layout, top down: the title, the bags, Gregg's verdict right under them, then the ledger (label left, value right, dot leaders between)
+  const cl = classic(), two = d.rl.length > 1, ds = G.dsecDots || [], BY = 33, RY = two ? 58 : 60, NAVY = '#0a1a4a';
   const gt = d.six ? c - d.g0 : -1;
-  if (gt >= 0 && gt < 50) text('TIM: SIX BAGS. MY CALL.', VW / 2, 20, '#94e0cc', 2, '#0a1a4a', 'center');
-  else if (gt >= 50 && gt < SIX_T) text(d.sixWin ? "IT'S SIX BAGS CINEMA TIME." : 'GREGG: FIVE IS THE HIGHEST.', VW / 2, 20, d.sixWin ? '#94e0cc' : '#ffe680', 2, '#0a1a4a', 'center');
-  else text(d.sixWin && gt >= SIX_T ? "TIM'S RATING:" : "GREGG'S RATING:", VW / 2, 20, d.sixWin && gt >= SIX_T ? '#94e0cc' : '#fff', 2, '#0a1a4a', 'center');
-  if (d.sixWin && gt >= 18) { const sx = VW / 2 - 61 + 5 * 26, p = gt >= 50 && gt < 64 ? Math.round(Math.sin((gt - 50) / 14 * Math.PI) * 5) : 0; drawBag(sx, 38 - p, 1, 0.35, 0, 1 + p * 0.04); }   // SIX BAGS: the sixth stays on the scale
+  if (gt >= 0 && gt < 50) text('TIM: SIX BAGS. MY CALL.', VW / 2, 18, '#94e0cc', 2, NAVY, 'center');
+  else if (gt >= 50 && gt < SIX_T) text(d.sixWin ? "IT'S SIX BAGS CINEMA TIME." : 'GREGG: FIVE IS THE HIGHEST.', VW / 2, 18, d.sixWin ? '#94e0cc' : '#ffe680', 2, NAVY, 'center');
+  else text(d.sixWin && gt >= SIX_T ? "TIM'S RATING" : "GREGG'S RATING", VW / 2, 18, d.sixWin && gt >= SIX_T ? '#94e0cc' : '#fff', 2, NAVY, 'center');
+  if (d.sixWin && gt >= 18) { const sx = VW / 2 - 61 + 5 * 26, p = gt >= 50 && gt < 64 ? Math.round(Math.sin((gt - 50) / 14 * Math.PI) * 5) : 0; drawBag(sx, BY - p, 1, 0.35, 0, 1 + p * 0.04); }   // SIX BAGS: the sixth stays on the scale
   else if (gt >= 0 && gt < SIX_T) {   // the sixth bag slides in from Tim's side, then Gregg knocks it off the scale
     const sx = VW / 2 - 61 + 5 * 26, x = gt < 18 ? sx + (VW + 10 - sx) * (1 - gt / 18) ** 2 : sx, fall = Math.max(0, gt - 64);
-    drawBag(x + fall * 1.5, 38 + fall * fall * 0.12, 1, 0.35, fall * 0.12, 1);
-    if (gt >= 50 && gt < 64) text('VFA RULES', sx + 8, 30, '#ff5a5a', 1, '#000', 'center');
+    drawBag(x + fall * 1.5, BY + fall * fall * 0.12, 1, 0.35, fall * 0.12, 1);
+    if (gt >= 50 && gt < 64) text('VFA RULES', sx + 8, RY, '#ff5a5a', 1, '#000', 'center');   // in the verdict's slot, which is still empty
   }
   for (let i = 0; i < 5; i++) {   // the bags fill one at a time, each with a pop
-    const t0 = d.bag0 + i * 20, on = i < d.bags, fill = on ? clamp((c - t0) / 12, 0, 1) : 0, pop = d.pop && d.pop.i === i ? d.pop.t : 99;
-    drawBag(VW / 2 - 61 + i * 26, 38 - (pop < 14 ? Math.round(Math.sin(pop / 14 * Math.PI) * 5) : 0), fill, 0.35, pop < 14 ? Math.sin(pop * 1.1) * 0.3 * (1 - pop / 14) : 0, pop < 14 ? 1 + 0.25 * Math.sin(pop / 14 * Math.PI) : 1);
+    const t0 = d.bag0 + i * BAG_GAP, on = i < d.bags, fill = on ? clamp((c - t0) / BAG_FILL, 0, 1) : 0, pop = d.pop && d.pop.i === i ? d.pop.t : 99;
+    drawBag(VW / 2 - 61 + i * 26, BY - (pop < 14 ? Math.round(Math.sin(pop / 14 * Math.PI) * 5) : 0), fill, 0.35, pop < 14 ? Math.sin(pop * 1.1) * 0.3 * (1 - pop / 14) : 0, pop < 14 ? 1 + 0.25 * Math.sin(pop / 14 * Math.PI) : 1);
   }
+  if (hit) { ctx.fillStyle = 'rgba(255,240,200,' + (0.25 * (1 - (c - rEnd) / 10)) + ')'; ctx.fillRect(24, RY - 3, VW - 48, two ? 28 : 15); }
+  if (c >= d.r0) { let t0 = d.r0; d.rl.forEach((l, i) => { text(typed(l, t0), VW / 2 - Math.floor((l.length * 8 - 2) / 2), RY + i * 13, '#ffd27a', 2, '#000'); t0 += (l.length + 1) * TYPE; }); }
+  const rows = ['pop', 'tape', 'vhs'].concat(cl ? ['card'] : [], ds.length ? ['dsec'] : [], ['foam']), st = two ? 8 : 9, LY = RY + (two ? 30 : 19);   // every row's slot is fixed up front, so nothing shifts as they reveal
+  ctx.fillStyle = '#1a47a6'; ctx.fillRect(32, LY - 5, VW - 64, rows.length * st + 5); ctx.fillStyle = '#3a6ad0'; ctx.fillRect(32, LY - 5, VW - 64, 1);   // the ledger's inset
+  const row = (key, lab, val, col, dy = 0, vw = String(val).length * 4 - 1) => {
+    const y = LY + rows.indexOf(key) * st, xv = VW - 40 - vw;
+    text(lab, 40, y, '#8fb0f0', 1, NAVY);
+    ctx.fillStyle = '#3a6ad0'; for (let x = 40 + lab.length * 4 + 2; x < xv - 3; x += 3) ctx.fillRect(x, y + 4, 1, 1);
+    if (val !== null) text(val, xv, y - dy, col, 1, NAVY);
+    return { x: xv, y };
+  };
   const k = clamp((c - d.cnt0) / d.cdur, 0, 1), shown = Math.round(G.got * k);
   const cj = k > 0 && k < 1 && (c - d.cnt0) % 3 < 1 ? 1 : 0;   // the count ticks with a little jump
-  text('POPCORN  ' + shown + ' / ' + popsTotal, VW / 2, 66 - cj, '#fff6d4', 1, '#000', 'center');
-  if (c > d.cnt0 + d.cdur) {
-    if (!d.boss) text('LANDED ' + Math.round(d.frac * 100) + '% UP THE TAPE  +' + d.bonus, VW / 2, 76, '#cfd8ff', 1, '#000', 'center');
-    else text((G.boss ? G.boss.name : 'BOSS') + ' DEFEATED', VW / 2, 76, '#cfd8ff', 1, '#000', 'center');
+  if (c > d.cnt0) row('pop', 'POPCORN', shown + ' / ' + popsTotal, '#fff6d4', cj);
+  if (c >= d.tape0) {
+    if (!d.boss) row('tape', 'UP THE TAPE', Math.round(d.frac * 100) + '%  +' + d.bonus, '#fff6d4');
+    else row('tape', G.boss ? G.boss.name : 'BOSS', 'DEFEATED', '#fff6d4');
   }
-  const cl = classic(), two = d.rl.length > 1;
-  if (c >= d.tally) text('POPCORN CLASSIC  ' + (G.vhs && cl ? cl.title + ' (' + cl.year + ')' : G.vhs ? 'FOUND' : 'STILL OUT THERE'), VW / 2, 84, G.vhs ? '#ffe680' : '#9aa8d8', 1, '#000', 'center');
-  if (c >= d.tally + 18) {   // foam heads, and the stage's Dot secrets beside them when it has any
-    const fh = 'FOAM HEADS  GREGG ' + (G.heads.gh || 0) + '   TIM ' + (G.heads.th || 0), ds = G.dsecDots || [];
-    if (!ds.length) text(fh, VW / 2, 93, '#fff', 1, '#000', 'center');
-    else { const sw = 46 + ds.length * 8, x0 = Math.round(VW / 2 - (sw + 14 + fh.length * 4) / 2); text('DOT SECRETS', x0, 93, '#ffe680', 1, '#000'); ds.forEach((q, k) => secPip(x0 + 47 + k * 8, 93, DOTS[q].col, !!G.dsec[q] || G.dsecHad.includes(q), 0)); text(fh, x0 + sw + 14, 93, '#fff', 1, '#000'); }
-  }
-  if (c >= d.tally + 18 && cl) text('BLUE CARD  ' + (G.factGot === 'right' ? 'YOU CALLED IT +25' : G.factGot ? 'YOU CALLED IT WRONG' : 'STILL OUT THERE'), VW / 2, 102, G.factGot ? '#7ab0ff' : '#9aa8d8', 1, '#000', 'center');
-  if (hit) { ctx.fillStyle = 'rgba(255,240,200,' + (0.25 * (1 - (c - rEnd) / 10)) + ')'; ctx.fillRect(24, two ? 110 : 115, VW - 48, two ? 28 : 16); }
-  if (c >= d.r0) { let t0 = d.r0; d.rl.forEach((l, i) => { text(typed(l, t0), VW / 2 - Math.floor((l.length * 8 - 2) / 2), (two ? 113 : 118) + i * 13, '#ffd27a', 2, '#000'); t0 += l.length * 2 + 2; }); }
-  const jn = DD.opts && DD.opts.joins, jy = jn ? 136 : 142;
+  if (c >= d.tally) row('vhs', 'POPCORN CLASSIC', G.vhs && cl ? cl.title + ' (' + cl.year + ')' : G.vhs ? 'FOUND' : 'STILL OUT THERE', G.vhs ? '#ffe680' : '#7f93cc');
+  if (cl && c >= d.rt.card) row('card', 'BLUE CARD', G.factGot === 'right' ? 'YOU CALLED IT  +25' : G.factGot ? 'CALLED IT WRONG' : 'STILL OUT THERE', G.factGot === 'right' ? '#94e0cc' : G.factGot ? '#ff9a8a' : '#7f93cc');
+  if (ds.length && c >= d.rt.dsec) { const p = row('dsec', 'DOT SECRETS', null, null, 0, ds.length * 8 - 3); ds.forEach((q, i) => secPip(p.x + i * 8, p.y, DOTS[q].col, !!G.dsec[q] || G.dsecHad.includes(q), 0)); }
+  if (c >= d.rt.foam) row('foam', 'FOAM HEADS', 'GREGG ' + (G.heads.gh || 0) + '   TIM ' + (G.heads.th || 0), '#fff');
+  const jn = DD.opts && DD.opts.joins, jy = jn ? 137 : 142;
   if (d.next && c >= d.n0) { const s = 'NEXT: ' + d.next; text(typed(s, d.n0), VW / 2 - Math.floor((s.length * 4 - 1) / 2), jy, '#94e0cc', 1, '#000'); }
   if (jn && DOTS[jn]) {   // a new Dot joins the cast: walks on from the right, then the line types out
     const j0 = d.next ? d.n0 + 12 : d.r0 + 12, D = DOTS[jn], k = clamp((c - j0) / 40, 0, 1), sx = Math.round(VW + 20 - k * 60);
@@ -1361,15 +1373,15 @@ function drawResults() {
     if (c >= j0 && ready(jn)) { const z = Math.min(1, 22 / IMG[jn].height), ar = c - j0 - 40, pose = k < 1 ? 'walk' + (Math.floor(c / 6) % 4) : ar < 8 ? 'land' : ar % 200 < 6 ? 'blink' : 'idle'; drawDot(jn, pose, sx, 152, true, z, z, k < 1 ? -0.08 : 0); }   // walks on with a real walk cycle
     if (c >= j0 + 40) { const s = D.name + ' JOINED THE CAST: ' + D.how; text(typed(s, j0 + 40), VW / 2 - 14 - Math.floor((s.length * 4 - 1) / 2), 146, D.col, 1, '#000'); }
   }
-  if (d.hei && c >= d.tally + 18) {   // HEI Points, top right of the card: a coin and the pay-out
-    const k = clamp((c - d.tally - 18) / 24, 0, 1), n = Math.round(d.hei.n * k), S = window.DDStore;
-    if (c === d.tally + 18) SFX.bag();
-    const B = HEIBTN, sto2 = DD.opts && DD.opts.store, lit = sto2 && Math.floor(d.t / 24) % 2;
-    if (sto2) { ctx.fillStyle = '#000'; ctx.fillRect(B.x - 1, B.y - 1, B.w + 2, B.h + 3); ctx.fillStyle = lit ? '#3a2a6a' : '#2a1e52'; ctx.fillRect(B.x, B.y, B.w, B.h); ctx.fillStyle = '#6a5ab0'; ctx.fillRect(B.x, B.y, B.w, 1); ctx.fillStyle = '#140c30'; ctx.fillRect(B.x, B.y + B.h - 1, B.w, 1); }   // a raised button: click it to spend
-    if (S) S.icon('rewards', B.x + 3, 18, 1, d.t);
-    text('+' + n, B.x + 14, 18, '#ffe680', 2, '#0a1a4a'); text('HEI POINTS', B.x + 3, 30, '#fff6d4', 1, '#0a1a4a');
-    if (sto2) text('SPEND >', B.x + 3, 39, lit ? '#ffe680' : '#c8b8f0', 1, '#0a1a4a');
-    if (d.hei.first) text('FIRST CLEAR', B.x + 3, sto2 ? 50 : 39, '#94e0cc', 1, '#0a1a4a');
+  if (d.hei && c >= d.hei0) {   // HEI Points, top right of the card: a coin and the pay-out
+    const k = clamp((c - d.hei0) / 30, 0, 1), n = Math.round(d.hei.n * k), S = window.DDStore;
+    if (c === d.hei0) SFX.bag();
+    const B = HEIBTN, sto2 = DD.opts && DD.opts.store, lit = sto2 && Math.floor(d.t / 24) % 2, bh = sto2 ? B.h : B.h - 9;
+    ctx.fillStyle = '#000'; ctx.fillRect(B.x - 1, B.y - 1, B.w + 2, bh + 3); ctx.fillStyle = lit ? '#3a2a6a' : '#2a1e52'; ctx.fillRect(B.x, B.y, B.w, bh); ctx.fillStyle = '#6a5ab0'; ctx.fillRect(B.x, B.y, B.w, 1); ctx.fillStyle = '#140c30'; ctx.fillRect(B.x, B.y + bh - 1, B.w, 1);   // a raised panel (a button when the store is on: click it to spend)
+    if (S) S.icon('rewards', B.x + 3, B.y + 3, 1, d.t);
+    text('+' + n, B.x + 14, B.y + 3, '#ffe680', 2, NAVY); text('HEI POINTS', B.x + 3, B.y + 15, '#fff6d4', 1, NAVY);
+    if (sto2) text('SPEND >', B.x + 3, B.y + 24, lit ? '#ffe680' : '#c8b8f0', 1, NAVY);
+    if (d.hei.first) { const ty = B.y + bh + 3; ctx.fillStyle = '#94e0cc'; ctx.fillRect(B.x, ty, B.w, 8); text('FIRST CLEAR', B.x + B.w / 2, ty + 2, NAVY, 1, null, 'center'); }   // a teal sticker hung under the panel
   }
   const sto = DD.opts && DD.opts.store;
   if (c > d.END - 24 && Math.floor(d.t / 30) % 2) text(padUsed ? (DD.opts && DD.opts.onExit ? (sto ? 'CROSS: CONTINUE  SQUARE: STORE  TRIANGLE: AGAIN' : 'CROSS: CONTINUE   TRIANGLE: AGAIN') : 'TRIANGLE: PLAY AGAIN') : DD.opts && DD.opts.onExit ? (sto ? jumpKey() + ': CONTINUE   X: HEI STORE   R: AGAIN' : jumpKey() + ': CONTINUE   R: AGAIN') : 'PRESS R TO PLAY AGAIN', VW / 2, 156, '#fff', 1, '#000', 'center');

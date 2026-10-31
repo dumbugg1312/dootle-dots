@@ -290,9 +290,16 @@
         px(X0, Y - 2, X1 - X0, 2, '#c8202c'); px(X0, Y - 2, X1 - X0, 1, '#ff5a5a'); px(X0, Y - 3, X1 - X0, 1, '#e8b030');
         if (roll > 0) { blob(X0, Y - 3, 2, '#9a1418'); px(X0 - 1, Y - 4, 2, 1, '#e8b030'); }
       }
-      if (k === 'tape') {   // VHS ribbon unspooling behind, sagging as it ages
-        const H = T.hist; ctx.fillStyle = '#2a1408';
-        for (let i = 0; i < H.length - 1; i++) { const q = H[i], age = H.length - i, y = q.y - q.h * 0.45 + Math.min(10, age * 0.25) + Math.sin(i * 0.6 + T.f * 0.1); if (age > 50) continue; ctx.fillRect(Math.round(sx(q.x)), Math.round(sy(y)), 2, 1); if (i % 3 === 0) { ctx.fillStyle = '#6a4a30'; ctx.fillRect(Math.round(sx(q.x)), Math.round(sy(y)) - 1, 1, 1); ctx.fillStyle = '#2a1408'; } }
+      if (k === 'tape') {   // a VHS reel on the Dot's back, glossy black ribbon paying out behind and sagging as it ages
+        const H = T.hist, n = H.length; if (!n) return;
+        const pt = i => { const q = H[i], age = n - 1 - i; return [Math.round(sx(q.x - q.face * 9)), Math.round(sy(q.y - q.h * 0.5 + Math.min(10, age * 0.25) + Math.sin(i * 0.6 + T.f * 0.1) * Math.min(1, age / 6)))]; };
+        for (let i = Math.max(0, n - 50); i < n - 1; i++) {   // join each pair of points so the ribbon never breaks into crumbs
+          const [x0, y0] = pt(i), [x1, y1] = pt(i + 1), m = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1);
+          for (let s = 0; s < m; s++) { const X = Math.round(x0 + (x1 - x0) * s / m), Y = Math.round(y0 + (y1 - y0) * s / m); px(X, Y, 1, 1, ((X + T.f) >> 1) % 7 ? '#5a5868' : '#d8d4e4'); px(X, Y + 1, 1, 1, '#0e0c12'); }   // a sheen row over black, a glint running along it
+        }
+        const [X, Y] = pt(n - 1); if (n > 1) T.spin = (T.spin || 0) + Math.abs(H[n - 1].x - H[n - 2].x) * 0.4;
+        const [dx, dy] = [[0, -1], [1, 0], [0, 1], [-1, 0]][Math.floor(T.spin || 0) & 3];
+        blob(X, Y, 3, '#0e0c12'); px(X - 2, Y - 2, 1, 1, '#5a5868'); px(X - 1, Y - 1, 3, 3, '#f4f0e8'); px(X + dx, Y + dy, 1, 1, '#0e0c12');   // tape pack, white hub, a spoke turning as you run
       }
       if (k === 'bags') for (let i = 4; i >= 0; i--) {   // five bags hop along in the Dot's footsteps
         const q = T.hist[T.hist.length - 1 - (i + 1) * 6]; if (!q) continue;

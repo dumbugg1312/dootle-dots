@@ -129,6 +129,7 @@ window.LEVEL = {"id": "12-1", "name": "COUNTDOWN", "sub": "LIVE FROM THE SPECIAL
   });
 
   DD.defineEntity('w12mascot', {   // a Dot mascot costume: walks at Dot when close, stomp it for 2
+    bowl: true,   // a person: Mel's roll knocks them over
     spawn: t => ({ x: t.x, y: t.y, w: 14, h: 32, vx: 0, vy: 0, dir: -1, ph: (t.tx * 7) % 2, step: 0 }),
     update(e, G) {
       const p = G.pl, dist = Math.abs(DD.cx(p) - DD.cx(e));

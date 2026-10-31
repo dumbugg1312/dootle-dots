@@ -450,6 +450,7 @@ Object.assign(window.LEVEL, {
 (function () {
   const TS = 16, CFG = { mainH: 32, name: 'GLIDE PATH', bg: ['#1a1008', '#3a2412', 'rgba(255,230,160,0.07)'] };
   DD.defineEntity('w8crew', {
+    bowl: true,   // a person: Mel's roll knocks them over
     spawn: t => ({ x: t.x + 1, y: t.y + 32 - 26, w: 14, h: 26, vx: 0, vy: 0, dir: -1, st: 'walk', t: 0, x0: t.x, cool: 0, ext: 0 }),
     update(e, G) {
       const p = G.pl; e.t++; if (e.cool > 0) e.cool--;

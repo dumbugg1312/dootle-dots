@@ -22,6 +22,7 @@ DD.defineEntity('latch', {   // gold briefcase latch plate with a 5: stomp all t
   touch() {},
 });
 DD.defineEntity('abdul', {   // Abdul fan: red keffiyeh, white robe, a fast walker that closes in once you are near
+  bowl: true,   // a person: Mel's roll knocks them over
   spawn: t => ({ x: t.x + 1, y: t.y, w: 14, h: 28, vx: -0.7, vy: 0, t: 0 }),
   update(e, G) {
     const d = DD.cx(G.pl) - DD.cx(e); e.t++;
@@ -90,10 +91,23 @@ Object.assign(window.LEVEL, {
         if (!ok(name)) return; const im = I[name], ox = -Math.round(c.x * par) % im.width, Y = Math.round(bottom - im.height - dy * par * 0.5);
         for (let x = ox - im.width; x < VW; x += im.width) ctx.drawImage(im, x, Y);
         ctx.fillStyle = fill; ctx.fillRect(0, Y + im.height, VW, VH);
+        return { im, ox, Y };
       };
       strip('w3_far', 0.08, 118, '#7a4e74');
       if (t > 0) { ctx.fillStyle = 'rgba(40,16,84,' + (0.5 * t) + ')'; ctx.fillRect(0, 40, VW, 90); }
-      strip('w3_hills', 0.22, 136, '#744a3c');
+      const hl = strip('w3_hills', 0.22, 136, '#744a3c');
+      if (hl && ok('w3_bike_a')) {   // Decker on the far ridge road: a road cut along the hillside (trestle spans over the two dips), and the motorcycle credits riding it in the hills' own parallax, behind the nearer dunes
+        const im = hl.im, W = im.width, rd = hl.Y + 41;
+        if (!im.crest) { const cv = document.createElement('canvas'); cv.width = W; cv.height = im.height; const x2 = cv.getContext('2d'); x2.drawImage(im, 0, 0); const a = x2.getImageData(0, 0, W, im.height).data;
+          im.crest = []; for (let x = 0; x < W; x++) { let y = 0; while (y < im.height && a[(y * W + x) * 4 + 3] < 128) y++; im.crest.push(y); } }
+        for (let x = 0; x < VW; x++) {
+          const gap = im.crest[((x - hl.ox) % W + W) % W] > 41;
+          ctx.fillStyle = gap ? '#4a2c30' : '#8a5c48'; ctx.fillRect(x, rd, 1, 2); ctx.fillStyle = 'rgba(255,226,170,0.35)'; ctx.fillRect(x, rd, 1, 1);
+          if (gap && (x - hl.ox) % 4 === 0) { ctx.fillStyle = '#4a2c30'; ctx.fillRect(x, rd + 2, 1, 6); }   // trestle posts
+        }
+        const k = ((G.frame * 1.4 - c.x * 0.22) % 760 + 760) % 760 - 70;
+        if (k < VW + 20) { ctx.globalAlpha = 0.9 * (1 - t * 0.7); ctx.drawImage(I['w3_bike_' + (Math.floor(G.frame / 4) % 2 ? 'b' : 'a')], 0, 0, 52, 34, Math.round(k), rd - 17, 26, 17); ctx.globalAlpha = 1; }
+      }
       if (t > 0) { ctx.fillStyle = 'rgba(30,12,70,' + (0.4 * t) + ')'; ctx.fillRect(0, 70, VW, 100); }
       strip('w3_hills2', 0.45, 150, '#4a2e30');
       if (t > 0) { ctx.fillStyle = 'rgba(24,10,56,' + (0.45 * t) + ')'; ctx.fillRect(0, 90, VW, 100); }
@@ -109,10 +123,6 @@ Object.assign(window.LEVEL, {
         const gl = (1 - t) * (0.5 + 0.1 * Math.sin(f / 40));   // the low sun: long gold beams through the haze, and a flare that follows it
         if (gl > 0.02) { A.cone(sx - 40, 0, 190, 60, '#ffd890', 0.1 * gl); A.cone(sx + 30, 0, 190, 40, '#ffc880', 0.07 * gl); A.cone(sx - 110, 0, 190, 50, '#ffe0a0', 0.06 * gl); A.glow(sx, sy, 60, '#ffe6b0', 0.2 * gl); }
         if (t > 0.3) A.glow(238 - Math.round(c.x * 0.02) % 40 + 12, 26 - Math.round(dy * 0.03), 44, '#c8c0ff', 0.2 * t);   // the moon's halo over the graveyard
-      }
-      if (ok('w3_bike_a')) {   // Decker on the far ridge road: the motorcycle credits
-        const k = (G.frame * 1.4) % 760 - 70; if (k < VW + 20) { const im = I['w3_bike_' + (Math.floor(G.frame / 4) % 2 ? 'b' : 'a')], Y = Math.round(96 - dy * 0.22 * 0.5);
-          ctx.globalAlpha = 0.9 * (1 - t * 0.7); ctx.drawImage(im, 0, 0, 52, 34, Math.round(k), Y, 26, 17); ctx.globalAlpha = 1; }
       }
     },
     tile(ctx, k, X, Y, tx, ty) {   // the set itself, from the hand-made tiles
@@ -334,6 +344,7 @@ Object.assign(window.LEVEL, {
 // and pays 3 popcorn. Same block lives in 3-1, 3-2 and 3-3.
 window.LEVEL.sprites = (window.LEVEL.sprites || []).concat(['w3_courier_0', 'w3_courier_1', 'w3_courier_2']);
 DD.defineEntity('courier', {
+  bowl: true,   // a person: Mel's roll knocks them over
   spawn: t => ({ x: t.x, y: t.y + 16 - 26, w: 16, h: 26, vx: 0, vy: 0, dir: -1, st: 'walk', t: 0, wk: 0, home: t.x, air: false }),
   update(e, G) {
     const p = G.pl, dx = DD.cx(p) - DD.cx(e);

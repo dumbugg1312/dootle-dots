@@ -230,6 +230,7 @@ Object.assign(window.LEVEL, {
 // its red lamp flashes and he leans back (a half-second wind-up), then he shoves the truck forward. Stomp him from above (the amp
 // never hurts from the top); he pays 3 popcorn. Same block lives in 4-1, 4-2 and 4-3.
 DD.defineEntity('roadie', {
+  bowl: true,   // a person: Mel's roll knocks them over
   spawn: t => ({ x: t.x - 2, y: t.y + 16 - 26, w: 24, h: 26, vx: 0, vy: 0, dir: -1, st: 'walk', t: 0, wk: 0, home: t.x }),
   update(e, G) {
     const p = G.pl, dx = DD.cx(p) - DD.cx(e);

@@ -2,7 +2,7 @@
 // Four games bet real HEI Points: LUCKY SEVEN slots (3 reels, 5 lines, the game's own sprites, the blue card is the WILD CARD),
 // IN THE MONEY and LUCKY DIP scratchers (Tim's S7E07 ticket paid $1000; the S7E02 lucky dip), roulette (single zero; BET THE VFA goes
 // all in) and blackjack (Gregg deals; beat him three hands straight and he walks off, as he did in S7E07, and Tim deals).
-// Payback sits a little under break-even (tests/casino.js). UNLIMITED HEI POINTS: everything still plays, free, and pays nothing.
+// Payback sits a little over break-even on slots, blackjack and bingo, a little under on scratchers and roulette (tests/casino.js). UNLIMITED HEI POINTS: everything still plays, free, and pays nothing.
 // Broke? Beat any stage and Tim has a free IN THE MONEY ticket waiting. Lines and clip sources: design/lines/casino.md (clips CAS1-10).
 // The store runs the header and calls step / draw / drawTop here while its CASINO tab is up.
 (function () {
@@ -21,7 +21,7 @@
   // ---- LUCKY SEVEN: real reel strips, so payback is exact (every stop combination is counted in the test)
   const SYM = ['dot', 'pop', 'cup', 'tub', 'vhs', 'gregg', 'tim', 'boss', 'seven', 'wild'];
   const KER = 0, BOSS = 7, SEV = 8, WILD = 9;
-  const PAY3 = [5, 8, 10, 14, 20, 30, 30, 80, 150, 300];   // three on a line, in line bets (bet / 5)
+  const PAY3 = [6, 9, 12, 15, 20, 30, 30, 80, 150, 300];   // three on a line, in line bets (bet / 5)
   const PAY77 = 6, PAYPOP = 3, PAYHOST = 12;   // two sevens from the left; ANY DOT OR BAG (Dootle Dots and popcorn bags mixed); ON CINEMA (Tim and Gregg mixed)
   const COUNTS = [[7, 6, 5, 4, 3, 3, 3, 1, 2, 2], [7, 6, 5, 4, 3, 3, 3, 1, 2, 2], [7, 6, 5, 4, 3, 3, 3, 1, 1, 2]];
   function seeded(s) { return () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -54,9 +54,9 @@
   // ---- scratchers: the prize is drawn first, then the ticket is dealt to show it
   const TIX = [
     { id: 'money', name: 'IN THE MONEY', price: 10, top: 1000, amts: [5, 10, 20, 50, 100, 1000],
-      odds: [[1000, 1 / 1500], [100, 1 / 100], [50, 1 / 30], [20, 1 / 8], [10, 1 / 4.5], [5, 1 / 6]] },
+      odds: [[1000, 1 / 1500], [100, 1 / 100], [50, 1 / 30], [20, 1 / 7], [10, 1 / 4], [5, 1 / 6]] },
     { id: 'dip', name: 'LUCKY DIP', price: 25, top: 500, syms: ['pop', 'tub', 'vhs', 'cup', 'dot', 'card'],
-      odds: [[500, 1 / 500], [250, 1 / 100], [100, 1 / 20], [50, 1 / 6], [25, 1 / 4]] },
+      odds: [[500, 1 / 500], [250, 1 / 100], [100, 1 / 20], [50, 1 / 6], [25, 1 / 3.5]] },
   ];
   function drawPrize(odds) { let r = M.rng(); for (const [p, q] of odds) { if (r < q) return p; r -= q; } return 0; }
   function moneyTicket() {
@@ -75,13 +75,13 @@
   }
   M.moneyTicket = moneyTicket; M.dipTicket = dipTicket; M.TIX = TIX;
 
-  // ---- roulette: single zero, European wheel order
+  // ---- roulette: single zero, European wheel order; zero gives back half of red, black, odd, even, low and high
   const WHEEL = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
   const REDS = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
   const numCol = n => n === 0 ? '#1a8a3a' : REDS.has(n) ? '#c8202c' : '#1a1418';
   function rouletteWins(bet, n) {   // bet key -> returns (stake included) when n comes up, 0 if it loses
     if (/^n\d+$/.test(bet)) return +bet.slice(1) === n ? 36 : 0;
-    if (n === 0) return 0;
+    if (n === 0) return /^(red|black|odd|even|low|high)$/.test(bet) ? 0.5 : 0;   // zero hands back half of an even-money bet
     const col = 3 - ((n - 1) % 3);   // 1 top row ... matches the board
     return ({ red: REDS.has(n), black: !REDS.has(n), odd: n % 2 === 1, even: n % 2 === 0, low: n <= 18, high: n >= 19 })[bet] ? 2
       : bet === 'd1' && n <= 12 || bet === 'd2' && n > 12 && n <= 24 || bet === 'd3' && n > 24 ? 3
@@ -89,7 +89,7 @@
   }
   M.rouletteWins = rouletteWins;
 
-  // ---- blackjack: six decks, dealer stands on all 17s, blackjack pays 3 to 2, double on any two cards
+  // ---- blackjack: six decks, dealer stands on all 17s, blackjack pays 2 to 1, double on any two cards
   const RANK = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
   const cardV = c => c.r === 0 ? 1 : Math.min(10, c.r + 1);
   function handV(h) { let v = 0, ace = false; for (const c of h) { if (c.hide) continue; v += cardV(c); if (c.r === 0) ace = true; } const soft = ace && v <= 11; return { v: soft ? v + 10 : v, soft }; }
@@ -99,7 +99,7 @@
 
   // ---- bingo: 75 balls, a 5 x 5 card (B 1-15 ... O 61-75, free middle); any row, column, diagonal or the four corners
   const BLINES = (() => { const L = []; for (let i = 0; i < 5; i++) { L.push([0, 1, 2, 3, 4].map(r => i * 5 + r)); L.push([0, 1, 2, 3, 4].map(c => c * 5 + i)); } L.push([0, 6, 12, 18, 24], [4, 8, 12, 16, 20], [0, 4, 20, 24]); return L; })();
-  const BPAY = [[16, 12], [22, 6], [99, 4]];   // bingo within this many balls pays this many times the card
+  const BPAY = [[16, 15], [22, 8], [99, 4]];   // bingo within this many balls pays this many times the card
   const bingoPay = n => BPAY.find(([lim]) => n <= lim)[1];
   function bingoCard() { const c = []; for (let col = 0; col < 5; col++) { const pool = []; for (let k = 1; k <= 15; k++) pool.push(col * 15 + k); for (let i = 0; i < 5; i++) c.push(pool.splice(rnd(pool.length), 1)[0]); } c[12] = 0; return c; }   // c[col * 5 + row]; 0 is FREE
   const bingoToGo = (c, called) => Math.min(...BLINES.map(L => L.filter(k => c[k] && !called.has(c[k])).length));
@@ -368,7 +368,7 @@
   }
 
   // ================================================================ the lobby
-  const GAMES = [{ id: 'slots', name: 'LUCKY SEVEN', sub: 'SLOTS' }, { id: 'scratch', name: 'SCRATCHERS', sub: '10 OR 25' }, { id: 'roul', name: 'ROULETTE', sub: 'ONE ZERO' }, { id: 'bj', name: 'BLACKJACK', sub: '3 TO 2' }, { id: 'bingo', name: 'BINGO NIGHT', sub: 'AT THE MANOR' }];
+  const GAMES = [{ id: 'slots', name: 'LUCKY SEVEN', sub: 'SLOTS' }, { id: 'scratch', name: 'SCRATCHERS', sub: '10 OR 25' }, { id: 'roul', name: 'ROULETTE', sub: 'ZERO HALF BACK' }, { id: 'bj', name: 'BLACKJACK', sub: '2 TO 1' }, { id: 'bingo', name: 'BINGO NIGHT', sub: 'AT THE MANOR' }];
   const GX = i => 34 + i * 63, FLOOR = 126;
   const CAB = i => ({ x: GX(i) - 30, y: 54, w: 60, h: 88 });
   function enter(id) {
@@ -816,10 +816,10 @@
     if (IN.back) { if (tableTotal()) rouletteAct({ id: 'clear' }); scr = 'lobby'; SFX.switch(); }
   }
   function rouletteResult() {
-    let back = 0; for (const k in R.bets) back += R.bets[k] * rouletteWins(k, R.n);
+    let back = 0; for (const k in R.bets) back += R.bets[k] * rouletteWins(k, R.n); back = Math.floor(back);
     R.won = back; R.hist.unshift(R.n); R.hist.length = Math.min(R.hist.length, 9); R.state = 'show'; R.k = 0;
     const lucky = R.n === 7 && R.bets.n7;
-    if (back > 0) { give(back, 62, 86); tier(back, R.stake, 62, 86, lucky ? 'LUCKY 7! +' + back : null); if (lucky) vo('CAS10.mp3', 0); }
+    if (back > 0) { give(back, 62, 86); tier(back, R.stake, 62, 86, lucky ? 'LUCKY 7! +' + back : null); if (lucky) vo('CAS10.mp3', 0); if (R.n === 0 && !R.bets.n0) bannerUp('0 GREEN. HALF BACK +' + back, '#9aff7a', 1, 90); }
     else { tone(240, 160, 0.2, 'triangle', 0.04); bannerUp(R.n + ' ' + (R.n === 0 ? 'GREEN' : REDS.has(R.n) ? 'RED' : 'BLACK') + '. NO WIN', '#c8a0a8', 1, 90); }
     settle(R.stake, back, R.stake >= 100);
   }
@@ -854,7 +854,7 @@
     led(178, 106, 24, BETS[bi], 4, '#ffd040'); text('CHIP', 190, 98, '#9ac8a0', 1, null, 'center');
     const s = SPOTS[R.cur], on = R.bets[s.id] || 0, tot = tableTotal();
     text('ON THE TABLE', 120, 126, '#9ac8a0', 1, null); led(172, 124, 30, tot, 4, '#ffd040');
-    if (!s.ctl) text(s.label + ' PAYS ' + (s.id[0] === 'n' ? '35' : s.id[0] === 'd' || s.id[0] === 'c' ? '2' : '1') + ' TO 1' + (on ? '. YOU HAVE ' + on : ''), 120, 138, '#cfe8d0', 1, null);
+    if (!s.ctl) text(s.label + ' PAYS ' + (s.id[0] === 'n' ? '35 TO 1' : s.id[0] === 'd' || s.id[0] === 'c' ? '2 TO 1' : '1 TO 1, HALF BACK ON 0') + (on ? '. YOU HAVE ' + on : ''), 120, 138, '#cfe8d0', 1, null);
     else if (s.id === 'vfa') text('ALL IN ON ' + SPOTS.find(q => q.id === (R.lastSpot || 'red')).label + '. GREGG BET THE VFA', 120, 138, '#ff8a6a', 1, null);
     if (R.state === 'show' && R.won) logo('WON ' + R.won, 270, 126, 1, GOLD, null);
     if (A) A.vignette(0.3);
@@ -896,7 +896,7 @@
   function resolve() { const p = handV(B.P).v, d = handV(B.D).v; if (d > 21) finish('dbust', 'DEALER BUSTS!'); else if (p > d) finish('win', 'YOU WIN'); else if (p === d) finish('push', 'PUSH'); else finish('lose', 'DEALER WINS'); }
   function finish(r, label) {
     B.state = 'done'; B.res = label; const st = B.stake;
-    const back = r === 'bj' ? Math.round(st * 2.5) : r === 'win' || r === 'dbust' ? st * 2 : r === 'push' ? st : 0;
+    const back = r === 'bj' ? st * 3 : r === 'win' || r === 'dbust' ? st * 2 : r === 'push' ? st : 0;
     if (back > 0) { give(back, 160, 120); tier(back, st, 160, 110, r === 'bj' ? 'BLACKJACK! +' + back : null); } else { bannerUp(label, '#c8a0a8', 2, 90); tone(260, 170, 0.18, 'triangle', 0.04); }
     if (r === 'bj') dsay('you'); else if (r === 'dbust') { dsay('bust'); if (B.dealer === 'gregg') vo('CAS8.mp3', 60); } else if (r === 'win') dsay('you', 110); else if (r === 'push') dsay('push');
     else if (label === 'BUST') dsay('yb'); else if (label === 'DEALER BLACKJACK') dsay('bj'); else dsay('win', 110);
@@ -947,7 +947,7 @@
     for (const lx of [70, 250]) { rect('#5a4a30', lx, 15, 1, 6); box(lx - 9, 21, 19, 6, '#1e5a3a'); rect('#e8c060', lx - 9, 26, 19, 1); if (A) A.cone(lx, 27, 120, 46, '#fff2c0', 0.08); glow(lx, 30, 16, '#fff2c0', 0.3); }
     ell(160, 214, 252, 82, '#1a0806'); ell(160, 215, 250, 80, '#7a3020'); ell(160, 217, 248, 78, '#5a2216'); ell(160, 224, 246, 76, '#3a140e');   // our rail, padded leather
     for (let x = 0; x < VW; x += 4) { const q = (x - 160) / 248; if (Math.abs(q) < 1) rect('#a8604a', x, Math.round(218 - 78 * Math.sqrt(1 - q * q)), 2, 1); }   // its stitching
-    const arc = 'BLACKJACK PAYS 3 TO 2'; for (let i = 0; i < arc.length; i++) { const x = 160 - arc.length * 2 + i * 4, y = 90 + Math.round(((x - 160) / 46) ** 2); text(arc[i], x, y, '#e8c060', 1, null); }
+    const arc = 'BLACKJACK PAYS 2 TO 1'; for (let i = 0; i < arc.length; i++) { const x = 160 - arc.length * 2 + i * 4, y = 90 + Math.round(((x - 160) / 46) ** 2); text(arc[i], x, y, '#e8c060', 1, null); }
     // the dealer's line, the shoe
     if (B.sayT > 0 && B.say) bubble(B.say, 188, 18, 92, B.dx === 0);
     box(284, 30, 30, 22, '#2a1a10'); rect('#4a2a18', 286, 32, 26, 3); for (let k = 0; k < 6; k++) rect(k % 2 ? '#e8e0d0' : '#c8c0b0', 288 + k, 36, 1, 12); card({ hide: true }, 294, 31);
@@ -1167,7 +1167,7 @@
     if (k === 'popcorn') for (let i = 0; i < 4; i++) { const yy = b - 4 - Math.abs(Math.sin(ph + i)) * 8; rect('#3a2010', x + 2 + i * 4, yy, 3, 3); rect('#fff6d4', x + 2 + i * 4, yy, 2, 2); }
     if (k === 'vape') for (let i = 0; i < 3; i++) { const r = 2 + i; ctx.globalAlpha = 0.8 - i * 0.2; ell(x + 3 + i * 5, b - 6 - i * 4, r, r, '#e8e4f0'); ctx.globalAlpha = 1; }
     if (k === 'carpet') { rect('#c8202c', x, b - 2, 14, 2); rect('#e8b030', x, b - 3, 14, 1); ell(x + 15, b - 3, 2, 2, '#9a1418'); }
-    if (k === 'tape') { for (let i = 0; i < 16; i++) rect('#2a1408', x + i, b - 8 + Math.round(Math.sin(i * 0.6 + ph) * 3), 1, 1); }
+    if (k === 'tape') { for (let i = 0; i < 13; i++) { const yy = b - 9 + Math.round(Math.sin(i * 0.6 + ph) * 3 * (13 - i) / 13); rect((i + Math.floor(tt)) % 7 ? '#5a5868' : '#d8d4e4', x + i, yy, 1, 1); rect('#0e0c12', x + i, yy + 1, 1, 1); } ell(x + 13, b - 9, 3, 3, '#0e0c12'); rect('#f4f0e8', x + 12, b - 10, 3, 3); rect('#0e0c12', x + 13, b - 10 + (Math.floor(tt) & 1), 1, 1); }
     if (k === 'bags') for (let i = 0; i < 3; i++) { const bx = x + 2 + i * 6, by = b - Math.abs(Math.sin(ph + i)) * 3; rect('#2a0e1a', bx - 1, by - 6, 5, 6); rect('#fff6e8', bx, by - 5, 3, 5); rect('#d8202c', bx + 1, by - 5, 1, 5); rect('#ffe680', bx, by - 7, 3, 1); }
     if (k === 'stewdog') { Wd.stewDog(x + 9, b + 2); Wd.stewDog(x + 8, b - 7 - Math.round(Math.abs(Math.sin(ph)) * 3)); }
     if (k === 'rats') { Wd.rat(x + 9 + Math.round(Math.sin(ph) * 2), b + 3, 1, Math.floor(tt)); Wd.rat(x + 7 + Math.round(Math.sin(ph + 2) * 2), b - 6, 1, Math.floor(tt) + 2); }

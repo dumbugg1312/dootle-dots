@@ -5,6 +5,7 @@ window.LEVEL = {"id": "7-1", "name": "THE BLACK BOX", "sub": "OCX", "world": 7, 
 // Reference: refs/contact-sheets/s10a.jpg and s10b.jpg: black matte box, giant white foam o X c, white director's chairs, white plinths with the blue
 // GERM SHIELD-X tub and Rio-Jenesis jars, a lighting truss throwing white-cyan cones, and the 360 VR cameras.
 DD.defineEntity('germ', {   // Germ Shield-X fan: two tiles tall, a fan wearing the blue tub. Walks at you when near, hops every second or so. Stomp it.
+  bowl: true,   // a person: Mel's roll knocks them over
   spawn: t => ({ x: t.x + 4, y: t.y + 2, w: 22, h: 30, vx: -0.5, vy: 0, t: (t.tx * 7) % 40, face: -1 }),
   update(e, G) {
     const d = DD.cx(G.pl) - DD.cx(e);
@@ -295,6 +296,7 @@ Object.assign(window.LEVEL, {
 (function () {
   const TS = 16, CFG = { mainH: 24, name: 'CRAWLSPACE', bg: ['#04060c', '#0a1220', 'rgba(63,214,255,0.07)'] };
   DD.defineEntity('w7rig', {
+    bowl: true,   // a person: Mel's roll knocks them over
     spawn: t => ({ x: t.x, y: t.y + 32 - 28, w: 16, h: 28, vx: 0, vy: 0, dir: -1, st: 'roll', t: 0, x0: t.x, cool: 0, lens: 0 }),
     update(e, G) {
       const p = G.pl; e.t++; if (e.cool > 0) e.cool--;

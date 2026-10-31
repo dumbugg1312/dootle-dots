@@ -110,6 +110,7 @@ DD.defineEntity('w8crv', {   // the Mobile VFA: a black CR-V covered in memorabi
 });
 
 DD.defineEntity('w8larue', {   // LaRue on his red-and-black mobility scooter: wakes when Dot is close, then chases; stomp him to bail him out
+  bowl: true,   // a person: Mel's roll knocks them over
   spawn: t => ({ x: t.x, y: t.y, w: 18, h: 18, vx: 0, vy: 0, on: false, dir: -1, t: 0 }),
   update(e, G) {
     const p = G.pl;
@@ -493,6 +494,7 @@ DD.defineEntity('w8shop', {   // the HEI Points shop: a kiosk where the points b
 (function () {
   const TS = 16, CFG = { mainH: 24, name: 'THE CABLE RUN', bg: ['#14060a', '#240a12', 'rgba(232,200,96,0.07)'] };
   DD.defineEntity('w8crew', {
+    bowl: true,   // a person: Mel's roll knocks them over
     spawn: t => ({ x: t.x + 1, y: t.y + 32 - 26, w: 14, h: 26, vx: 0, vy: 0, dir: -1, st: 'walk', t: 0, x0: t.x, cool: 0, ext: 0 }),
     update(e, G) {
       const p = G.pl; e.t++; if (e.cool > 0) e.cool--;
