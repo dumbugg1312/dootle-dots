@@ -183,9 +183,9 @@
     names: { lawyer: 'LAWYER TIM', judge: 'JUDGE' },
     intro: { bg: '#2a1608', fg: '#f4eedc', edge: '#e8362a' },
     lines: {
-      boss: [['lawyer', 'MAY I APPROACH THE BENCH?'], ['judge', 'NO, MR. HEIDECKER.']],
-      bossPhase: [['judge', 'MR. HEIDECKER, YOU ARE IN CONTEMPT.'], ['lawyer', 'OBJECTION.']],
-      bossDefeat: [['judge', 'THE COURT DECLARES A MISTRIAL.'], ['lawyer', 'I TAKE THAT AS AN EXONERATION.']],
+      boss: [['lawyer', 'MAY I APPROACH THE BENCH?'], ['judge', 'NO, YOU MAY NOT APPROACH THE BENCH.']],   // refs/trial day-1 48:59
+      bossPhase: [['judge', 'MR. HEIDECKER, THE COURT IS RUNNING OUT OF CONTEMPT CITATION FORMS.'], ['lawyer', 'ALL RIGHT, FINE. HOLD ME IN CONTEMPT.']],   // day-5; day-3 19:24
+      bossDefeat: [['judge', 'THE COURT HAS NO CHOICE BUT TO DECLARE A MISTRIAL.'], ['lawyer', "I'VE PROVEN MYSELF TO BE BASICALLY UNSTOPPABLE."]],   // verdict 16:13; his statement after
     },
     boss: {
       name: 'LAWYER TIM', hp: 6, arena: [2, 62], inv: 60,

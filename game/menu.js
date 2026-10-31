@@ -182,55 +182,11 @@
   function openShelf() { st = 'shelf'; t = 0; scur = 0; SFX.switch(); }
   function selectTo(i) { if (i === cur) return; cur = i; sTape(); }
   const eraLine = w => { const V = window.DDVoice; if (V && w && worldOpen(w)) V.say('world', { world: w.n }); };   // opening a world: its era says its line (game/voice/cues.js)
-  // ---- the rewind between World 1 and World 2: the last Oscar special stops, the tape rewinds through every era, and Season One plays.
-  // Every era is a live trailer, the real engine playing the real stages (DD.trailer): its first stage, a cut to a second stage, then the boss
-  // mid-attack, under VHS cuts and a lower third with the world's title. A shot whose level isn't loaded is left out; one that won't build shows its card.
-  const RWK = 'dootledots.rewindseen', RWS = { open: 150, a: 72, b: 54, boss: 100, fin: 240, cut: 9 };   // frames per shot; cut: the snow and tear at each splice
-  // hand-picked shots ({ id, x: start tile, dot } per stage, pre: boss frames run unseen, 95 by default since most bosses wind up near 95 and strike near 140); anything left out is picked by busiest()
-  const SHOTS = {
-    10: { a: { x: 16 } },                          // the lobby's fan brawl under the portraits
-    7: { a: { x: 6 } },                            // the giant O X C letters, fans posing
-    4: { b: { id: '4-3', x: 32 }, pre: 110 },      // the locker hall full of fans; Dekkar opens with a bottle and slams later, so run on to the slam
-  };
-  const RW = { play: RWS.open, rew: RWS.open, end: RWS.open + RWS.fin };
-  let reel = [], shot = null, tr = null;
-  function busiest(L) {   // the start tile of the liveliest 20 columns: fans, the level's own entities, props, popcorn and how much the ground moves
-    const W = L.W, score = new Array(W).fill(0), add = (x, v) => { if (x >= 0 && x < W) score[x] += v; };
-    const ents = L.ENTS || {}, props = { crate: 1, stack: 1, tub: 1, plate: 1, cp: 1, vhs: 1, ghostS: 1, ghostM: 1, ghostC: 1, ghostB: 1 };
-    for (const [k, x] of L.THINGS) add(x | 0, k === 'gh' || k === 'th' ? 3 : ents[k] ? 3 : props[k] ? 1.5 : 0);
-    for (const [x, , n] of L.POPCORN || []) for (let i = 0; i < n; i++) add((x | 0) + i, 0.25);
-    for (const [k, x, , w] of L.SOLID) if (k !== 'hole' && k !== 'dip' && w < 12) add(x | 0, 0.6);   // platforms and steps, not long floors
-    let best = 6, bs = -1;
-    for (let x = 6; x < Math.max(7, W - 26); x++) { let s = 0; for (let k = 0; k < 20; k++) s += score[x + k] || 0; if (s > bs) { bs = s; best = x; } }
-    return Math.max(2, best - 3);   // a run-up into it
-  }
-  function makeReel() {   // the shot list: Dot City under the Oscar line, then Worlds 12 down to 3, three shots each
-    reel = []; let t0 = 0;
-    const add = (s, len) => { reel.push(Object.assign({ t0, len }, s)); t0 += len; };
-    const stage = (id, o, dot) => have(id) ? Object.assign({ id, x: busiest(LEVELS[id]), dot }, o, { id }) : null;
-    const plain = id => have(id) && !(LEVELS[id].script && LEVELS[id].script.camera);   // the second shot prefers a stage that doesn't drive its own camera
-    add(Object.assign({ open: true }, stage('1-1', SHOTS[1] && SHOTS[1].a, 'sam') || {}), RWS.open);
-    for (let n = 12; n >= 3; n--) {
-      const w = WORLDS[n - 1], o = SHOTS[n] || {}, mids = idsOf(w).slice(1, -1), d = w.dots || ['sam'];
-      const bid = (o.b && o.b.id) || mids.find(plain) || mids.find(have);
-      const list = [[stage(n + '-1', o.a, d[0]), RWS.a], [bid && stage(bid, o.b, d[1] || d[0]), RWS.b],
-        [have(n + '-boss') ? { id: n + '-boss', boss: true, pre: o.pre ?? 95, dot: o.bossDot || d[0] } : null, RWS.boss]].filter(q => q[0]);
-      list.forEach(([s, len], i) => add(Object.assign(s, { w, first: i === 0 }), len));
-    }
-    RW.rew = Math.max(RWS.open, t0); RW.end = RW.rew + RWS.fin;
-    DD.loadSprites([].concat(...reel.filter(s => s.id).map(s => LEVELS[s.id].sprites || [])));   // every shot's sprites, well before its turn
-  }
-  function rwStop() { if (tr) tr.end(); tr = null; shot = null; }
-  function rwRoll() {   // the shot under the playhead: splice it in if it's new, then run it a frame
-    const s = reel.find(q => t >= q.t0 && t < q.t0 + q.len) || null;
-    if (s !== shot) {
-      rwStop(); shot = s;
-      if (s && s.id && !s.dead) { tr = DD.trailer(LEVELS[s.id], { x: s.x, boss: s.boss, pre: s.pre, dot: s.dot, speed: s.boss ? 1 : 1.25, swap: s.boss ? 60 : 80 }); if (!tr) s.dead = true; }
-      if (s && s.w) { if (s.first) { DD.noise(0.12, 0.04, 2400); DD.tone(1600, 900, 0.06, 'square', 0.02); } else DD.noise(0.07, 0.03, 3200); }
-    }
-    if (tr) tr.step();
-  }
-  const BOSS_ART = { 1: ['w1_scissors_idle'], 2: ['drsan'], 3: ['w3_abdul_idle'], 4: ['w4_dekkar'], 5: ['w5_timboss'], 6: ['w6_lawyer_tim', 54], 7: ['w7_timocx'],
+  // ---- the rewind between World 1 and World 2: Dot City's ribbon is cut, the tape rewinds through every era (a stage gimmick, then
+  // the boss, for Worlds 12 down to 3), and Season One plays. The reel is game/rewind.js (RewindReel), drawn from its own clock (t / 60
+  // seconds); here: starting and ending it, the deck's sounds at its cues, the Empty Bottle loop under the rewind, and its four voice lines.
+  const RWK = 'dootledots.rewindseen', RWR = () => window.RewindReel || null;
+  const BOSS_ART = { 1: ['w1_scissors_idle'], 2: ['drsan'], 3: ['w3_abdul_idle'], 4: ['w4_dekkar'], 5: ['w5_timboss'], 6: ['w6_lawyer_tim', 36], 7: ['w7_timocx'],
     8: ['w8_joker'], 9: ['w9_amato_0'], 10: ['w10_ratking'], 11: ['w11_new_a'], 12: ['w12_mg_idle'] };   // each world's boss, for the rewind's preview cards ([sprite, frame width] for a strip)
   function bossArt(n, cx, by, maxH, bob) {   // draw a boss bottom-centred at (cx, by), scaled down to fit maxH
     const a = BOSS_ART[n], im = a && DD.IMG[a[0]]; if (!im || !im.width) return;
@@ -258,65 +214,30 @@
     ['sam', 'mel', 'cloud', 'baxter'].forEach((n, i) => spr(n, 112 + i * 32, VH - 6 + Math.round(-Math.abs(Math.sin(t / 10 + i * 1.3)) * 5), false, 1, 1));
     ctext(DD.padUsed ? 'UP/DOWN + CROSS' : 'UP/DOWN + JUMP, OR CLICK', VH - 26, '#ffd27a', 1, '#000');
   }
-  function startRewind() { st = 'rewind'; t = 0; rwStop(); makeReel(); try { localStorage.setItem(RWK, '1'); } catch (e) {} }
-  function rewindDone() { rwStop(); st = 'era'; t = 0; eraLine(world); }
-  function vhsCut(v) {   // a splice: a white pop, snow thinning out, and a few torn lines dragged sideways
-    if (v >= RWS.cut) return;
-    const cv = ctx.canvas;
-    if (cv && v > 1) for (let i = 0; i < 4; i++) { const y = (hash(t * 3 + i) * (VH - 12)) | 0, h = 2 + ((hash(t + i * 7) * 8) | 0), dx = ((hash(t * 5 + i) - 0.5) * 60) | 0; try { ctx.drawImage(cv, 0, y, VW, h, dx, y, VW, h); } catch (e) {} }
-    const n = Math.round(260 * (1 - v / RWS.cut));
-    for (let i = 0; i < n; i++) rect(Math.random() < 0.5 ? '#fff' : '#777', (Math.random() * VW) | 0, (Math.random() * VH) | 0, 2, 1);
-    rect('rgba(255,255,255,' + (v < 2 ? 0.75 : (RWS.cut - v) / 40).toFixed(2) + ')', 0, 0, VW, VH);
+  function startRewind() {
+    st = 'rewind'; t = 0; try { localStorage.setItem(RWK, '1'); } catch (e) {}
+    const R = RWR(), M = window.DDMusic; if (R) R.prepare(); if (R && M && M.load) M.load(R.AUDIO.music.track);
   }
-  function tracking(u) {   // slow tracking bands rolling up, and faint scanlines, over the footage
-    for (let i = 0; i < 2; i++) { const y = (VH - ((u * 3 + i * 97) % (VH + 20))) | 0; rect('rgba(255,255,255,0.14)', 0, y, VW, 1); rect('rgba(0,0,0,0.22)', 0, y + 1, VW, 3); }
-    for (let y = 1; y < VH; y += 3) rect('rgba(0,0,0,0.07)', 0, y, VW, 1);
+  function rewindDone() {
+    const M = window.DDMusic, V = window.DDVoice; if (M) { M.preview = null; M.silent = false; } if (V && V.hush) V.hush();
+    st = 'era'; t = 0; eraLine(world);
   }
-  function card(w, tt) {   // a shot that wouldn't build: the era's backdrop and its boss, as a still
-    rect(w.bg, 0, 0, VW, VH); backdrop(w, tt * 3, 0, VH); rect('rgba(8,6,20,0.45)', 0, 0, VW, VH);
-    bossArt(w.n, VW / 2, 128, 80, Math.round(Math.sin(tt / 10) * 2));
-  }
-  function lowerThird(s, tt) {   // the world's number, title and seasons; the stage's name, or BOSS: <name> under the boss shot
-    const w = s.w, w0 = reel.find(q => q.w === w), k = Math.min(1, (tt - w0.t0) / 10), e = k * k * (3 - 2 * k), ox = Math.round(-(1 - e) * VW);
-    ctx.save(); ctx.translate(ox, 0);
-    rect('rgba(0,0,0,0.66)', 0, 140, VW, 30); rect(w.accent, 0, 140, VW, 1);
-    rect(w.accent, 6, 144, 22, 11); text(String(w.n), 17, 147, '#000', 1, null, 'center');   // the world number on a tab of its colour
-    text(w.title, 33, 144, lumOf(w.fg) > 130 ? w.fg : '#fffbd0', fitScale(w.title, VW - 40, 2), '#000');
-    const v = tt - s.t0;
-    if (s.boss) { if (v > 6 || v % 2) { rect('#e8302a', 6, 159, 22, 7); text('BOSS', 17, 160, '#fffbd0', 1, null, 'center'); text(w.boss, 33, 160, '#fffbd0', 1, '#000'); } }
-    else { const L = LEVELS[s.id]; text(s.id.toUpperCase(), 17, 160, '#cfc6bc', 1, '#000', 'center'); text(clipW(((L && L.name) || '').toUpperCase(), 40), 33, 160, '#a8a0b8', 1, '#000'); }
-    text(clipW(w.seasons || '', 30), VW - 8, 160, w.accent, 1, '#000', 'right');
-    ctx.restore();
+  function rewindCues() {   // the deck and the sound, frame by frame on the reel's cues
+    const R = RWR(); if (!R) return;
+    const C = R.cues, at = s => Math.round(s * 60), M = window.DDMusic, V = window.DDVoice, A = R.AUDIO;
+    if (t === 1) DD.noise(0.4, 0.05, 900);                                                                     // PLAY
+    if (t === at(C.Rewind - 0.55)) DD.tone(220, 180, 0.08, 'square', 0.03);                                    // PAUSE
+    if (t === at(C.Rewind)) { DD.tone(400, 1600, 0.5, 'square', 0.03); if (M) { M.silent = false; M.preview = A.music.track; } }   // the motor kicks into rewind
+    for (const n of R.SECTIONS) if (/^[GB]\d/.test(n) && t === at(C[n])) DD.noise(0.07, 0.03, 3200);         // a splice
+    if (t === at(C.Whip)) DD.tone(900, 2400, 0.9, 'square', 0.02);
+    if (t === at(C.Stop)) { DD.noise(0.12, 0.04, 2400); DD.tone(1600, 900, 0.06, 'square', 0.02); if (M) M.silent = true; }   // STOP: the music cuts
+    if (t === at(C.SeasonOne)) sBeep(true);
+    for (const v of A.voice) if (t === at(C[v.at[0]] + v.at[1]) && V && V.clip) V.clip(v.id);
   }
   function drawRewind() {
-    const tt = t, w1 = WORLDS[0], w2 = WORLDS[1];
-    const osd = (s, x, y, col) => { text(s, x + 1, y + 1, '#000', 1, null); text(s, x, y, col, 1, null); };
-    const bars = () => { rect('#000', 0, 0, VW, 10); rect('#000', 0, VH - 10, VW, 10); };   // letterbox: the footage plays between them
-    if (tt < RW.play) {   // PLAY: World 1, still running
-      if (tr && tr.ok) tr.draw(); else { rect(w1.bg, 0, 0, VW, VH); backdrop(w1, tt, 0, VH); }
-      rect('rgba(0,0,0,0.45)', 0, 0, VW, VH); tracking(tt); bars();
-      osd('PLAY >', 8, 3, '#7cff7c');
-      typed('THAT WAS THE LAST', 62, tt, 10, '#fffbd0', 2, '#000'); typed('OSCAR SPECIAL,', 82, tt, 44, '#ffe680', 2, '#7a2a10');
-    } else if (tt < RW.rew) {   // REWIND: each era's trailer, newest first, the tape counter running backwards
-      const s = shot && shot.w ? shot : null, w = (s && s.w) || w2, u = tt - RW.play, v = s ? tt - s.t0 : 0;
-      if (tr && tr.ok) tr.draw(); else card(w, tt);
-      tracking(u); vhsCut(v); bars();
-      osd('<< REWIND', 8, 3, '#7cff7c');
-      const sec = Math.max(0, Math.round(5999 * (1 - u / Math.max(1, RW.rew - RW.play)))), cnt = String(Math.floor(sec / 60)).padStart(2, '0') + ':' + String(sec % 60).padStart(2, '0');
-      osd(cnt, VW - 8 - cnt.length * 4, 3, '#7cff7c');
-      if (s) lowerThird(s, tt);
-    } else {   // STOP, then PLAY: Season One
-      const u = tt - RW.rew;
-      rect(w2.bg, 0, 0, VW, VH); backdrop(w2, tt, 0, VH); rect('rgba(0,0,0,0.4)', 0, 0, VW, VH);
-      if (u < 20) { osd('STOP', 10, 10, '#7cff7c'); rect('rgba(255,255,255,' + ((20 - u) / 40).toFixed(2) + ')', 0, 0, VW, VH); }
-      else osd('PLAY >', 10, 10, '#7cff7c');
-      typed("BUT LET'S GO BACK", 56, u, 20, '#fffbd0', 2, '#000');
-      typed('TO SEASON ONE!', 78, u, 40, '#ffe680', 3, '#7a2a10');
-      const dots = ['sam', 'mel', 'cloud', 'baxter'];
-      if (u > 60) dots.forEach((n, i) => spr(n, 112 + i * 32, VH - 22 + Math.round(-Math.abs(Math.sin(tt / 9 + i * 1.3)) * 8), false, 1, 1));
-      if (u === 20) sBeep(true);
-    }
-    if (tt > 30 && Math.floor(tt / 30) % 2) text(DD.padUsed ? 'CROSS: SKIP' : 'JUMP: SKIP', VW - 50, VH - 8, '#cfc6bc', 1, '#000');
+    const R = RWR(); if (!R) return;
+    R.draw(ctx, t / 60, R.cues, { total: R.total });
+    if (t > 30 && Math.floor(t / 30) % 2 && !R.speaking(t / 60)) text(DD.padUsed ? 'CROSS: SKIP' : 'JUMP: SKIP', VW - 50, VH - 8, '#cfc6bc', 1, '#000');
   }
   const prepSongs = w => { const m = window.DDMusic; if (m && m.prepare && w) for (const id of idsOf(w)) m.prepare(id, w.n, /boss/.test(id)); };   // fetch the world's songs before its stages start
   function enterWorld(i) { if (worldOpen(WORLDS[i]) && !worldUnlocked(WORLDS[i])) { SFX.buzz(); note = 'BEAT ' + WORLDS[i - 1].boss + ' FIRST'; noteT = 60; return; } world = WORLDS[i]; st = 'era'; t = 0; eraPlay = false; SFX.switch(); prepSongs(world); if (world.n === 2) { let seen = false; try { seen = !!localStorage.getItem(RWK); } catch (e) {} if (!seen) { startRewind(); return; } } eraLine(world); }
@@ -449,10 +370,9 @@
       return;
     }
     if (st === 'rewind') {
-      if (t === 1) { DD.noise(0.4, 0.05, 900); }
-      if (t === RW.play) { DD.tone(400, 1600, 0.5, 'square', 0.03); }   // the motor kicks into rewind
-      if (t >= RW.end || (t > 30 && (IN.ok || IN.start || IN.any || c))) return rewindDone();
-      rwRoll();
+      const R = RWR();
+      if (!R || t >= Math.round(R.total * 60) || (t > 30 && (IN.ok || IN.start || IN.any || c))) return rewindDone();
+      rewindCues();
       return;
     }
     if (st === 'store') { if (!window.DDStore || window.DDStore.step(IN, c) === 'back') closeStore(); return; }
@@ -1016,7 +936,6 @@
       try { wipe = wipe || document.createElement('canvas'); wipe.width = VW; wipe.height = VH; wipe.getContext('2d').drawImage(ctx.canvas, 0, 0); wipeT = 0; } catch (e) { wipe = null; }
     }
     lastSt = st;
-    if (tr && st !== 'rewind') rwStop();
     if (pvTr && st !== 'levels') pvStop();   // the poster's footage only runs on the stage list   // never leave a trailer running under another screen
     if (st === 'load') { bg('#2a0e1a', '#0e070c'); ctext('LOADING', VH / 2 - 3, '#fff', 1); return; }
     if (st === 'rewind') drawRewind(); else if (st === 'fork') drawFork(); else if (st === 'title') drawTitle(); else if (st === 'select') drawSelect(); else if (st === 'era') drawEra(); else if (st === 'shelf') drawShelf(); else if (st === 'options') drawOptions(); else if (st === 'jukebox') drawJukebox(); else if (st === 'store') { if (window.DDStore) window.DDStore.draw(); } else if (st === 'wardrobe') drawWardrobe(); else drawLevels();
@@ -1048,7 +967,7 @@
     st = 'title'; t = 0;
   });
   window.__menu = { have, LEVELS, MISSING, get PROG() { return PROG; }, get st() { return st; }, get t() { return t; }, rewind: () => { cur = 1; world = WORLDS[1]; eraPlay = !!have(idsOf(world)[0]); eraAll = false; startRewind(); },   // debug and tests: play the rewind into World 2
-     get reel() { return reel; }, ff: n => { for (let i = 0; i < n; i++) step({ nx: 0, ny: 0 }); draw(); },   // ff: run the menu n frames and draw (screenshots)
-     get shot() { return shot; }, get lcur() { return lcur; }, cast, worldUnlocked, stageUnlocked,
+     get reel() { return window.RewindReel || null; }, ff: n => { for (let i = 0; i < n; i++) step({ nx: 0, ny: 0 }); draw(); },   // ff: run the menu n frames and draw (screenshots)
+     get lcur() { return lcur; }, cast, worldUnlocked, stageUnlocked,
      pauseOptions: { open(done) { inGame = { st, t, done }; click = null; openOptions(); }, step, draw } };   // the engine's pause menu runs the options and jukebox screens over a paused level
 })();

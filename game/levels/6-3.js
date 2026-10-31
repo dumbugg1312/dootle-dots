@@ -24,9 +24,9 @@ window.LEVEL = {"id": "6-3", "name": "APPROACH THE BENCH", "sub": "MAY I APPROAC
     names: { lawyer: 'LAWYER TIM', judge: 'JUDGE' },
     intro: { bg: '#2a1608', fg: '#f4eedc', edge: '#e8362a' },
     lines: {   // design/VOICE.md. The engine plays start and goal; open is fired when the first pad is granted
-      start: [['lawyer', 'MAY I APPROACH?'], ['judge', 'NOT UNTIL THE LAMP IS GREEN.']],
-      open: [['judge', 'YOU MAY APPROACH.'], ['lawyer', 'THANK YOU, YOUR HONOR.']],
-      goal: [['lawyer', 'I REST MY CASE.']],
+      start: [['lawyer', 'MAY I APPROACH?'], ['judge', 'NO, YOU MAY NOT APPROACH THE BENCH.']],   // day-1 48:59
+      open: [['judge', 'YES, MR. HEIDECKER, YOU MAY.'], ['lawyer', 'THANK YOU, MR. JUDGE.']],   // day-2 1:31, 2:33
+      goal: [['lawyer', 'AT THIS TIME THE DEFENSE RESTS. THANK YOU.']],   // day-5 20:26
     },
   });
 
@@ -222,7 +222,6 @@ window.LEVEL = {"id": "6-3", "name": "APPROACH THE BENCH", "sub": "MAY I APPROAC
 ;(function () {
   const TS = 16;
   DD.defineEntity('procserver', {
-    bowl: true,   // a person: Mel's roll knocks them over
     spawn: t => ({ x: t.x + 1, y: t.y - 2, w: 14, h: 34, vx: 0, vy: 0, x0: t.x, st: 'walk', t: 0, face: -1, a: 0 }),
     update(e, G) {
       e.a++; e.t++;

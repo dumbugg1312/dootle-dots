@@ -1,6 +1,6 @@
 // World 6 cutscenes: THE TRIAL (The Trial of Tim Heidecker, November 2017). Player and rules: game/cutscene.js, design/CUTSCENES.md.
 // Sources: refs/lore/seasons-09-12.md section 3 (the trial: days, judge, verdict), refs/lore/fan-culture.md and gemini-fan-culture.md (Tim's courtroom lines).
-// No clip of the trial passed QA, so the voices are the lines the lore gives to Tim with certainty, plus the gavel. The shape is courtroom procedure: objection, approach, verdict.
+// Lines checked against the Trial transcripts (refs/trial, 2026-10-30). The shape is courtroom procedure: objection, approach, verdict.
 (function () {
   const C = window.DDCut; if (!C) return;
   const F = 21 * 16;   // the floor (px), the same in 6-1 and 6-boss
@@ -32,7 +32,7 @@
         { move: 'tim', x: 170, t: 96, ease: 'out' },                                              // Tim, representing himself, crosses the well
         { set: 'tim', f: 0, flip: false }, { wait: 16 },
         { set: 'tim', f: 2 }, { sfx: 'wind' },
-        { say: 'lawyer', text: 'OBJECTION. HEARSAY.', hold: 78 },                                // lore (gemini-fan-culture): Tim as his own defence attorney, "Objection... hearsay."
+        { say: 'lawyer', text: 'OBJECTION. SPECULATIVE.', hold: 78 },                            // refs/trial hl-day-3 0:28, the fans' favourite objection ("hearsay" is never said)
         { wait: 10 },
         { set: 'gavel', f: 1 }, { sfx: 'slam' }, { shake: 6 },                                    // the judge answers with the gavel
         { fn: () => { DD.dust(224, 19 * 16 + 4, 10, 2, '#e8c890'); DD.stars(170, fy - 40, 6, '#ffe680'); } },

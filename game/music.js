@@ -75,7 +75,7 @@
   // the rotation: each level plays its own song start to finish; a boss fight moves once through one shared order of every track
   const ROT = (CUES.rotation || []).filter(Boolean), RKEY = 'dootledots.music.rot';
   let rotAt = 0; try { rotAt = (+localStorage.getItem(RKEY) || 0) % Math.max(1, ROT.length); } catch (e) {}
-  let preview = null, carry = null;   // carry: the song the last level ended on   // the jukebox plays the highlighted song
+  let preview = null, carry = null, silent = false;   // silent: nothing plays (the rewind's STOP cuts the music dead)   // carry: the song the last level ended on   // the jukebox plays the highlighted song
   let run = null;   // this level's music: { G, name, switches, last, cps, engaged, phase }
   const startSong = (id, world, isBoss) => (CUES.level || {})[id] || (isBoss ? (CUES.boss || {})[world] : null) || (CUES.world || {})[world] || CUES.title;
   // the jukebox's choices: songs taken out of the rotation, and shuffle; saved with the game
@@ -113,7 +113,7 @@
 
   // which track, and how intense, right now
   function want() {
-    const DD = window.DD; if (!DD) return null;
+    const DD = window.DD; if (!DD || silent) return null;
     if (DD.inMenu || !DD.G) { if (run) carry = run.name; run = null; return { name: preview || carry || CUES.title, layer: 1 }; }   // back in the menu the last level's song keeps going
     if (preview) return { name: preview, layer: 1 };   // the jukebox opened from the pause menu: the level's run waits underneath
     const G = DD.G, L = DD.L || {}, id = L.id || '', world = parseInt(id, 10);
@@ -223,6 +223,7 @@
   function applyVol() { if (OUT && AC && !muted) { const g = OUT.gain; g.cancelScheduledValues(AC.currentTime); g.value = 0.32 * MV() * duckK(); } }   // the options slider moved
   window.DDMusic = { want, duck, applyVol, get muted() { return muted; }, get run() { return run; }, get rotAt() { return rotAt; },
     get preview() { return preview; }, set preview(n) { preview = n || null; },
+    get silent() { return silent; }, set silent(v) { silent = !!v; if (silent && looper && AC) { const g = looper.gain.gain; g.cancelScheduledValues(AC.currentTime); g.setValueAtTime(0, AC.currentTime); } },
     get prefs() { return prefs; }, reloadPrefs, isOn, load, prepare, missing: n => !!MISSING[n],
     toggle(n) { const i = prefs.off.indexOf(n); if (i >= 0) prefs.off.splice(i, 1); else if (ROT.filter(isOn).length > 1) prefs.off.push(n); else return false; savePrefs(); return true; },
     setShuffle(v) { prefs.shuffle = !!v; savePrefs(); } };

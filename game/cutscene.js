@@ -160,6 +160,7 @@
     if (b.shake != null) { G.shake = Math.max(G.shake, b.shake); return null; }
     if (b.flash != null) { S.flashCol = b.flash || '#fff'; S.flash = S.flashMax = b.t || 8; return null; }
     if (b.fade != null) { const from = S.fade, to = b.fade, dur = b.t || 30; if (b.col) S.fadeCol = b.col; return t => { S.fade = from + (to - from) * clamp(t / dur, 0, 1); return t >= dur; }; }
+    { const X = window.DDCutFX && window.DDCutFX.task(S, b); if (X !== undefined) return X; }   // the new beats (game/cutfx.js)
     if (b.wait != null) return t => t >= b.wait;
     return null;
   }
@@ -235,6 +236,7 @@
   function drawOver(S, ctx) {
     const G = S.G, text = DD.text;
     if (S.def.over) S.def.over(ctx, G, S);
+    if (window.DDCutFX) window.DDCutFX.under(S, ctx);   // zoom, lights, grades, iris (game/cutfx.js)
     if (S.fade > 0) { ctx.globalAlpha = clamp(S.fade, 0, 1); rect(S.fadeCol, 0, 0, VW, VH); ctx.globalAlpha = 1; }
     if (S.flash > 0) { ctx.globalAlpha = S.flash / S.flashMax * 0.85; rect(S.flashCol, 0, 0, VW, VH); ctx.globalAlpha = 1; }
     const bh = Math.round(BAR * ease(S.bars));
@@ -242,6 +244,7 @@
     if (S.third) drawThird(S);
     if (S.card) drawCard(S, S.card);
     if (S.cap) drawCap(S, S.cap);
+    if (window.DDCutFX) window.DDCutFX.over(S, ctx);   // stamps, the tape OSD, the pause tag
     if (S.hint > 0 && S.ready && !S.closing) {   // the skip prompt, in the top bar, when a key goes down
       ctx.globalAlpha = Math.min(1, S.hint / 30) * 0.9;
       const s = 'HOLD ' + (DD.jumpKey ? DD.jumpKey() : 'JUMP') + ' TO SKIP', w = s.length * 4 - 1, x = VW - 8 - w;
@@ -279,6 +282,7 @@
 
   function drawCard(S, c) {
     const ctx = DD.ctx, text = DD.text, w = c.w || {}, t = c.t, out = c.dur - 16;
+    if (c.kind === 'boss' && window.DDCutFX && window.DDCutFX.bossCard(S, c)) return;   // the new boss card (game/cutfx.js)
     if (c.kind === 'boss') {   // a band slams in from the right, holds, and goes out to the left
       const X = t < 12 ? Math.round((1 - backOut(t / 12)) * VW) : t > out ? -Math.round(ease((t - out) / 16) * (VW + 10)) : 0;
       const Y = 56, H = 68, acc = w.accent || '#e8c060';
