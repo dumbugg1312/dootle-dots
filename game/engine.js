@@ -149,6 +149,7 @@ const DDVol = window.DDVol = (() => {
 function initAudio() {
   if (AC) return;
   try { AC = new AudioContext(); MASTER = AC.createGain(); MASTER.gain.value = 0.5 * DDVol.get('sfx'); MASTER.connect(AC.destination); } catch (e) { AC = null; }
+  if (AC && window.DDSfxMake && !Q.has('oldsfx')) Object.assign(SFX, window.DDSfxMake(AC, MASTER, () => TRQ));   // the chip set (sfx.js) takes over the table in place; ?oldsfx keeps the old beeps
 }
 function tone(f0, f1, dur, type = 'square', vol = 0.08, delay = 0) {
   if (!AC || TRQ) return;
@@ -197,7 +198,11 @@ const SFX = {
   count: k => tone(520 + k * 12, 520 + k * 12, 0.025, 'square', 0.03),   // results tally tick, k rises with the count
   bag: () => { tone(660, 990, 0.06, 'square', 0.05); tone(1320, 1320, 0.1, 'triangle', 0.05, 0.05); },   // a bag fills
   blip: f => tone(f, f * 1.04, 0.03, 'square', 0.016),   // one letter of narration
+  // moments only the chip set (sfx.js) voices; with the old set they fall back to what played before
+  roll: () => SFX0.wind(), slamWind: () => SFX0.wind(), germsBack: () => SFX0.wind(), respawn: () => SFX0.wind(), dsec: () => SFX0.vhs(), chip: () => SFX0.vhs(),
+  rollTick() {}, glide() {}, crate() {}, crumble() {}, fanCard() {}, irisIn() {}, irisOut() {}, phase() {},
 };
+const SFX0 = Object.assign({}, SFX);
 
 // ---------------------------------------------------------------- input (keyboard + gamepad), edge-detected per step
 const keys = {}, hits = {};
@@ -534,7 +539,7 @@ function hitBoss(n = 1) {   // one hit on the boss: false if it is out of the fi
     if (B.cfg.onDefeat) B.cfg.onDefeat(G, B);
     if (!cue('boss_out')) { vo('boss_defeat'); playLines('bossDefeat'); }   // a knockout scene says its own lines
   } else if (ph > B.phase) {
-    B.phase = ph; G.flareAt = G.frame; const q = B.cfg.phases[ph - 1];
+    B.phase = ph; G.flareAt = G.frame; SFX.phase(); const q = B.cfg.phases[ph - 1];
     vo('boss_phase', { ph }); banner(q.say || 'PHASE ' + (ph + 1), 100, q.sub || ''); if (q.enter) q.enter(G, B);
     (L.lines && L.lines['bossPhase' + ph] ? playLines('bossPhase' + ph) : playLines('bossPhase', true));   // bossPhase1, bossPhase2... for a particular phase, else bossPhase
   }
@@ -572,7 +577,7 @@ function setDot(dot) {
   if (!G.owned.includes(dot)) { SFX.buzz(); G.lockT[dot] = 20; float(c, p.y - 6, 'NOT IN THE CAST YET', '#ff8080'); return; }   // a Dot who hasn't joined: the portrait shakes
   if (!boxFree(c - D.w / 2, b - D.h, D.w, D.h)) { SFX.buzz(); G.denyT = 20; float(c, p.y - 6, 'NO ROOM', '#ff8080'); return; }
   p.dot = dot; p.w = D.w; p.h = D.h; p.x = c - D.w / 2; p.y = b - D.h; p.rolling = false; p.slam = 0;
-  p.sy = 1.45; p.sx = 0.65; p.svx = p.svy = 0; p.landT = 0; SFX.switch(); vo('dot', { dot }); stars(c, b - D.h / 2, 10, D.col);
+  p.sy = 1.45; p.sx = 0.65; p.svx = p.svy = 0; p.landT = 0; SFX.switch(dot); vo('dot', { dot }); stars(c, b - D.h / 2, 10, D.col);
   if (!G.seen[dot]) { G.seen[dot] = true; banner(D.name, 110, D.how); } else float(c, b - D.h - 6, D.name, D.col);
 }
 function rumble(strong, weak, ms) {   // controller rumble, where the browser supports it
@@ -609,7 +614,7 @@ function updatePlayer() {
   if (p.inv > 0) p.inv--;
   if (G.star > 0) {   // GERM FREE: counts down only while you're playing; rainbow sparkles trail off the Dot
     if (G.star === G.pk.star) { SFX.star(); float(cx(p), p.y - 14, 'GERM FREE!', '#ffe680'); }
-    if (--G.star === 0) { SFX.wind(); float(cx(p), p.y - 10, 'GERMS ARE BACK', '#cfc6bc'); }
+    if (--G.star === 0) { SFX.germsBack(); float(cx(p), p.y - 10, 'GERMS ARE BACK', '#cfc6bc'); }
     if (G.frame % 3 === 0 && !TR) parts.push({ x: p.x + Math.random() * p.w, y: p.y + Math.random() * p.h, vx: (Math.random() - 0.5) * 0.8, vy: -0.4 - Math.random() * 0.6, life: 22, max: 22, r: 1.5, col: 'hsl(' + ((G.frame * 12 + Math.random() * 90) % 360 | 0) + ',95%,65%)', star: true, g: 0 });
   }
 
@@ -626,9 +631,10 @@ function updatePlayer() {
   // Mel curls into a bowling ball when she's running, and to squeeze under anything lower than her full height
   const wasRolling = p.rolling;
   p.rolling = p.dot === 'mel' && (Math.abs(p.vx) > P.melRoll || !boxFree(p.x, bot(p) - 20, p.w, 20 - p.h + 1));
-  if (p.rolling && !wasRolling && p.onGround) { SFX.wind(); dust(cx(p), bot(p), 3); }
+  if (p.rolling && !wasRolling && p.onGround) { SFX.roll(); dust(cx(p), bot(p), 3); }
+  if (p.rolling && p.onGround && Math.abs(p.vx) > 0.5 && G.frame % 7 === 0) SFX.rollTick(Math.abs(p.vx));   // the ball rumbling along
   // Baxter: down in the air = hang, then slam
-  if (p.dot === 'baxter' && !p.onGround && IN.dp && !p.slam) { p.slam = 1; p.slamT = P.slamWind; p.vx = 0; p.vy = 0; SFX.wind(); }
+  if (p.dot === 'baxter' && !p.onGround && IN.dp && !p.slam) { p.slam = 1; p.slamT = P.slamWind; p.vx = 0; p.vy = 0; SFX.slamWind(); }
 
   // horizontal
   if (dir) p.face = dir;
@@ -658,7 +664,7 @@ function updatePlayer() {
     const probe = { x: p.x + dir * 1.5, y: p.y + 2, w: p.w, h: p.h - 4 };
     if (ov(probe, b)) {
       const want = dir * Math.min(Math.max(Math.abs(p.vx), 0.6), 0.9), bx = b.x;
-      moveX(b, want); p.vx = b.x - bx || dir * 0.01; if (G.frame % 8 === 0) dust(dir > 0 ? b.x : b.x + b.w, bot(b), 1);
+      moveX(b, want); p.vx = b.x - bx || dir * 0.01; if (b.x !== bx) SFX.crate(); if (G.frame % 8 === 0) dust(dir > 0 ? b.x : b.x + b.w, bot(b), 1);
     }
   }
 
@@ -667,7 +673,7 @@ function updatePlayer() {
   if (p.buf > 0 && canJump && !p.slam) {
     p.vy = -(P.jump + P.jumpRun * Math.min(1, Math.abs(p.vx) / P.run));
     p.airMax = Math.abs(p.vx); p.onGround = false; p.coyote = 0; p.buf = 0; p.usedDJ = false;
-    p.sy = 1.3; p.sx = 0.75; SFX.jump(); dust(cx(p), bot(p), 4);
+    p.sy = 1.3; p.sx = 0.75; SFX.jump(p.dot); dust(cx(p), bot(p), 4);
   } else if (IN.jp && !canJump && p.dot === 'sam' && !p.usedDJ && !p.slam) {
     p.vy = -P.dj; p.usedDJ = true; p.buf = 0; p.spin = 1; p.airMax = Math.max(p.airMax, Math.abs(p.vx));
     p.sy = 1.25; p.sx = 0.8; SFX.dj(); stars(cx(p), bot(p), 5, '#ffd27a');
@@ -684,6 +690,7 @@ function updatePlayer() {
     p.vy = Math.min(p.vy + g, P.term);
     p.glide = p.dot === 'cloud' && p.held && p.vy > P.glide;
     if (p.glide) p.vy = Math.max(P.glide, p.vy - 0.4);
+    if (p.glide && G.frame % 9 === 0) SFX.glide();
   }
 
   // move
@@ -742,7 +749,7 @@ function updatePlayer() {
     const l = T(Math.floor((p.x - 6) / TS), Math.floor((bot(p) + 1) / TS)), rr = T(Math.floor((p.x + p.w + 6) / TS), Math.floor((bot(p) + 1) / TS));
     if (l && rr) G.safe = { x: p.x, y: p.y, f: bot(p) };
   }
-  if (p.y > LH + 40 && !G.fall) { SFX.fall(); vo('death'); G.fall = { t: 0 }; }   // into a pit: the iris closes, then opens on the safe spot (updateFall)
+  if (p.y > LH + 40 && !G.fall) { SFX.fall(); SFX.irisOut(); vo('death'); G.fall = { t: 0 }; }   // into a pit: the iris closes, then opens on the safe spot (updateFall)
   p.x = clamp(p.x, 0, LW - p.w);
 }
 const FALL_OUT = 20, FALL_IN = 22;   // frames: iris closing after a pit, iris opening on the respawn
@@ -753,7 +760,7 @@ function updateFall() {   // the respawn happens when the iris is shut (t = FALL
     G.safe = respawnSpot(p);   // and never into a hole: the spot must have room and a floor under it
     G.lastRespawn = G.frame; G.landed = false;
     Object.assign(p, { x: G.safe.x, y: G.safe.y + p.h - DOTS[p.dot].h, h: DOTS[p.dot].h, vx: 0, vy: 0, inv: 60, rolling: false, slam: 0 });
-    G.cam.y = clamp(bot(p) - VH * CAM_FEET, 0, LH - VH); updateCamera(true); SFX.wind();
+    G.cam.y = clamp(bot(p) - VH * CAM_FEET, 0, LH - VH); updateCamera(true); SFX.respawn(); SFX.irisIn();
     if (G.takes > 0) { G.takes--; G.perkT = 40; float(cx(p), p.y - 14, 'TAKE TWO!', '#ffe680'); stars(cx(p), p.y + p.h / 2, 8, '#ffe680'); }   // TAKE TWO: this fall is free
     else loseBag(cx(p), p.y);   // the pit's bag bursts out where you come back in
   }
@@ -795,7 +802,7 @@ function slamLand(r) {
   }
   // shockwave knocks over nearby fans on the same ground
   for (const f of fans) if ((f.state === 'walk' || f.state === 'idle') && Math.abs(cx(f) - cx(p)) < 44 && Math.abs(bot(f) - bot(p)) < 10) fling(f, sign(cx(f) - cx(p)) || 1);
-  if (broke) { G.secretHint = 60; return; }   // keep slamming down through the hole
+  if (broke) { SFX.crumble(); G.secretHint = 60; return; }   // keep slamming down through the hole
   p.slam = 0;
 }
 function tubStomp(t) {
@@ -938,7 +945,7 @@ function interact() {
       stompFan(f); addGot(1, cx(f), f.y); popSound(); chainStomp(cx(f), f.y);
       if (p.slam === 2) continue;
       p.vy = -(p.held ? P.stompBounceHeld : P.stompBounce); p.y = f.y - p.h; p.usedDJ = false; p.airMax = Math.max(p.airMax, Math.abs(p.vx));
-      p.sy = 1.3; p.sx = 0.75; G.hitstop = 3; SFX.stomp(); stars(cx(f), f.y, 6);
+      p.sy = 1.3; p.sx = 0.75; G.hitstop = 3; SFX.stomp(Math.max(0, G.chain - 1)); stars(cx(f), f.y, 6);
     } else if (G.star > 0) fling(f, sign(cx(f) - cx(p)) || p.face);   // GERM FREE: they bounce off
     else if (p.inv <= 0) {   // a fan mob: they bump you around and grab some popcorn
       hurt(cx(f)); say(f, '♥', '#d8202c', 50); float(cx(p), p.y - 10, 'MOBBED!', '#ffb0c8');
@@ -982,11 +989,11 @@ function interact() {
     } else if (b.kind === 'dsec' && !b.got && ov(p, b)) {   // a Dot secret: any Dot can take it (the placement is what needs that Dot's move)
       b.got = true; G.dsec[b.dot] = true;
       if (b.had) { SFX.tick(); stars(cx(b), b.y + 8, 6, '#fff2a6'); }   // found on an earlier run: just a glint
-      else { SFX.vhs(); stars(cx(b), b.y + 8, 14, DOTS[b.dot].col); stars(cx(b), b.y + 8, 8, '#fff2a6'); float(cx(b), b.y - 6, DOTS[b.dot].name + "'S SECRET!", '#ffe680'); G.dsecT = 40; G.dsecWho = b.dot; }
+      else { SFX.dsec(b.dot); stars(cx(b), b.y + 8, 14, DOTS[b.dot].col); stars(cx(b), b.y + 8, 8, '#fff2a6'); float(cx(b), b.y - 6, DOTS[b.dot].name + "'S SECRET!", '#ffe680'); G.dsecT = 40; G.dsecWho = b.dot; }
     } else if (b.kind === 'gchip' && !b.got && ov(p, b)) {
       b.got = true;
       if (b.had || TR || !window.DDCasino) { SFX.tick(); stars(cx(b), b.y + 7, 6, '#fff2a6'); }
-      else { window.DDCasino.goldChip(L.id); SFX.vhs(); stars(cx(b), b.y + 7, 16, '#ffd24a'); stars(cx(b), b.y + 7, 8, '#fff6d4'); float(cx(b), b.y - 6, 'GOLD CHIP! 3 FREE BETS', '#ffe680'); }
+      else { window.DDCasino.goldChip(L.id); SFX.chip(); stars(cx(b), b.y + 7, 16, '#ffd24a'); stars(cx(b), b.y + 7, 8, '#fff6d4'); float(cx(b), b.y - 6, 'GOLD CHIP! 3 FREE BETS', '#ffe680'); }
     } else if (b.kind === 'fact' && !b.got && ov(p, b)) {
       b.got = true; SFX.tick(); stars(cx(b), b.y + 6, 10, '#7ab0ff'); readFact(b);
     } else if (b.kind === 'goal' && !G.done && ov(p, b)) finish(b);
@@ -1086,7 +1093,7 @@ function updateWorld() {
   bodies = bodies.filter(b => !b.dead);
   updateBoss();
   hook('update', G);
-  if (G.done) G.done.t++;
+  if (G.done && ++G.done.t === 4) SFX.irisOut();   // the end iris starts closing
 }
 
 // ---------------------------------------------------------------- particles
@@ -1116,7 +1123,7 @@ function updateParts() {
   loose = loose.filter(c => !c.got && c.life > 0 && c.y < LH + 40);
   if (G.scuffles) { for (const s of G.scuffles) s.t--; G.scuffles = G.scuffles.filter(s => s.t > 0); }
   if (G.comboT > 0) G.comboT--;
-  if (cardGo()) { G.cards[0].t++; if (G.cards[0].t > 240) G.cards.shift(); }   // cards wait for the title wipe and for anyone talking
+  if (cardGo()) { if (++G.cards[0].t === 1) SFX.fanCard(); if (G.cards[0].t > 240) G.cards.shift(); }   // cards wait for the title wipe and for anyone talking
   if (G.banner && !dlgUp() && --G.banner.f <= 0) G.banner = null;   // a banner waits while a dialogue is up
   if (!G.banner && G.bq.length) G.banner = G.bq.shift();
   if (G.greggAlert) G.greggAlert--;
@@ -1381,7 +1388,7 @@ function step() {
   if (G.state === 'title') { if (IN.jp || IN.start || IN.sp || IN.click || IN.any) { G.state = 'play'; try { localStorage.setItem('dd_controls_seen', '1'); } catch (e) {} } return; }   // the level title wipe (introStrip) takes over from here
   if (G.state === 'pause') { updatePause(); return; }
   if ((IN.start || (IN.click && inBox(IN.click, PAUSEBTN.x - 2, PAUSEBTN.y - 2, PAUSEBTN.w + 4, PAUSEBTN.h + 4))) && !G.done) { G.state = 'pause'; G.pm.sel = 0; SFX.tick(); if (window.DDVoice && !TR) window.DDVoice.menu('pause'); return; }
-  if (G.intro < INTRO_T) { if (++G.intro === 60) playLines('start'); }
+  if (G.intro < INTRO_T) { if (++G.intro === 60) playLines('start'); if (G.intro === 6 && !CUT) SFX.irisIn(); }   // the opening iris
   if (talking()) return;
   updateDlg();
   if (G.shake > 0) G.shake *= 0.86;
