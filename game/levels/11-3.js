@@ -296,7 +296,8 @@ window.LEVEL = {"id": "11-3", "name": "FOUR EPISODES, ONE MOVIE", "sub": "CUT OU
       if (G.frame >= (G.cdUntil || 0) && DD.door(e)) {   // press Down in the doorway to cross
         G.cdUntil = G.frame + 45; G.hitstop = 8;
         DD.stars(DD.cx(p), p.y + 6, 10, '#ffd24a'); DD.SFX.cp && DD.SFX.cp();
-        p.x = e.dx * 16 + 2; p.y = (e.dr + 1) * 16 - p.h - 1; p.vx = 0; p.vy = 0; p.slam = 0; p.inv = Math.max(p.inv || 0, 20);
+        { const x0 = e.dx * 16 + 8 - p.w / 2, y0 = (e.dr + 1) * 16 - p.h - 1; let x = x0; for (let d = 1; d <= 40 && !DD.boxFree(x, y0, p.w, p.h); d++) x = x0 + (d % 2 ? 1 : -1) * Math.ceil(d / 2) * 4; p.x = x; p.y = y0; }   // centred, nudged to the nearest spot this Dot fits
+         p.vx = 0; p.vy = 0; p.slam = 0; p.inv = Math.max(p.inv || 0, 20);
         G.safe = { x: p.x, y: p.y }; G.cpSafe = { x: p.x, y: p.y };
         G.cam.x = DD.clamp(p.x - 160, 0, LEVEL.W * 16 - 320); G.cam.y = DD.clamp(p.y + p.h - 112, 0, LEVEL.H * 16 - 180);
         DD.stars(DD.cx(p), p.y + 6, 10, '#ffd24a');

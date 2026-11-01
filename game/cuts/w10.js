@@ -78,6 +78,7 @@
         { set: 'king', spr: 'w10_ratking_atk' },
         { sfx: 'wind' },
         { fn: () => DD.float(kx, ky - 62, 'SKRRK!', '#ff5a4a') },
+        { fn: () => { S.third = null; } },   // its clock stalls under captions: take the lower third down before the boss card's sub line arrives
         { wait: 30 },
         { card: 'boss', sub: 'IN THE WALLS OF MOVIE HOUSE', from: 'SEASON FIFTEEN' },
       ];

@@ -161,6 +161,7 @@ window.LEVEL = {"id": "3-2", "name": "EYES IN THE SKY", "sub": "I NEED EYES IN T
       },
       update(G) {
         const s = G.s, p = G.pl, L = DD.L, LW = L.W * TS, LH = L.H * TS, VW = DD.VW, cx = DD.cx, bot = DD.bot;
+        if (s.pdot !== p.dot) { s.pdot = p.dot; s.py = p.y; }   // a switch re-seats the Dot at its own height: don't let the tow put the old top line back
         if (p.y > 64 * TS) { s.py = p.y; s.fvy = 0; return; }   // inside the duct run: ordinary ground rules, no tow, no rope
         s.alt = Math.max(0, (SEA_Y - bot(p)) / TS);
         if (!s.launched) {   // a thermal catches you at the end of the dock: the rope tightens and the boat starts to tow

@@ -175,7 +175,7 @@ window.LEVEL = {"id": "1-3", "name": "INTRODUCING THE DOOTLE DOTS", "sub": "SAM.
         }
         const sx = DD.wx(3 * TS), sy = DD.wy(FLOOR_Y - 66);   // the sign at the start
         if (sx > -150 && sx < VW) { ctx.fillStyle = INK; ctx.fillRect(sx - 1, sy - 1, 150, 24); ctx.fillStyle = '#fff6d4'; ctx.fillRect(sx, sy, 148, 22); ctx.fillStyle = '#8a5a2a'; ctx.fillRect(sx + 20, sy + 22, 3, 44); ctx.fillRect(sx + 125, sy + 22, 3, 44);
-          DD.text('THE CALLED DOT PASSES.', sx + 74, sy + 4, '#3a2a4a', 1, null, 'center'); DD.text('X OR 1-4 SWITCH DOTS.', sx + 74, sy + 13, '#8a6a8a', 1, null, 'center'); }
+          DD.text('THE CALLED DOT PASSES.', sx + 74, sy + 4, '#3a2a4a', 1, null, 'center'); DD.text(DD.keyText ? DD.keyText('{SWITCH} OR 1-4 SWITCH DOTS.') : 'X OR 1-4 SWITCH DOTS.', sx + 74, sy + 13, '#8a6a8a', 1, null, 'center'); }   // names the key the player is actually using
       },
       drawFG(ctx, G) {   // the call card, down the right edge (clear of the banners): four tabs, the called one lit and pulled out, the beat running down it
         const s = G.s, p = G.pl, f = G.frame, VW = DD.VW;

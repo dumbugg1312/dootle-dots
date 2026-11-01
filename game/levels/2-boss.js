@@ -290,7 +290,7 @@
       ['catwalk', 38, F - 9, 6, 1],                                                                       // Sam's perch
       ['seat', 54, F - 2, 4, 2],
       ['riser', 58, F - 2, 2, 2], ['riser', 60, F - 4, 2, 4], ['riser', 62, F - 6, 2, 6], ['riser', 64, F - 8, 4, 8],   // the tower
-      ['cracked', 70, F, 3, 1], ['hole', 69, F + 1, 6, 2],                                                // Baxter's trapdoor and the cellar
+      ['cracked', 70, F, 3, 1], ['hole', 69, F + 1, 6, 2], ['carpet', 71, F + 2, 1, 1], ['carpet', 72, F + 1, 1, 2],   // Baxter's trapdoor and the cellar, with a two-step stair so every Dot can climb back out
       ['riser', 74, F - 3, 6, 3],                                                                         // the island
       ['catwalk', 85, F - 4, 4, 1], ['catwalk', 100, F - 4, 4, 1], ['catwalk', 86, F - 7, 3, 1], ['catwalk', 100, F - 7, 3, 1],   // the arena ledges, and a lighting deck above each
     ],

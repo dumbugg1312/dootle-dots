@@ -108,7 +108,7 @@ DD.defineEntity('warp10_boss', {
     e.st = 'hurt'; e.t = 0; e.hurtT = 36; DD.stars(DD.cx(e), e.y + 6, 10, '#fff2a6'); DD.float(DD.cx(e), e.y - 6, 'POW!', '#fff2a6');
     return true;
   },
-  touch(e, G) { if (e.st !== 'hurt' && e.st !== 'bald' && e.st !== 'rest' && !e.hide && !(DD.boss && DD.boss.dead)) DD.hurt(DD.cx(e)); },   // dizzy, bald or recovering: harmless, bump him all you like on the way up
+  touch(e, G) { if (e.st !== 'hurt' && e.st !== 'bald' && e.st !== 'rest' && !(e.st === 'walk' && e.t < 30) && !e.hide && !(DD.boss && DD.boss.dead)) DD.hurt(DD.cx(e)); },   // dizzy, bald or recovering: harmless, bump him all you like on the way up
   update(e, G) {
     const B = DD.boss; if (!B || !B.engaged) return;
     if (B.dead) { e.spin++; return; }
@@ -155,7 +155,7 @@ DD.defineEntity('warp10_boss', {
       if (e.t > 56) { e.st = 'bald'; e.t = 0; DD.float(me, e.y - 12, 'STOMP HIM!', '#fff2a6'); }
     } else if (e.st === 'bald') {                // dizzy and bare-headed: stomp him
       e.vx = 0;
-      if (e.t > 160 - ph * 20) { e.st = 'walk'; e.t = 0; DD.float(me, e.y - 4, 'WIG BACK ON', '#ff8a7a'); }
+      if (e.t > 208 - ph * 26) { e.st = 'walk'; e.t = 0; DD.float(me, e.y - 4, 'WIG BACK ON', '#ff8a7a'); }
     } else if (e.st === 'hurt') {                // knocked about, wig back on
       e.vx = 0; DD.moveX(e, -e.dir * 0.8, false);
       if (--e.hurtT <= 0) { e.st = 'walk'; e.t = 0; }

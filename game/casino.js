@@ -22,7 +22,7 @@
   const SYM = ['dot', 'pop', 'cup', 'tub', 'vhs', 'gregg', 'tim', 'boss', 'seven', 'wild'];
   const KER = 0, BOSS = 7, SEV = 8, WILD = 9;
   const PAY3 = [6, 9, 12, 15, 20, 30, 30, 80, 150, 300];   // three on a line, in line bets (bet / 5)
-  const PAY77 = 6, PAYPOP = 3, PAYHOST = 12;   // two sevens from the left; ANY DOT OR BAG (Dootle Dots and popcorn bags mixed); ON CINEMA (Tim and Gregg mixed)
+  const PAY77 = 6, PAYPOP = 2, PAYHOST = 12;   // two sevens from the left; ANY DOT OR BAG (Dootle Dots and popcorn bags mixed); ON CINEMA (Tim and Gregg mixed)
   const COUNTS = [[7, 6, 5, 4, 3, 3, 3, 1, 2, 2], [7, 6, 5, 4, 3, 3, 3, 1, 2, 2], [7, 6, 5, 4, 3, 3, 3, 1, 1, 2]];
   function seeded(s) { return () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
   const STRIPS = COUNTS.map((cs, r) => {   // spread each symbol out so no reel clumps
@@ -54,9 +54,9 @@
   // ---- scratchers: the prize is drawn first, then the ticket is dealt to show it
   const TIX = [
     { id: 'money', name: 'IN THE MONEY', price: 10, top: 1000, amts: [5, 10, 20, 50, 100, 1000],
-      odds: [[1000, 1 / 1500], [100, 1 / 100], [50, 1 / 30], [20, 1 / 7], [10, 1 / 4], [5, 1 / 6]] },
+      odds: [[1000, 1 / 1500], [100, 1 / 100], [50, 1 / 30], [20, 1 / 8], [10, 1 / 4.2], [5, 1 / 6]] },   // 90.5% back
     { id: 'dip', name: 'LUCKY DIP', price: 25, top: 500, syms: ['pop', 'tub', 'vhs', 'cup', 'dot', 'card'],
-      odds: [[500, 1 / 500], [250, 1 / 100], [100, 1 / 20], [50, 1 / 6], [25, 1 / 3.5]] },
+      odds: [[500, 1 / 500], [250, 1 / 100], [100, 1 / 20], [50, 1 / 6.5], [25, 1 / 3.8]] },   // 91.1% back
   ];
   function drawPrize(odds) { let r = M.rng(); for (const [p, q] of odds) { if (r < q) return p; r -= q; } return 0; }
   function moneyTicket() {
@@ -89,7 +89,7 @@
   }
   M.rouletteWins = rouletteWins;
 
-  // ---- blackjack: six decks, dealer stands on all 17s, blackjack pays 2 to 1, double on any two cards
+  // ---- blackjack: six decks, dealer stands on all 17s, blackjack pays 3 to 2, double on any two cards
   const RANK = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
   const cardV = c => c.r === 0 ? 1 : Math.min(10, c.r + 1);
   function handV(h) { let v = 0, ace = false; for (const c of h) { if (c.hide) continue; v += cardV(c); if (c.r === 0) ace = true; } const soft = ace && v <= 11; return { v: soft ? v + 10 : v, soft }; }
@@ -99,7 +99,7 @@
 
   // ---- bingo: 75 balls, a 5 x 5 card (B 1-15 ... O 61-75, free middle); any row, column, diagonal or the four corners
   const BLINES = (() => { const L = []; for (let i = 0; i < 5; i++) { L.push([0, 1, 2, 3, 4].map(r => i * 5 + r)); L.push([0, 1, 2, 3, 4].map(c => c * 5 + i)); } L.push([0, 6, 12, 18, 24], [4, 8, 12, 16, 20], [0, 4, 20, 24]); return L; })();
-  const BPAY = [[16, 15], [22, 8], [99, 4]];   // bingo within this many balls pays this many times the card
+  const BPAY = [[16, 14], [22, 6], [99, 4]];   // bingo within this many balls pays this many times the card
   const bingoPay = n => BPAY.find(([lim]) => n <= lim)[1];
   function bingoCard() { const c = []; for (let col = 0; col < 5; col++) { const pool = []; for (let k = 1; k <= 15; k++) pool.push(col * 15 + k); for (let i = 0; i < 5; i++) c.push(pool.splice(rnd(pool.length), 1)[0]); } c[12] = 0; return c; }   // c[col * 5 + row]; 0 is FREE
   const bingoToGo = (c, called) => Math.min(...BLINES.map(L => L.filter(k => c[k] && !called.has(c[k])).length));
@@ -107,42 +107,56 @@
 
   // ================================================================ the save: stats, and the free ticket for the broke
   const CKEY = 'dootledots.casino.v1';
-  let C; function cload() { try { C = JSON.parse(localStorage.getItem(CKEY)) || {}; } catch (e) { C = {}; } C = Object.assign({ big: 0, best: 0, streak: 0, net: 0, rounds: 0, seen: 0, brokeAt: -1, houseBest: 0, free: 0, gold: {} }, C); }
-  const csave = () => { try { localStorage.setItem(CKEY, JSON.stringify(C)); } catch (e) {} };
+  let C; function cload() {   // a missing key is a fresh save (reload() after CLEAR DATA); wrong types from a hand-edited save fall back to the defaults
+    let r; try { r = JSON.parse(localStorage.getItem(CKEY)); } catch (e) { r = null; }
+    if (!r || typeof r !== 'object' || Array.isArray(r)) r = {};
+    const n = (v, d, lo = 0) => typeof v === 'number' && isFinite(v) ? Math.max(lo, v) : d, gold = {};
+    if (r.gold && typeof r.gold === 'object' && !Array.isArray(r.gold)) for (const k in r.gold) if (r.gold[k]) gold[k] = 1;
+    const tk = r.ftk, okTk = tk && typeof tk === 'object' && tk.kind === 0 && typeof tk.prize === 'number' && Array.isArray(tk.cells) && tk.cells.length === 9 && tk.cells.every(v => typeof v === 'number');   // a free ticket taken but not yet scratched
+    C = { big: n(r.big, 0), best: n(r.best, 0), streak: n(r.streak, 0), net: n(r.net, 0, -1e12), rounds: n(r.rounds, 0), seen: r.seen ? 1 : 0, brokeAt: n(r.brokeAt, -1, -1), houseBest: n(r.houseBest, 0), free: Math.min(99, Math.floor(n(r.free, 0))), gold, ftk: okTk ? tk : null };
+  }
+  const csave = () => { if (ST() && ST().sandboxed) return; try { localStorage.setItem(CKEY, JSON.stringify(C)); } catch (e) {} };
   cload();
   // UNLIMITED HEI POINTS plays from the house stack: a fresh 1000 each visit, the best visit kept. A gold chip (one hidden per world,
   // engine.js 'gchip') is three free bets; a free bet puts up to 100 of one round's stake on the house (credit, used: this round's share)
-  const HOUSE = 1000, FREE = 100; let H = HOUSE, credit = 0, used = 0;
-  const unl = () => !!(ST() && ST().unlimited), pts = () => unl() ? H : ST() ? ST().pts : 0;
-  const freeTix = () => !unl() && C.brokeAt >= 0 && ST() && ST().earned > C.brokeAt;
+  // Every stake is tagged with the bank it came from ('h' the house stack, 'r' real points) and pays out or refunds into THAT bank, whatever UNLIMITED says by then.
+  // One chip covers up to 100 of one round's stake (chipOn: a chip is open this round), and backing all the way out hands the chip itself back.
+  const HOUSE = 1000, FREE = 100; let H = HOUSE, credit = 0, used = 0, chipOn = false;
+  const unl = () => !!(ST() && ST().unlimited), pts = () => unl() ? H : ST() ? ST().pts : 0, bank = () => unl() ? 'h' : 'r';
+  const freeTix = () => !unl() && (!!C.ftk || (C.brokeAt >= 0 && !!ST() && ST().earned > C.brokeAt));
 
   // ================================================================ shared juice: voice, coins, banner, shake, messages
-  let t = 0, scr = 'lobby', lc = 0, bi = 1, msg = '', msgT = 0, shake = 0, banner = null, coins = [], spark = [], sessOpen = false;
+  let t = 0, rebuy = 0, scr = 'lobby', lc = 0, bi = 1, msg = '', msgT = 0, shake = 0, banner = null, coins = [], spark = [], sessOpen = false;
   const say = (s, n = 100) => { msg = s; msgT = n; };
   let vAud = null, vAt = -99; const vLast = {};
   function vo(f, cool = 45) {   // a voice clip from game/voice, spaced out so the casino never nags
     const now = performance.now() / 1000;
     if ((window.DDVoice && window.DDVoice.on === false) || now - vAt < 3 || now - (vLast[f] ?? -999) < cool) return;
     vLast[f] = now; vAt = now;
-    try { if (vAud) vAud.pause(); const a = new Audio('voice/' + f); a.volume = 0.95 * (window.DDVol ? window.DDVol.get('voice') : 1); a.play().catch(() => {}); vAud = a; if (window.DDMusic) window.DDMusic.duck(2.5); } catch (e) {}
+    try { if (vAud) vAud.pause(); if (window.DDVoice && window.DDVoice.hush) window.DDVoice.hush(); const a = new Audio('voice/' + f); a.volume = 0.95 * (window.DDVol ? window.DDVol.get('voice') : 1); a.play().catch(() => {}); vAud = a; if (window.DDMusic) window.DDMusic.duck(2.5); } catch (e) {}
   }
+  const stopVoice = () => { try { if (vAud) vAud.pause(); } catch (e) {} vAud = null; };   // the store plays its own lines: the casino's current clip stops
   const BAL = { x: VW - 58, y: 6 };
   function flyCoins(x, y, n, spread = 6) { n = Math.max(1, Math.min(40, n)); for (let k = 0; k < n; k++) coins.push({ x0: x + (Math.random() - 0.5) * spread, y0: y + (Math.random() - 0.5) * spread, t: -k * 2, d: 20 + rnd(8), k }); }
   function fountain(x, y, n) { for (let k = 0; k < n; k++) spark.push({ x, y, vx: (Math.random() - 0.5) * 4, vy: -2 - Math.random() * 3.5, t: 0, life: 50 + rnd(30), c: Math.random() < 0.8 ? '#ffd27a' : '#fff6d4' }); }
-  function take(n) {   // pay a stake: false (and a buzz) when short. A free bet covers the first 100 of the round
-    if (unl()) { if (H < n) { say('THE HOUSE STACK IS DRY. COME BACK FOR A NEW ONE', 150); SFX.buzz(); return false; } H -= n; return true; }
-    const f = Math.min(credit > 0 ? credit : C.free > 0 ? FREE : 0, n), rest = n - f;
+  function take(n) {   // pay a stake: the bank it came from ('h' / 'r'), or false (and a buzz) when short. A free bet covers up to 100 of the round
+    if (unl()) { if (H < n) { say('THE HOUSE STACK IS DRY. COME BACK FOR A NEW ONE', 150); SFX.buzz(); return false; } H -= n; return 'h'; }
+    const open = credit <= 0 && !chipOn && C.free > 0, f = Math.min(credit > 0 ? credit : open ? FREE : 0, n), rest = n - f;   // a second 100 in the same round never pulls a second chip
     if (pts() < rest) { say('NEED ' + (rest - pts()) + ' MORE HEI POINTS', 90); SFX.buzz(); if (ST().poor) ST().poor(); return false; }
-    if (f) { if (credit <= 0) { C.free--; credit = FREE; csave(); say('FREE BET! THE HOUSE PUTS UP ' + FREE + (C.free ? '. ' + C.free + ' LEFT' : '. THAT WAS THE LAST ONE'), 150); } credit -= f; used += f; }
-    if (rest) ST().bank(-rest); return true;
+    if (f) { if (open) { C.free--; chipOn = true; credit = FREE; csave(); say('FREE BET! THE HOUSE PUTS UP ' + f + (C.free ? '. ' + C.free + ' LEFT' : '. THAT WAS THE LAST ONE'), 150); } credit -= f; used += f; }
+    if (rest) ST().bank(-rest); return 'r';
   }
-  function refund(n) { const f = Math.min(n, used); used -= f; credit += f; n -= f; if (!n) return; if (unl()) H += n; else ST().bank(n); }   // chips taken back off the table
+  function refund(n, bk = bank()) {   // chips taken back off the table, into the bank they came from
+    if (bk === 'h') { H += n; return; }
+    const f = Math.min(n, used); used -= f; credit += f; n -= f; if (n) ST().bank(n, true);
+    if (chipOn && used <= 0) { chipOn = false; credit = 0; used = 0; C.free++; csave(); }   // backed all the way out: the chip itself comes back, saved
+  }
   function goldChip(id) { const w = String(id).split('-')[0]; if (C.gold[w]) return false; C.gold[w] = 1; C.free += 3; csave(); return true; }   // engine.js: a gold chip found in a stage
-  function give(n, x, y) { if (n <= 0) return; if (unl()) H += n; else ST().bank(n); flyCoins(x, y, Math.ceil(n / 5)); }
-  function settle(stake, back, big) {   // a finished round: records and the broke check. big: a loss worth a sigh
+  function give(n, x, y, bk = bank()) { if (n <= 0) return; if (bk === 'h') H += n; else ST().bank(n, true); flyCoins(x, y, Math.ceil(n / 5)); }
+  function settle(stake, back, big, bk = bank()) {   // a finished round: records and the broke check. big: a loss worth a sigh
     if (back >= Math.max(50, stake * 5) && performance.now() / 1000 - vAt > 3 && window.DDVoice) setTimeout(() => { if (performance.now() / 1000 - vAt > 2) window.DDVoice.menu('casino_win'); }, 700);   // a big win the casino's own lines didn't cover
-    C.rounds++; credit = 0; used = 0;
-    if (unl()) C.houseBest = Math.max(C.houseBest, H);
+    C.rounds++; credit = 0; used = 0; chipOn = false;
+    if (bk === 'h') C.houseBest = Math.max(C.houseBest, H);
     else {
       C.net += back - stake;
       if (back > C.big) { if (C.big > 0 && back >= 50) setTimeout(() => say('NEW BIGGEST WIN: ' + back, 150), 900); C.big = back; }
@@ -372,12 +386,12 @@
   const GX = i => 34 + i * 63, FLOOR = 126;
   const CAB = i => ({ x: GX(i) - 30, y: 54, w: 60, h: 88 });
   function enter(id) {
-    scr = id; t = 0; SFX.switch(); banner = null;
+    abandon(); scr = id; t = 0; rebuy = 0; SFX.switch(); banner = null;   // anything still open from before is closed out first
     if (C.free && !unl() && ['slots', 'bj', 'bingo', 'roul'].includes(id) && BETS[bi] < FREE) { bi = BETS.indexOf(FREE); setTimeout(() => say('FREE BET WAITING: THE BET IS UP TO ' + FREE + ' ON THE HOUSE', 160), 60); }
     if (id === 'prize') { PZ.onTabs = false; say('BUY IT ONCE AND ALL FOUR DOTS WEAR IT', 160); }
     if (id === 'slots') { S.state = 'idle'; }
     if (id === 'scratch') { K.state = 'pick'; if (freeTix()) say('FREE TICKET! TIM PICKED ONE UP ON THE WAY IN.', 200); }
-    if (id === 'roul') { R.state = 'bet'; }
+    if (id === 'roul') { R.state = 'bet'; R.bets = {}; }
     if (id === 'bingo') { BG.state = BG.state === 'play' ? 'play' : 'bet'; }
     if (id === 'bj') { B.state = 'bet'; B.dealer = 'gregg'; B.dx = 0; B.wins = 0; B.say = 'THE BUFF DEALS. PLACE YOUR BET.'; B.sayT = 200; B.P = []; B.D = []; }
   }
@@ -469,8 +483,8 @@
   const S = { state: 'idle', pos: [3, 9, 15], spd: [0, 0, 0], st: ['done', 'done', 'done'], to: [0, 0, 0], from: [0, 0, 0], lt: [0, 0, 0], ln: [1, 1, 1], at: [0, 0, 0], stops: [3, 9, 15], tease: false, res: null, bet: 5, face: 0, lever: 99, show: 0, shown: 0, tickAt: 0 };
   const CELL = 28, RX = r => 126 + r * 34, RY = 86;
   function spin() {
-    const bet = BETS[bi]; if (!take(bet)) return;
-    S.bet = bet; S.face = rnd(3); S.state = 'spin'; S.tease = false; S.res = null; S.lever = 0; S.show = 0; banner = null;
+    const bet = BETS[bi], bk = take(bet); if (!bk) return;
+    S.bk = bk; S.bet = bet; S.face = rnd(3); S.state = 'spin'; S.tease = false; S.res = null; S.lever = 0; S.show = 0; banner = null;
     S.stops = [0, 1, 2].map(r => rnd(STRIPS[r].length));
     for (let r = 0; r < 3; r++) { S.st[r] = 'spin'; S.spd[r] = 0.2; S.at[r] = t + 34 + r * 14; }
     noise(0.12, 0.05, 900); tone(220, 440, 0.18, 'square', 0.04);
@@ -516,13 +530,13 @@
     S.res = Object.assign(ev, { back }); S.state = 'show'; S.show = 0; S.shown = 0;
     const jack = ev.wins.some(w => w.sym === SEV && w.n === 3), wild3 = ev.wins.some(w => w.sym === WILD), boss = ev.wins.some(w => w.sym === BOSS);
     if (back > 0) {
-      give(back, 160, 86);
+      give(back, 160, 86, S.bk);
       tier(back, S.bet, 160, 90, jack ? 'LUCKY SEVEN!' : wild3 ? 'WILD CARD!' : null);
       if (jack) vo('CAS10.mp3', 0); else if (wild3) vo('CAS7.mp3', 0);
       else if (boss) { const w = BOSSES[S.face][1], L = (window.VOICE_CLIPS || []).filter(c => c.ok && c.w === w && c.hooks && c.hooks.includes('boss_taunt')); if (L.length) vo(L[rnd(L.length)].f, 20); bannerUp('BOSS LINE! +' + back, '#ff8a6a', 2, 140); }
       else if (ev.grid.some(col => col.includes(WILD)) && ev.wins.length && Math.random() < 0.35) vo('CAS7.mp3', 120);
     } else { tone(200, 150, 0.12, 'triangle', 0.03); if (LINES.some(L => { const a = cellOf(0, S.stops[0], L[0]), b = cellOf(1, S.stops[1], L[1]); return a === SEV && b === SEV; })) say('SO CLOSE. TWO SEVENS AND A NOTHING.', 90); }
-    settle(S.bet, back, S.bet >= 50);
+    settle(S.bet, back, S.bet >= 50, S.bk);
   }
   function slotsDraw(tt) {
     room(tt, 122, 0.7);
@@ -597,9 +611,10 @@
   }
   function buyTicket(kind) {
     const T = TIX[kind], free = kind === 0 && freeTix();
-    if (!free && !take(T.price)) return;
-    if (free) C.brokeAt = -1;
-    K.free = free; K.tk = kind === 0 ? moneyTicket() : dipTicket(); K.state = 'scratch'; K.auto = null; K.done = 0; K.stake = free ? 0 : T.price; banner = null;
+    let bk = 'r'; if (!free) { bk = take(T.price); if (!bk) return; }
+    if (free) { K.tk = C.ftk || moneyTicket(); C.ftk = K.tk; C.brokeAt = -1; csave(); }   // the free ticket's outcome is decided and saved when it is taken: a reload gets the same ticket back, never a re-roll
+    else K.tk = kind === 0 ? moneyTicket() : dipTicket();
+    K.bk = bk; K.free = free; K.state = 'scratch'; K.auto = null; K.done = 0; K.stake = free ? 0 : T.price; banner = null;
     K.regions = regionsOf(K.tk).map(r => Object.assign(r, { n: 0, tot: 0, open: false }));
     const cv = document.createElement('canvas'); cv.width = TW; cv.height = TH; const fx = cv.getContext('2d'); K.foil = cv; K.fx = fx;
     K.cov = new Uint8Array(TW * TH);
@@ -637,10 +652,11 @@
     return { P, i: 0, k: 0 };
   }
   function ticketResult() {
-    const tk = K.tk, T = TIX[tk.kind], p = tk.prize; K.state = 'done';
-    if (p > 0) { give(p, 160, 76); tier(p, Math.max(1, T.price), 160, 76, p >= T.top ? (tk.kind === 0 ? 'IN THE MONEY! +' + p : 'LUCKY DIP! +' + p) : null); if (tk.kind === 0 && p === 1000) vo('CAS6.mp3', 0); }
+    const tk = K.tk, T = TIX[tk.kind], p = tk.prize; K.state = 'done'; rebuy = t + 20;
+    if (K.free) C.ftk = null;   // the free ticket is used up
+    if (p > 0) { give(p, 160, 76, K.bk); tier(p, Math.max(1, T.price), 160, 76, p >= T.top ? (tk.kind === 0 ? 'IN THE MONEY! +' + p : 'LUCKY DIP! +' + p) : null); if (tk.kind === 0 && p === 1000) vo('CAS6.mp3', 0); }
     else { bannerUp('NOT A WINNER', '#c8a0a8', 1, 90); tone(260, 180, 0.15, 'triangle', 0.03); }
-    settle(K.stake, p, false);
+    settle(K.stake, p, false, K.bk);
   }
   function scratchStep(IN, c) {
     if (K.state === 'pick') {
@@ -667,8 +683,8 @@
     }
     if (K.state === 'done') {
       if (IN.nx) { K.pick = mod(K.pick + IN.nx, 2); SFX.tick(); }
-      if (c) { if (inR(c, 248, 120, 66, 14)) { buyTicket(K.tk.kind); return; } if (inR(c, 6, 120, 66, 14)) { K.state = 'pick'; SFX.switch(); return; } }
-      else if (IN.ok) { buyTicket(K.tk.kind); return; }
+      if (c) { if (inR(c, 248, 120, 66, 14)) { if (t >= rebuy) buyTicket(K.tk.kind); return; } if (inR(c, 6, 120, 66, 14)) { K.state = 'pick'; SFX.switch(); return; } }
+      else if (IN.ok) { if (t >= rebuy) buyTicket(K.tk.kind); return; }   // a mashed JUMP right after the result doesn't buy the next ticket
       if (IN.back) { K.state = 'pick'; SFX.switch(); }
     }
   }
@@ -768,10 +784,14 @@
     SPOTS.forEach((s, i) => { if (i === R.cur) return; const sx = s.x + s.w / 2 - ax, sy = s.y + s.h / 2 - ay, along = dx ? sx * dx : sy * dy; if (along <= 2) return; const d = along + (dx ? Math.abs(sy) : Math.abs(sx)) * 3; if (d < bd) { bd = d; best = i; } });
     if (best >= 0) { R.cur = best; R.vfa = 0; SFX.tick(); }
   }
-  function placeBet(id, amt) { if (!take(amt)) return false; R.bets[id] = (R.bets[id] || 0) + amt; R.lastSpot = id; tone(900, 700, 0.05, 'square', 0.04); noise(0.03, 0.04, 3000); return true; }
+  function closeTable() {   // chips still on the table go back to the bank they were staked from; a spin in flight is finished first (its number is drawn); a shown result is already paid
+    if (R.state === 'spin') rouletteResult(); else if (R.state === 'bet') { const n = tableTotal(); if (n) refund(n, R.bk); }
+    R.bets = {}; R.state = 'bet'; R.vfa = 0;
+  }
+  function placeBet(id, amt) { if (tableTotal() && R.bk !== bank()) closeTable(); const bk = take(amt); if (!bk) return false; R.bk = bk; R.bets[id] = (R.bets[id] || 0) + amt; R.lastSpot = id; tone(900, 700, 0.05, 'square', 0.04); noise(0.03, 0.04, 3000); return true; }
   function rouletteAct(s) {
     if (R.state !== 'bet') return;
-    if (s.id === 'clear') { const n = tableTotal(); if (n) refund(n); R.bets = {}; SFX.tick(); if (n) say('CHIPS BACK: ' + n, 60); return; }
+    if (s.id === 'clear') { const n = tableTotal(); if (n) refund(n, R.bk); R.bets = {}; SFX.tick(); if (n) say('CHIPS BACK: ' + n, 60); return; }
     if (s.id === 'less' || s.id === 'more') { bump(s.id === 'less' ? -1 : 1); return; }
     if (s.id === 'vfa') {
       const on = R.lastSpot || 'red', all = pts();
@@ -808,10 +828,10 @@
       if (IN.ok && R.T < DUR - 40) R.T = Math.max(R.T, DUR - 40);   // hurry it along
       return;
     }
-    if (R.state === 'show') { R.ball = { a: R.wa + R.target, rr: 27 }; R.k++; if (R.k > 90 || (R.k > 20 && (IN.ok || c))) { R.state = 'bet'; R.bets = {}; } if (R.state === 'show') { if (IN.back) { R.state = 'bet'; R.bets = {}; } return; } }
+    if (R.state === 'show') { R.ball = { a: R.wa + R.target, rr: 27 }; R.k++; if (R.k > 90 || (R.k > 20 && (IN.ok || c))) { R.state = 'bet'; R.bets = {}; return; } if (IN.back) { R.state = 'bet'; R.bets = {}; } return; }   // the press that dismisses the result does nothing else
     if (R.state === 'bet' && R.ball && R.ball.rr) R.ball.a = R.wa + R.target;
     if (IN.nx) navSpot(IN.nx, 0); if (IN.ny) navSpot(0, IN.ny);
-    if (c) { const i = SPOTS.findIndex(s => inR(c, s.x, s.y, s.w, s.h)); if (i >= 0) { if (R.cur !== i) R.vfa = 0; R.cur = i; rouletteAct(SPOTS[i]); return; } }
+    if (c) { const i = SPOTS.findIndex(s => inR(c, s.x, s.y, s.w, s.h)); if (i >= 0) { const pick = DD.touchOn && !SPOTS[i].ctl && R.cur !== i; if (R.cur !== i) R.vfa = 0; R.cur = i; if (pick) SFX.tick(); else rouletteAct(SPOTS[i]); return; } }   // on touch a finger is fatter than a number: the first tap on a betting spot lights it, the next puts the chip down
     else if (IN.ok) { rouletteAct(SPOTS[R.cur]); return; }
     if (IN.back) { if (tableTotal()) rouletteAct({ id: 'clear' }); scr = 'lobby'; SFX.switch(); }
   }
@@ -819,9 +839,9 @@
     let back = 0; for (const k in R.bets) back += R.bets[k] * rouletteWins(k, R.n); back = Math.floor(back);
     R.won = back; R.hist.unshift(R.n); R.hist.length = Math.min(R.hist.length, 9); R.state = 'show'; R.k = 0;
     const lucky = R.n === 7 && R.bets.n7;
-    if (back > 0) { give(back, 62, 86); tier(back, R.stake, 62, 86, lucky ? 'LUCKY 7! +' + back : null); if (lucky) vo('CAS10.mp3', 0); if (R.n === 0 && !R.bets.n0) bannerUp('0 GREEN. HALF BACK +' + back, '#9aff7a', 1, 90); }
+    if (back > 0) { give(back, 62, 86, R.bk); tier(back, R.stake, 62, 86, lucky ? 'LUCKY 7! +' + back : null); if (lucky) vo('CAS10.mp3', 0); if (R.n === 0 && !R.bets.n0) bannerUp('0 GREEN. HALF BACK +' + back, '#9aff7a', 1, 90); }
     else { tone(240, 160, 0.2, 'triangle', 0.04); bannerUp(R.n + ' ' + (R.n === 0 ? 'GREEN' : REDS.has(R.n) ? 'RED' : 'BLACK') + '. NO WIN', '#c8a0a8', 1, 90); }
-    settle(R.stake, back, R.stake >= 100);
+    settle(R.stake, back, R.stake >= 100, R.bk);
   }
   function rouletteDraw(tt) {
     felt('#0e4a24', 15, 149);
@@ -869,8 +889,8 @@
   const later = (n, f) => B.q.push({ at: t + n, f });
   const handX = (h, i, cx) => cx - (h.length - 1) * 7 + i * 14 - 9;
   function deal() {
-    const bet = BETS[bi]; if (!take(bet)) return;
-    B.bet = bet; B.stake = bet; B.doubled = false; B.P = []; B.D = []; B.res = ''; B.state = 'deal'; B.sel = 0; banner = null; B.flipT = 99;
+    const bet = BETS[bi], bk = take(bet); if (!bk) return;
+    B.bk = bk; B.bet = bet; B.stake = bet; B.doubled = false; B.P = []; B.D = []; B.res = ''; B.state = 'deal'; B.sel = 0; banner = null; B.flipT = 99;
     const sw = () => noise(0.05, 0.05, 3500);
     later(0, () => { B.P.push(drawCard()); sw(); }); later(9, () => { B.D.push(drawCard()); sw(); });
     later(18, () => { B.P.push(drawCard()); sw(); }); later(27, () => { B.D.push(drawCard(true)); sw(); });
@@ -887,7 +907,8 @@
     if (v > 21) { B.state = 'wait'; later(14, () => { flipHole(); later(10, () => finish('lose', 'BUST')); }); }
     else if (v === 21) { B.state = 'wait'; later(12, stand); }
   }
-  function dbl() { if (B.P.length !== 2) return; if (!take(B.bet)) return; B.stake += B.bet; B.doubled = true; tone(523, 784, 0.08, 'square', 0.04); B.state = 'wait'; later(8, () => { B.P.push(drawCard()); noise(0.05, 0.05, 3500); if (handV(B.P).v > 21) later(14, () => { flipHole(); later(10, () => finish('lose', 'BUST')); }); else later(14, stand); }); }
+  function dbl() { if (B.P.length !== 2) return; const bk = take(B.bet); if (!bk) return; if (bk !== B.bk) { refund(B.bet, bk); SFX.buzz(); return; } B.stake += B.bet;   // (the double always comes from the bank the hand began in)
+    B.doubled = true; tone(523, 784, 0.08, 'square', 0.04); B.state = 'wait'; later(8, () => { B.P.push(drawCard()); noise(0.05, 0.05, 3500); if (handV(B.P).v > 21) later(14, () => { flipHole(); later(10, () => finish('lose', 'BUST')); }); else later(14, stand); }); }
   function stand() {
     B.state = 'dealer'; flipHole();
     const step = () => { const v = handV(B.D).v; if (v < 17) { B.D.push(drawCard()); noise(0.05, 0.05, 3500); later(18, step); } else later(10, resolve); };
@@ -895,14 +916,14 @@
   }
   function resolve() { const p = handV(B.P).v, d = handV(B.D).v; if (d > 21) finish('dbust', 'DEALER BUSTS!'); else if (p > d) finish('win', 'YOU WIN'); else if (p === d) finish('push', 'PUSH'); else finish('lose', 'DEALER WINS'); }
   function finish(r, label) {
-    B.state = 'done'; B.res = label; const st = B.stake;
-    const back = r === 'bj' ? st * 3 : r === 'win' || r === 'dbust' ? st * 2 : r === 'push' ? st : 0;
-    if (back > 0) { give(back, 160, 120); tier(back, st, 160, 110, r === 'bj' ? 'BLACKJACK! +' + back : null); } else { bannerUp(label, '#c8a0a8', 2, 90); tone(260, 170, 0.18, 'triangle', 0.04); }
+    B.state = 'done'; B.res = label; rebuy = t + 20; const st = B.stake;
+    const back = r === 'bj' ? Math.round(st * 2.5) : r === 'win' || r === 'dbust' ? st * 2 : r === 'push' ? st : 0;
+    if (back > 0) { give(back, 160, 120, B.bk); tier(back, st, 160, 110, r === 'bj' ? 'BLACKJACK! +' + back : null); } else { bannerUp(label, '#c8a0a8', 2, 90); tone(260, 170, 0.18, 'triangle', 0.04); }
     if (r === 'bj') dsay('you'); else if (r === 'dbust') { dsay('bust'); if (B.dealer === 'gregg') vo('CAS8.mp3', 60); } else if (r === 'win') dsay('you', 110); else if (r === 'push') dsay('push');
     else if (label === 'BUST') dsay('yb'); else if (label === 'DEALER BLACKJACK') dsay('bj'); else dsay('win', 110);
     if (back > st) B.wins++; else if (back < st) B.wins = 0;
     if (B.dealer === 'gregg' && B.wins >= 3) { B.walk = 1; later(70, () => { dsay('THIS IS IRRELEVANT CASINO GAMBLING.', 120); vo('CAS3.mp3', 0); }); }
-    settle(st, back, st >= 100);
+    settle(st, back, st >= 100, B.bk);
   }
   function bjStep(IN, c) {
     if (B.sayT > 0) B.sayT--;
@@ -920,8 +941,8 @@
     const BT = [['HIT', () => hit()], ['STAND', () => { B.state = 'wait'; stand(); }], ['DOUBLE', () => dbl()]];
     if (B.state === 'bet' || B.state === 'done') {
       if (IN.ny) bump(-IN.ny); if (IN.nx) bump(IN.nx);
-      if (c) { if (betClick(c, 260, 70)) return; if (inR(c, 258, 104, 60, 18)) { deal(); return; } }
-      else if (IN.ok) { deal(); return; }
+      if (c) { if (betClick(c, 260, 70)) return; if (inR(c, 258, 104, 60, 18)) { if (t >= rebuy) deal(); return; } }
+      else if (IN.ok) { if (t >= rebuy) deal(); return; }   // a mashed JUMP right after a hand doesn't deal the next one
       if (IN.back) { scr = 'lobby'; SFX.switch(); }
       return;
     }
@@ -947,7 +968,7 @@
     for (const lx of [70, 250]) { rect('#5a4a30', lx, 15, 1, 6); box(lx - 9, 21, 19, 6, '#1e5a3a'); rect('#e8c060', lx - 9, 26, 19, 1); if (A) A.cone(lx, 27, 120, 46, '#fff2c0', 0.08); glow(lx, 30, 16, '#fff2c0', 0.3); }
     ell(160, 214, 252, 82, '#1a0806'); ell(160, 215, 250, 80, '#7a3020'); ell(160, 217, 248, 78, '#5a2216'); ell(160, 224, 246, 76, '#3a140e');   // our rail, padded leather
     for (let x = 0; x < VW; x += 4) { const q = (x - 160) / 248; if (Math.abs(q) < 1) rect('#a8604a', x, Math.round(218 - 78 * Math.sqrt(1 - q * q)), 2, 1); }   // its stitching
-    const arc = 'BLACKJACK PAYS 2 TO 1'; for (let i = 0; i < arc.length; i++) { const x = 160 - arc.length * 2 + i * 4, y = 90 + Math.round(((x - 160) / 46) ** 2); text(arc[i], x, y, '#e8c060', 1, null); }
+    const arc = 'BLACKJACK PAYS 3 TO 2'; for (let i = 0; i < arc.length; i++) { const x = 160 - arc.length * 2 + i * 4, y = 90 + Math.round(((x - 160) / 46) ** 2); text(arc[i], x, y, '#e8c060', 1, null); }
     // the dealer's line, the shoe
     if (B.sayT > 0 && B.say) bubble(B.say, 188, 18, 92, B.dx === 0);
     box(284, 30, 30, 22, '#2a1a10'); rect('#4a2a18', 286, 32, 26, 3); for (let k = 0; k < 6; k++) rect(k % 2 ? '#e8e0d0' : '#c8c0b0', 288 + k, 36, 1, 12); card({ hide: true }, 294, 31);
@@ -981,8 +1002,8 @@
   const BCX = 110, BCY = 57, BCW = 17, BCH = 14;   // the card's grid
   const BUYP = () => BG.state === 'done' ? { bet: { x: 206, y: 96 }, buy: { x: 263, y: 104, w: 50, h: 14 }, box: [204, 92, 112, 32] } : { bet: { x: 126, y: 74 }, buy: { x: 118, y: 104, w: 70, h: 14 }, box: [112, 70, 82, 52] };   // after a round it moves off the card
   function bingoBuy() {
-    const bet = BETS[bi]; if (!take(bet)) return;
-    BG.stake = bet; BG.card = bingoCard(); BG.mark = BG.card.map(n => n === 0); BG.cur = 12;
+    const bet = BETS[bi], bk = take(bet); if (!bk) return;
+    BG.bk = bk; BG.stake = bet; BG.card = bingoCard(); BG.mark = BG.card.map(n => n === 0); BG.cur = 12;
     BG.order = shuffle([...Array(75)].map((_, k) => k + 1)); BG.calls = []; BG.called = new Set(); BG.res = [];
     for (let i = 0; i < 5; i++) BG.res.push({ card: bingoCard(), go: 4, shout: 0, react: 26 + rnd(28), bob: 0 });
     BG.state = 'play'; BG.next = t + (BG.first ? 130 : 45); BG.lock = 0; BG.who = -1; BG.win = 0; BG.splat = []; banner = null;
@@ -1005,17 +1026,17 @@
   }
   function bingoWin() {
     const n = BG.calls.length, m = bingoPay(n), back = BG.stake * m;
-    BG.state = 'done'; BG.win = back; BG.who = -1;
-    give(back, 152, 90); tier(back, BG.stake, 152, 90, m >= BPAY[0][1] ? 'QUICK BINGO! +' + back : 'BINGO! +' + back);
+    BG.state = 'done'; BG.win = back; BG.who = -1; rebuy = t + 20;
+    give(back, 152, 90, BG.bk); tier(back, BG.stake, 152, 90, m >= BPAY[0][1] ? 'QUICK BINGO! +' + back : 'BINGO! +' + back);
     bsay('BINGO IN ' + n + ' BALLS.', 160); BG.res.forEach(r => r.bob = 0);
-    settle(BG.stake, back, false);
+    settle(BG.stake, back, false, BG.bk);
   }
   function bingoLose(i) {
-    BG.state = 'done'; BG.who = i; BG.res[i].bob = 40;
+    BG.state = 'done'; BG.who = i; BG.res[i].bob = 40; rebuy = t + 20;
     bsay("LET'S GET A ROUND OF APPLAUSE.", 160);
     bannerUp('A RESIDENT GOT BINGO', '#c8a0a8', 1, 110); tone(260, 170, 0.18, 'triangle', 0.04);
     for (let k = 0; k < 10; k++) noise(0.04, 0.035, 1500 + rnd(1500), 0.15 + k * 0.07);   // polite applause
-    settle(BG.stake, 0, BG.stake >= 100);
+    settle(BG.stake, 0, BG.stake >= 100, BG.bk);
   }
   function bingoStep(IN, c) {
     if (BG.sayT > 0) BG.sayT--; BG.res.forEach(r => { if (r.bob > 0) r.bob--; }); if (BG.roll < 99) BG.roll++;
@@ -1028,8 +1049,8 @@
       return;
     }
     if (IN.ny) bump(-IN.ny); if (IN.nx) bump(IN.nx);
-    const P = BUYP(); if (c) { if (betClick(c, P.bet.x, P.bet.y)) return; if (inR(c, P.buy.x, P.buy.y, P.buy.w, P.buy.h)) { bingoBuy(); return; } }
-    else if (IN.ok) { bingoBuy(); return; }
+    const P = BUYP(); if (c) { if (betClick(c, P.bet.x, P.bet.y)) return; if (inR(c, P.buy.x, P.buy.y, P.buy.w, P.buy.h)) { if (t >= rebuy) bingoBuy(); return; } }
+    else if (IN.ok) { if (t >= rebuy) bingoBuy(); return; }
     if (IN.back) { scr = 'lobby'; SFX.switch(); }
   }
   function senior(i, x, by) { const im = DD.IMG && DD.IMG.w11_seniors; if (im && im.complete && im.naturalWidth) ctx.drawImage(im, i * 22, 0, 22, 30, Math.round(x - 11), Math.round(by - 30), 22, 30); }
@@ -1198,7 +1219,7 @@
     DD.drawDot(dot, pose, pv.x, 46 + pv.y, pv.face < 0, 1, 1, 0);
     ctx.restore();
     Wd.preview = null;
-    text(CATS[PZ.cat][0] === 'sec' ? 'DOT SECRETS FOUND ' + Wd.secFound() : 'WORN BY ALL FOUR DOTS', 65, 135, CATS[PZ.cat][0] === 'sec' ? '#ffe680' : '#c8a8a0', 1, null, 'center');
+    text(CATS[PZ.cat][0] === 'sec' ? 'DOT SECRETS FOUND ' + Wd.secFound() + '/' + Wd.SEC_MAX : 'WORN BY ALL FOUR DOTS', 65, 135, CATS[PZ.cat][0] === 'sec' ? '#ffe680' : '#c8a8a0', 1, null, 'center');
     // the tabs and the shelf
     CATS.forEach(([k, n], i) => btn(tabX(i), 18, 45, 12, n, i === PZ.cat, PZ.onTabs && i === PZ.cat ? '#ffe680' : '#c98f22'));
     pzItems().forEach((it, i) => {
@@ -1220,8 +1241,21 @@
 
   // ================================================================ the screen
   function openPrizes() { t = 0; banner = null; msgT = 0; enter('prize'); pzTab(); }
+  function abandon() {   // the casino is being left (or a game entered): close out any round still open, so no stake is lost and none is paid twice
+    if (S.state === 'spin') { S.st = ['done', 'done', 'done']; slotsResult(); }   // the stops are already drawn: pay them
+    S.state = 'idle';
+    if (K.state === 'scratch' && K.tk) ticketResult();   // the ticket was decided at purchase: pay it
+    if (K.state !== 'pick') K.state = 'pick';
+    closeTable();
+    if (!['bet', 'done'].includes(B.state)) {   // a hand in flight: play the queued deals out; if it is still the player's turn, they walked away and the stake is gone (ledger and streak updated)
+      for (let n = 0; n < 400 && B.q.length && !['bet', 'done', 'play'].includes(B.state); n++) B.q.shift().f();
+      if (B.state === 'play') { B.q.length = 0; B.state = 'done'; B.wins = 0; B.res = 'WALKED OUT'; settle(B.stake, 0, B.stake >= 100, B.bk); setTimeout(() => say('YOU WALKED OUT OF THE HAND. THE STAKE STAYS WITH THE HOUSE.', 150), 200); }
+      B.q.length = 0; B.state = 'bet';
+    }
+    if (BG.state === 'play') { BG.state = 'done'; BG.who = -1; settle(BG.stake, 0, BG.stake >= 100, BG.bk); }   // left a card half played: it is a loss
+  }
   function open() {
-    t = 0; scr = 'lobby'; banner = null;
+    abandon(); t = 0; rebuy = 0; scr = 'lobby'; banner = null;
     if (!C.seen) { C.seen = 1; csave(); vo('CAS2.mp3', 0); say('LUCKY SEASON 7. BET HEI POINTS, WIN HEI POINTS.', 200); }
     else if (!sessOpen) vo('CAS1.mp3', 0);
     else if (window.DDVoice) window.DDVoice.menu('casino_open');   // back in the lobby: a show line, on its own cooldown
@@ -1238,13 +1272,14 @@
     if (c && inR(c, 0, 0, 58, 14)) {   // the header's BACK button: a game goes back to the lobby, the lobby leaves the store
       if (scr === 'lobby' || scr === 'prize') return 'back';
       if (busy()) { say('FINISH THIS ONE FIRST', 70); SFX.buzz(); return; }
+      if (scr === 'roul') closeTable();   // chips on the table go back to where they came from
       scr = 'lobby'; SFX.switch(); return;
     }
     if (IN.back && busy() && scr !== 'scratch' && !(scr === 'bj' && B.walk)) { say('FINISH THIS ONE FIRST', 70); SFX.buzz(); }
     if (scr === 'lobby') return lobbyStep(IN, c);
     if (scr === 'prize') return prizeStep(IN, c); else if (scr === 'slots') slotsStep(IN, c); else if (scr === 'scratch') scratchStep(IN, c); else if (scr === 'roul') rouletteStep(IN, c); else if (scr === 'bj') bjStep(IN, c); else if (scr === 'bingo') bingoStep(IN, c);
   }
-  const busy = () => (scr === 'slots' && S.state === 'spin') || (scr === 'roul' && R.state === 'spin') || (scr === 'bj' && !['bet', 'done', 'play'].includes(B.state)) || (scr === 'scratch' && K.state === 'scratch') || (scr === 'bingo' && BG.state === 'play');
+  const busy = () => (scr === 'slots' && S.state === 'spin') || (scr === 'roul' && R.state === 'spin') || (scr === 'bj' && !['bet', 'done'].includes(B.state)) || (scr === 'scratch' && K.state === 'scratch') || (scr === 'bingo' && BG.state === 'play');
   function draw() {
     const tt = t;
     ctx.save(); if (shake) ctx.translate(Math.round((Math.random() - 0.5) * Math.min(6, shake / 3)), Math.round((Math.random() - 0.5) * Math.min(6, shake / 3)));
@@ -1255,14 +1290,14 @@
     rect('#000', 6, 151, VW - 12, 13); rect('#000', 5, 152, VW - 10, 11); rect('#1a0810', 6, 152, VW - 12, 11); rect('#3a1a24', 6, 152, VW - 12, 1);   // the message strip
     if (msgT > 0) text(msg, VW / 2, 155, msg.startsWith('NEED') || msg.startsWith('OUT') ? '#ff8080' : '#ffe680', 1, null, 'center');
     else text(unl() ? 'HOUSE STACK ' + H + '   BEST VISIT ' + C.houseBest : scr === 'prize' ? 'BALANCE ' + pts() + '   PRIZES ARE LOOKS ONLY: NO EDGE' : scr === 'lobby' ? 'BIGGEST WIN ' + C.big + '   BEST STREAK ' + C.best + '   YOU VS THE HOUSE ' + (C.net > 0 ? '+' : '') + C.net : 'YOU VS THE HOUSE ' + (C.net > 0 ? '+' : '') + C.net, VW / 2, 155, '#9a8a90', 1, null, 'center');
-    const J = DD.jumpKey(), X = DD.padUsed ? 'CIRCLE' : 'X', SW = DD.padUsed ? 'R1' : 'C';
+    const J = DD.jumpKey(), X = DD.padUsed ? (DD.btn ? DD.btn('circle') : 'CIRCLE') : 'X', SW = DD.padUsed ? (DD.btn ? DD.btn('r1') : 'R1') : 'C';
     const pzIt = scr === 'prize' && !PZ.onTabs && pzSel(), pzW = WR();
     const keys = scr === 'lobby' ? [['LEFT/RIGHT', 'PICK'], [J, 'PLAY'], [SW, 'STORE'], [X, ST() ? ST().backLabel : 'BACK']]
       : scr === 'prize' ? [['ARROWS', 'PICK'], [J, !pzIt ? 'SHELF' : !pzW.owns(pzIt.id) ? (pzIt.sec ? (pzW.secFound() >= pzIt.sec ? 'CLAIM' : 'NEED ' + pzIt.sec) : 'BUY ' + pzIt.cost) : pzW.on(pzIt.cat) === pzIt.id ? 'TAKE OFF' : 'WEAR'], [X, 'BACK']]   // the controls as keycaps: [key, what it does]
       : scr === 'slots' ? (S.state === 'spin' ? [[J, 'STOP THE REELS']] : [[J, 'SPIN'], ['ARROWS', 'BET'], [X, 'CASINO']])
       : scr === 'scratch' ? (K.state === 'pick' ? [['LEFT/RIGHT', 'PICK'], [J, 'BUY'], [X, 'CASINO']] : K.state === 'scratch' ? [['DRAG OR ARROWS', 'SCRATCH'], [J, 'ALL'], [X, 'REVEAL']] : [[J, 'AGAIN'], [X, 'TICKETS']])
-      : scr === 'roul' ? (R.state === 'spin' ? [[J, 'HURRY IT UP']] : [['ARROWS', 'MOVE'], [J, 'CHIP DOWN / PRESS'], [X, 'CASINO']])
-      : scr === 'bingo' ? (BG.state === 'play' ? [['ARROWS OR MOUSE', 'MOVE'], [J + ' OR CLICK', 'DAUB A CALLED NUMBER']] : [[J, 'BUY A CARD'], ['ARROWS', 'BET'], [X, 'CASINO']])
+      : scr === 'roul' ? (R.state === 'spin' ? [[J, 'HURRY IT UP']] : DD.touchOn ? [['TAP', 'PICK A SPOT'], ['TAP IT AGAIN', 'CHIP DOWN'], [X, 'CASINO']] : [['ARROWS', 'MOVE'], [J, 'CHIP DOWN / PRESS'], [X, 'CASINO']])
+      : scr === 'bingo' ? (BG.state === 'play' ? (DD.touchOn ? [['TAP', 'DAUB A CALLED NUMBER']] : [['ARROWS OR MOUSE', 'MOVE'], [J + ' OR CLICK', 'DAUB A CALLED NUMBER']]) : [[J, 'BUY A CARD'], ['ARROWS', 'BET'], [X, 'CASINO']])
       : B.state === 'play' ? [['ARROWS', 'PICK'], [J, 'DO IT']] : [[J, 'DEAL'], ['ARROWS', 'BET'], [X, 'CASINO']];
     window.DDUI.keycaps(keys);
   }
@@ -1281,15 +1316,16 @@
     }
   }
 
-  // ?casino=lobby|slots|scratch|roul|bj (testing and screenshots): straight into that casino screen; &demo shows it mid-play
+  // ?casino=lobby|slots|scratch|roul|bj (testing and screenshots; dev hosts only, and the demo money lives in memory so nothing is saved): straight into that casino screen; &demo shows it mid-play
   const Qs = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
-  if (Qs && Qs.has('casino') && ST()) { const iv = setInterval(() => { if (!window.__menu || window.__menu.st === 'load') return; clearInterval(iv);
-    const st = ST(), w = Qs.get('casino'); if (st.pts < 500 && !st.unlimited) st.bank(500 - st.pts);
+  if (window.DD_DEV && Qs && Qs.has('casino') && ST()) { const iv = setInterval(() => { if (!window.__menu || window.__menu.st === 'load') return; clearInterval(iv);
+    const st = ST(), w = Qs.get('casino'); if (st.sandbox) st.sandbox(500);
     st.tab = 1; st.open({ label: 'BACK' }); if (w && w !== 'lobby') enter(w); if (Qs.has('lc')) lc = +Qs.get('lc');
     if (Qs.has('demo')) { if (w === 'slots') { spin(); S.stops = STRIPS.map(a => a.indexOf(SEV)); } if (w === 'scratch') { buyTicket(+Qs.get('demo') || 0); } if (w === 'roul') { placeBet('red', 25); placeBet('n7', 10); placeBet('d2', 5); } if (w === 'bj') deal(); if (w === 'bingo') bingoBuy(); }
     DD.setScene({ step: IN => { if (st.step(IN, IN.click) === 'back') st.open({ label: 'BACK' }); }, draw: () => st.draw() });
   }, 100); }
 
-  window.DDCasino = { open, openPrizes, step, draw, drawTop, M, BETS, goldChip, hasChip: id => !!C.gold[String(id).split('-')[0]], get free() { return C.free; }, get scr() { return scr; }, get busy() { return busy(); }, get stats() { return C; }, reload: cload,
+  window.DDCasino = { open, openPrizes, step, draw, drawTop, M, BETS, goldChip, hasChip: id => !!C.gold[String(id).split('-')[0]], get free() { return C.free; }, get scr() { return scr; }, get busy() { return busy(); }, get stats() { return C; }, stopVoice, leave: abandon,
+    reload() { cload(); credit = 0; used = 0; chipOn = false; S.state = 'idle'; K.state = 'pick'; R.bets = {}; R.state = 'bet'; B.state = 'bet'; B.q.length = 0; BG.state = 'bet'; scr = 'lobby'; },   // after LOAD / CLEAR DATA: the new save, no round left over
     test: { S, K, R, B, BG, PZ, get H() { return H; }, get credit() { return credit; }, bingoBuy, daub, get t() { return t; }, set bi(n) { bi = n; }, enter, spin, deal, buyTicket, spinWheel, placeBet, settle, freeTix } };
 })();

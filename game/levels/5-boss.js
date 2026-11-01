@@ -103,7 +103,7 @@
         if (e.t > 50) { e.st = 'stun'; e.t = 0; }
       } else if (e.st === 'stun') {                // the opening: he is dizzy, stomp him now
         e.vx = 0;
-        if (e.t > 120 - ph * 20) { e.st = 'walk'; e.t = 0; }
+        if (e.t > 156 - ph * 26) { e.st = 'walk'; e.t = 0; }   // the window is +30% (casual pass)
       }
       if (e.st !== 'hop') { e.vy = Math.min(e.vy + 0.4, 6); if (DD.moveY(e, e.vy, false)) e.vy = 0; }
       const lo = B.arena[0], hi = B.arena[1];   // keep him inside the arena walls (DD.boss.arena is already in px)
@@ -184,7 +184,7 @@
     names: { tim: 'TIM', gregg: 'GREGG', mask: 'MASKED TIM' },
     intro: { bg: '#10060e', fg: '#f4ecdc', edge: '#d048b0' },
     lines: {   // design/VOICE.md. Sources: S9 king-arthur-and-snatched ("six bags cinema time"), unforgettable-animal-crackers-and-born-in-china (coach on a bad airline), smurfs-the-lost-village-and-the-case-for-christ (the self-relubricating mask, "this stupid mask"), kong-skull-island-and-the-wall (zero bags for the truffle popcorn, "I'm addicted to this stuff")
-      boss: [['tim', "IT'S SIX BAGS CINEMA TIME."], ['gregg', "I'D RATHER FLY COACH THAN SIT IN THESE."]],
+      boss: [['tim', "IT'S SIX BAG CINEMA TIME."], ['gregg', "I'D RATHER FLY COACH THAN SIT IN THESE."]],
       bossPhase: [['mask', "IT'S A SELF-RELUBRICATING MASK. IT PREVENTS INFECTION."], ['mask', "I CAN'T EAT WITH THIS MASK ON."]],
       bossDefeat: [['gregg', 'ZERO BAGS FOR THE TRUFFLE POPCORN.'], ['tim', "I'M ADDICTED TO THIS STUFF."]],
     },
@@ -193,7 +193,7 @@
       phases: [{ at: 3, say: 'THE MASK', sub: 'SELF-RELUBRICATING', enter(G, B) { G.shake = 10; DD.stars(DD.cx(G.pl), G.pl.y, 6, '#ffffff'); const bo = DD.bodies.find(b => b.kind === 'sixbags_boss'); if (bo) { bo.st = 'walk'; bo.t = -70; bo.hurt = 60; DD.burst && DD.burst(DD.cx(bo), bo.y + 10, 14); } } }],
       onHit(G, B) { const bo = DD.bodies.find(b => b.kind === 'sixbags_boss'); if (bo) for (let i = 0; i < 3; i++) DD.drop({ x: DD.cx(bo), y: bo.y, vx: (i - 1) * 1.3, vy: -3.2, life: 300, wait: 8 }); },
       onDefeat(G, B) {
-        DD.banner('SIX BAGS CINEMA', 90, 'CLOSED FOR RENOVATIONS');
+        DD.banner('SIX BAG CINEMA', 90, 'CLOSED FOR RENOVATIONS');
         const bo = DD.bodies.find(b => b.kind === 'sixbags_boss');
         if (bo) { for (let i = 0; i < 26; i++) DD.drop({ x: DD.cx(bo) + (i % 5 - 2) * 4, y: bo.y, vx: (Math.random() - 0.5) * 3.6, vy: -2 - Math.random() * 3.5, life: 360, wait: 10 + i * 2 }); DD.burst && DD.burst(DD.cx(bo), bo.y + 14, 20); }
       },

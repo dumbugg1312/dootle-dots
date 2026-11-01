@@ -103,7 +103,7 @@
         }
       } else if (e.st === 'stun') {                // the opening: he is dizzy, stomp him now
         e.vx = 0;
-        if (e.t > 120 - ph * 20) { e.st = 'walk'; e.t = 0; }
+        if (e.t > 156 - ph * 26) { e.st = 'walk'; e.t = 0; }   // the window is +30% (casual pass)
       }
       if (e.st !== 'hop') { e.vy = Math.min(e.vy + 0.4, 6); if (DD.moveY(e, e.vy, false)) e.vy = 0; }
       const lo = B.arena[0], hi = B.arena[1];   // keep him inside the arena walls (DD.boss.arena is already in px)

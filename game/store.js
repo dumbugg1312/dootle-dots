@@ -9,7 +9,7 @@
 (function () {
   const VW = DD.VW, VH = DD.VH, text = DD.text, SFX = DD.SFX, ctx = DD.ctx;
   const KEY = 'dootledots.hei.v1', UKEY = 'dootledots.unlimitedhei', MAX = 5;
-  const COST = [15, 30, 50, 75, 100];   // tiers 1-5: 270 maxes one upgrade; a first clear pays about 40, a replay about 25
+  const COST = [15, 30, 50, 75, 100];   // tiers 1-5: 270 maxes one upgrade; a first clear with five bags, the tape and the card pays 55, a replay 40 (boss 70 / 55); a screening pays 4 a bag
   const pl = (n, w) => n + ' ' + w + (n === 1 ? '' : 'S');
   const JUMP_PCT = [0, 6, 12, 17, 24, 30, 36], jumpPct = n => JUMP_PCT[n];   // measured in the engine (tests/store.js): how much higher a full jump goes, standing and running averaged
   const UP = [   // kind 0 passive, 1 active
@@ -18,7 +18,7 @@
     { id: 'takes', name: 'TAKE TWO', kind: 0, say: n => n === 1 ? 'IN EVERY STAGE, THE FIRST FALL INTO A PIT COSTS NO BAG' : 'IN EVERY STAGE, THE FIRST ' + n + ' FALLS INTO A PIT COST NO BAG' },
     { id: 'drop', name: 'FIVE-SECOND RULE', kind: 0, say: n => 'DROPPED POPCORN: ' + Math.min(100, 70 + 6 * n) + '% COMES BACK (NOT 70%) AND STAYS ' + (2.5 + n) + ' SECONDS (NOT 2.5)' },
     { id: 'rewards', name: 'THE POWER OF REWARDS', kind: 0, say: n => '+' + 10 * n + '% HEI POINTS FOR EVERY STAGE YOU BEAT' },
-    { id: 'star', name: 'GERM FREE', kind: 1, say: n => 'THE FIRST ' + 5 * n + ' SECONDS OF EVERY STAGE: YOU SHINE IN RAINBOW, NOTHING HURTS YOU AND FANS BOUNCE OFF' },
+    { id: 'star', name: 'GERM FREE', kind: 1, say: n => 'FIRST ' + 5 * n + ' SECONDS OF EVERY STAGE: RAINBOW, NOTHING HURTS YOU, FANS BOUNCE OFF' },
     { id: 'jump', name: 'EYES IN THE SKY', kind: 1, say: n => 'JUMP +' + n + ': EVERY DOT JUMPS ABOUT ' + jumpPct(n) + '% HIGHER' },
     { id: 'speed', name: 'WARP 10', kind: 1, say: n => 'SPEED +' + n + ': EVERY DOT RUNS ' + 5 * n + '% FASTER' },
     { id: 'magnet', name: 'POPCORN MAGNET', kind: 1, say: n => 'MAGNET +' + n + ': POPCORN FLIES TO YOU FROM ' + pl(n + 1, 'TILE') + ' AWAY' },
@@ -30,17 +30,20 @@
   // ---- the save: points on hand, tiers owned, tiers switched on
   let S;
   function load() {
-    try { S = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { S = {}; }
-    S = { pts: Math.max(0, +S.pts || 0), own: S.own || {}, on: S.on || {}, earned: +S.earned || 0 };
+    try { S = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { S = {}; }   // a missing key is a fresh save (reload() after CLEAR DATA)
+    const num = v => Number.isFinite(+v) ? Math.max(0, Math.min(999999999, +v)) : 0, tiers = o => { const r = {}; if (o && typeof o === 'object' && !Array.isArray(o)) for (const k in o) if (typeof o[k] === 'number' && Number.isFinite(o[k])) r[k] = o[k]; return r; };   // wrong types from a hand-edited save are dropped
+    S = { pts: num(S.pts), own: tiers(S.own), on: tiers(S.on), earned: num(S.earned) };
   }
-  function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* storage blocked: lasts this session */ } }
+  let NOSAVE = false;   // the dev ?casino= hook: demo money lives in memory, the real save is never written
+  function save() { if (NOSAVE) return; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* storage blocked: lasts this session */ } }
   load();
   let UNL = false; try { UNL = localStorage.getItem(UKEY) === '1'; } catch (e) {}
-  const own = id => Math.max(0, Math.min(maxOf(byId(id) || {}), S.own[id] | 0));
-  const act = id => { const o = own(id), a = S.on[id]; return a === undefined ? o : Math.max(0, Math.min(o, a | 0)); };
-  const setAct = (id, n) => { S.on[id] = n; save(); };
+  const ownR = id => Math.max(0, Math.min(maxOf(byId(id) || {}), S.own[id] | 0));
+  const actR = id => { const o = ownR(id), a = S.on[id]; return a === undefined ? o : Math.max(0, Math.min(o, a | 0)); };
+  const own = id => UNL && byId(id) ? maxOf(byId(id)) : ownR(id), act = id => UNL && byId(id) ? maxOf(byId(id)) : actR(id);   // UNLIMITED: every upgrade acts maxed (SIX BAGS too), read-only: nothing is written to the save, so turning it off gives back the real levels
+  const setAct = (id, n) => { if (UNL) return; S.on[id] = n; save(); };
   function setUnlimited(on) { UNL = !!on; try { localStorage.setItem(UKEY, UNL ? '1' : '0'); } catch (e) {} }
-  const canAfford = id => { const u = byId(id), o = own(id); return o < maxOf(u) && (UNL || S.pts >= priceOf(u, o)); };
+  const canAfford = id => { const u = byId(id), o = own(id); return o < maxOf(u) && S.pts >= priceOf(u, o); };
   const revealed = () => UP.every(u => own(u.id) === MAX);   // SIX BAGS shows up once all ten are maxed
   const items = () => revealed() ? UP.concat([SIX]) : UP;
   const sixOn = () => revealed() && act('six') > 0;
@@ -52,11 +55,12 @@
     return { six: sixOn(), bags: a('bags'), shield: a('shield'), takes: a('takes'), keep: 0.06 * d, life: 60 * d, star: 300 * a('star'),
       jump: 1 + 0.03 * a('jump'), speed: 1 + 0.05 * a('speed'), magnet: m ? 16 * (m + 1) + 8 : 0, foam: a('foam') };
   }
-  function award(r) {   // a won run's HEI Points: 10 for the clear, 4 a bag, 5 for the tape, 5 for the blue card, 15 for a boss, 15 the first time, 10 a new Dot secret (+10 for the set)
+  function award(r) {   // a won run's HEI Points: 10 for the clear, 4 a bag, 5 for the tape, 5 for the blue card, 15 for a boss, 15 the first time, 10 a new Dot secret (+10 for the set); a screening ('N-bonus'): 4 a bag, +15 the first time with a bag
     const P = window.__menu && window.__menu.PROG, first = !!P && !P[r.id];
-    let n = 10 + 4 * (r.bags || 0) + (r.vhs ? 5 : 0) + (r.fact === 'right' ? 5 : 0) + (r.boss ? 15 : 0) + (first ? 15 : 0);
-    if (r.six) n += 4;   // the sixth bag pays like the others
-    const had = (P && P[r.id] && P[r.id].sec) || [], fresh = (r.dsec || []).filter(d => !had.includes(d));   // Dot secrets: 10 each the first time, 10 more when the stage's set is complete
+    const shown = /-bonus$/.test(String(r.id)), bags = r.bags || 0;
+    let n = shown ? 4 * bags + (r.six ? 4 : 0) + (first && bags ? 15 : 0)   // a screening pays per bag only (0 bags: nothing); the first-time bonus needs at least one
+      : 10 + 4 * bags + (r.vhs ? 5 : 0) + (r.fact === 'right' ? 5 : 0) + (r.boss ? 15 : 0) + (first ? 15 : 0) + (r.six ? 4 : 0);   // the sixth bag pays like the others
+    const had = (P && P[r.id] && P[r.id].sec) || [], fresh = shown ? [] : (r.dsec || []).filter(d => !had.includes(d));   // Dot secrets: 10 each the first time, 10 more when the stage's set is complete
     n += 10 * fresh.length; if (fresh.length && r.dsecAll && r.dsecAll.length && r.dsecAll.every(d => had.includes(d) || r.dsec.includes(d))) n += 10;
     const rw = lvl('rewards'); if (rw) n = Math.round(n * (1 + 0.1 * rw));
     S.pts += n; S.earned += n; save();
@@ -97,14 +101,14 @@
 
   let tab = 0;   // 0 the store, 1 the casino (casino.js); C / R1 or a click on the tab flips it, and it stays put between visits
   const TABS = [{ x: 62, w: 92, label: 'HEI STORE' }, { x: 158, w: 80, label: 'CASINO' }];
-  function open(o = {}) { if (tab === 1 && window.DDCasino) window.DDCasino.open(); else if (window.DDVoice) window.DDVoice.menu('store_open'); t = 0; back = o.onBack || null; label = o.label || 'BACK'; shown = S.pts; msgT = 0; fly = []; pop = null; tip = (tip + 1) % TIPS.length; if (o.cur !== undefined) cur = o.cur; }
+  function open(o = {}) { if (tab === 1 && window.DDCasino) window.DDCasino.open(); else { if (window.DDCasino && window.DDCasino.stopVoice) window.DDCasino.stopVoice(); if (window.DDVoice) window.DDVoice.menu('store_open'); } t = 0; back = o.onBack || null; label = o.label || 'BACK'; shown = S.pts; msgT = 0; fly = []; pop = null; tip = (tip + 1) % TIPS.length; if (o.cur !== undefined) cur = o.cur; }
   function buy(i) {
     const u = items()[i], o = own(u.id), was = revealed();
     if (!u) return false;
     if (o >= maxOf(u)) { say(u.id === 'six' ? 'TIM ALREADY MADE HIS CALL' : u.name + ' IS MAXED OUT'); SFX.buzz(); return false; }
     const cost = priceOf(u, o);
-    if (!UNL && S.pts < cost) { say('NEED ' + (cost - S.pts) + ' MORE HEI POINTS'); SFX.buzz(); poorT = 14; if (window.DDVoice) window.DDVoice.menu('store_poor'); return false; }
-    if (!UNL) S.pts -= cost;
+    if (S.pts < cost) { say('NEED ' + (cost - S.pts) + ' MORE HEI POINTS'); SFX.buzz(); poorT = 14; if (window.DDVoice) window.DDVoice.menu('store_poor'); return false; }
+    S.pts -= cost;
     S.own[u.id] = o + 1; S.on[u.id] = o + 1; save();
     pop = { i, k: o, t: 0 };
     for (let k = 0; k < 8; k++) fly.push({ x0: VW - 58, y0: 6, x1: PIPX + o * 6 + 2, y1: rowY(i) + 2, t: -k * 2, d: 18 });   // coins fly from the balance to the new pip
@@ -115,6 +119,7 @@
     return true;
   }
   function nudge(i, d) {
+    if (UNL) { SFX.buzz(); say('UNLIMITED HEI POINTS: EVERYTHING IS ON AND MAXED', 60); return; }
     const u = items()[i], o = own(u.id), a = act(u.id), onOff = u.id === 'six';
     if (d > 0) { if (a < o) { setAct(u.id, a + 1); SFX.tick(); say(onOff ? 'SIX BAGS IS ON' : u.name + ' SET TO LEVEL ' + (a + 1), 50); } else if (o < maxOf(u)) { SFX.buzz(); say(DD.jumpKey() + ' BUYS LEVEL ' + (o + 1), 50); } else SFX.buzz(); }
     else if (a > 0) { setAct(u.id, a - 1); SFX.tick(); say(onOff ? 'SIX BAGS IS OFF. FIVE IS THE HIGHEST AGAIN.' : a - 1 ? u.name + ' SET TO LEVEL ' + (a - 1) : u.name + ' TURNED OFF', 50); }
@@ -127,7 +132,7 @@
     const L = items(), n = L.length; if (cur >= n) cur = n - 1;
     if (reveal > 0) reveal++;
     const flip = window.DDCasino && ((IN.sp && !IN.back) || (c && TABS.some((b, i) => i !== tab && inR(c, b.x, 0, b.w, 15))));
-    if (flip) { if (window.DDCasino.busy) { SFX.buzz(); return; } tab = 1 - tab; SFX.switch(); if (tab === 1) window.DDCasino.open(); return; }
+    if (flip) { if (window.DDCasino.busy) { SFX.buzz(); return; } if (tab === 1) { if (window.DDCasino.leave) window.DDCasino.leave(); if (window.DDCasino.stopVoice) window.DDCasino.stopVoice(); } tab = 1 - tab; SFX.switch(); if (tab === 1) window.DDCasino.open(); return; }
     if (c && inR(c, TABS[tab].x, 0, TABS[tab].w, 15)) return;
     if (tab === 1) return window.DDCasino.step(IN, c);
     if (IN.ny) { cur = (cur + IN.ny + n) % n; SFX.tick(); }
@@ -137,7 +142,8 @@
       if (inR(c, BUY.x, BUY.y, BUY.w, BUY.h)) { buy(cur); return; }
       for (let i = 0; i < n; i++) if (inR(c, 4, rowY(i) - 3, 172, 11)) {
         const u = L[i], id = u.id, o = own(id);
-        if (c.x >= PIPX - 1) {   // a pip: an owned one sets the level (the top one again turns it down a step), the next one buys
+        if (c.x >= PIPX - 1 && UNL) { cur = i; SFX.buzz(); say('UNLIMITED HEI POINTS: EVERYTHING IS ON AND MAXED', 60); }
+        else if (c.x >= PIPX - 1) {   // a pip: an owned one sets the level (the top one again turns it down a step), the next one buys
           const k = Math.max(0, Math.min(maxOf(u) - 1, Math.floor((c.x - PIPX + 1) / 6)));
           cur = i;
           if (k < o) { const a = act(id), v = a === k + 1 ? k : k + 1; setAct(id, v); SFX.tick(); say(v ? u.name + ' SET TO LEVEL ' + v : u.name + ' TURNED OFF', 50); }
@@ -215,7 +221,7 @@
     if (max) text(u.kind === 2 ? "TIM'S CALL" : 'MAXED OUT', B.x + B.w / 2, B.y + 5, '#c8b8c0', 1, null, 'center');
     else {
       const cost = UNL ? 'FREE' : String(priceOf(u, o)), ink = ok ? '#2a0e1a' : '#d8a0a0';
-      text(ok ? DD.jumpKey() + ': ' + (u.kind === 2 ? 'BUY SIX BAGS' : 'BUY LEVEL ' + (o + 1)) : 'NOT ENOUGH POINTS', B.x + 6, B.y + 5 - hb, ink, 1, null);   // no buy prompt you can't act on
+      text(ok ? DD.jumpKey() + ': ' + (u.kind === 2 ? 'BUY SIX BAGS' : 'BUY LEVEL ' + (o + 1)) : 'NOT ENOUGH HEI POINTS', B.x + 6, B.y + 5 - hb, ink, 1, null);   // no buy prompt you can't act on
       text(cost, B.x + B.w - 6, B.y + 5 - hb, ok ? '#2a0e1a' : '#ff9090', 1, null, 'right');
       icon('rewards', B.x + B.w - 6 - cost.length * 4 - 10, B.y + 3 - hb, 1);
     }
@@ -225,14 +231,14 @@
     rect('#000', 6, 148, VW - 12, 13); rect('#000', 5, 149, VW - 10, 11); rect('#1a0810', 6, 149, VW - 12, 11); rect('#3a1a24', 6, 149, VW - 12, 1);
     if (msgT > 0) text(msg, VW / 2, 152, msg.startsWith('NEED') || msg.endsWith('MAXED OUT') ? '#ff8080' : '#ffe680', 1, null, 'center');
     else text(TIPS[tip], VW / 2, 152, '#9a8a90', 1, null, 'center');
-    window.DDUI.keycaps(DD.padUsed ? [['CROSS', 'BUY'], ['LEFT/RIGHT', 'LEVEL -/+'], ['R1', 'CASINO'], ['CIRCLE', label]] : [['JUMP', 'BUY'], ['LEFT/RIGHT', 'LEVEL -/+'], ['C', 'CASINO'], ['X', label]]);
+    window.DDUI.keycaps(DD.padUsed ? [[DD.btn ? DD.btn('cross') : 'CROSS', 'BUY'], ['LEFT/RIGHT', 'LEVEL -/+'], [DD.btn ? DD.btn('r1') : 'R1', 'CASINO'], [DD.btn ? DD.btn('circle') : 'CIRCLE', label]] : [['JUMP', 'BUY'], ['LEFT/RIGHT', 'LEVEL -/+'], ['C', 'CASINO'], ['X', label]]);
   }
 
   window.DDStore = {
     UP, SIX, COST, MAX, perks, lvl, items, revealed, sixOn, award, icon, canBuy, open, step, draw, buy, nudge,
-    own, act, setAct, reload() { load(); try { UNL = localStorage.getItem(UKEY) === '1'; } catch (e) { UNL = false; } },   // after LOAD / CLEAR DATA
+    own, act, setAct, sandbox(n) { NOSAVE = true; if (S.pts < n && !UNL) S.pts = n; }, get sandboxed() { return NOSAVE }, reload() { NOSAVE = false; load(); try { UNL = localStorage.getItem(UKEY) === '1'; } catch (e) { UNL = false; } },   // after LOAD / CLEAR DATA
     get pts() { return S.pts; }, get earned() { return S.earned; },
-    bank(n) { if (!UNL) { S.pts = Math.max(0, S.pts + n); save(); } }, poor() { poorT = 14; }, get backLabel() { return label; }, get tab() { return tab; }, set tab(v) { tab = v ? 1 : 0; },   // the casino's stakes and pay-outs
+    bank(n, real) { if (!UNL || real) { S.pts = Math.max(0, S.pts + n); save(); } }, poor() { poorT = 14; }, get backLabel() { return label; }, get tab() { return tab; }, set tab(v) { tab = v ? 1 : 0; },   // the casino's stakes and pay-outs
     get unlimited() { return UNL; }, setUnlimited, get back() { return back; }, get cur() { return cur; }, set cur(i) { cur = i; },
   };
 })();

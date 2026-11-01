@@ -101,7 +101,7 @@ DD.defineEntity('dekkar', {
         }
         break;
       case 'quake':                                                            // the ring plays out; he is staggering, nothing is vulnerable yet
-        if (--e.t <= 0) { e.st = 'daze'; e.t = B.phase ? 105 : 120; }
+        if (--e.t <= 0) { e.st = 'daze'; e.t = B.phase ? 136 : 156; }   // +30% (casual pass)
         break;
       case 'daze':                                                             // stuck on the stage, seeing stars: the opening (about 2 s in phase 1, 1.75 s in phase 2). Harmless to touch.
         if (--e.t <= 0) { e.st = 'idle'; e.t = cool; }

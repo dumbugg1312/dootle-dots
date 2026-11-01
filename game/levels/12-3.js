@@ -182,7 +182,7 @@ window.LEVEL = {"id": "12-3", "name": "OSCAR FEVER", "sub": "THE OSCAR SPECIAL S
   window.LEVEL.script = {
     init(G) {
       const s = G.s, L = DD.L, th = G.things;
-      Object.assign(s, { clock: 0, scroll: 0, run: false, count: 0, ready: true, endX: L.SCROLL_END * TS, safe: { x: G.pl.x, y: G.pl.y }, rewound: false, key: false, keyT: 0, lowT: 0,
+      Object.assign(s, { clock: 0, scroll: 0, run: false, count: 0, ready: true, endX: L.SCROLL_END * TS, safe: { x: G.pl.x, y: G.pl.y + G.pl.h }, hold: 0, rewound: false, key: false, keyT: 0, lowT: 0,
         leadIdx: -1, stT: 4, stomps: [], flash: 0, goalFx: false, landed: false, midSaid: false });
       s.leads = (th.lead || []).map(t => ({ x: t.x, name: t.args[0] })).sort((a, b) => a.x - b.x);
       s.keyX = th.key ? th.key[0].x : 1e9;
@@ -193,12 +193,13 @@ window.LEVEL = {"id": "12-3", "name": "OSCAR FEVER", "sub": "THE OSCAR SPECIAL S
       s.clock++; if (s.flash > 0) s.flash--; if (s.key) s.keyT++; if (s.lowT > 0) s.lowT--;
       // a respawn goes back to the last checkpoint with the scroll (the challenge room, off the right edge, has its own respawn spot and holds the scroll still)
       const inRoom = p.x >= L.ROOMX * TS;
-      for (const b of DD.bodies) if (b.kind === 'cp' && b.lit && b.x > s.safe.x) s.safe = { x: b.x, y: bot(b) - p.h };
-      if (G.fall && G.fall.t >= 20 && !s.rewound && !inRoom) { s.rewound = true; p.x = s.safe.x; p.y = s.safe.y; G.safe = { x: p.x, y: p.y }; s.scroll = Math.max(0, p.x - 48); s.leadIdx = Math.max(-1, leadAt(s, p.x) - 1); }
+      for (const b of DD.bodies) if (b.kind === 'cp' && b.lit && b.x > s.safe.x) s.safe = { x: b.x, y: bot(b) };   // the feet line, so any Dot re-seats at its own height
+      if (G.fall && G.fall.t >= 20 && !s.rewound && !inRoom) { s.rewound = true; p.x = s.safe.x; p.y = s.safe.y - p.h; G.safe = { x: p.x, y: p.y }; s.scroll = Math.max(0, p.x - 96); s.hold = 100; s.leadIdx = Math.max(-1, leadAt(s, p.x) - 1); }   // 6 tiles behind; the scroll holds ~1.3 s after the iris opens (or until you move)
       if (!G.fall) s.rewound = false;
+      if (s.hold > 0) { s.hold--; if (!G.fall && (Math.abs(p.vx) > 0.3 || p.vy < -1)) s.hold = 0; }
       // the scroll: a count-in of four beats, then 4 tiles per half-bar; run ahead and it follows you
       if (!s.run) { if (!G.done && ++s.count >= 4 * BEAT) s.run = true; }
-      else if (!G.done && s.scroll < s.endX && !inRoom) s.scroll = Math.min(s.endX, Math.max(s.scroll + PACE, cx(p) - VW * 0.55));
+      else if (!G.done && s.scroll < s.endX && !inRoom && !s.hold) s.scroll = Math.min(s.endX, Math.max(s.scroll + PACE, cx(p) - VW * 0.55));
       const lead = s.scroll < s.endX ? s.scroll : s.endX;
       if (s.run && p.x < lead + 2) { DD.moveX(p, lead + 2 - p.x); if (p.x < lead - 6 && !G.fall) p.y = L.H * TS + 60; }
       // the pulse platforms and shutters
@@ -289,7 +290,8 @@ window.LEVEL = {"id": "12-3", "name": "OSCAR FEVER", "sub": "THE OSCAR SPECIAL S
       if (G.frame >= (G.cdUntil || 0) && DD.door(e)) {   // press Down in the doorway to cross
         G.cdUntil = G.frame + 45; G.hitstop = 8;
         DD.stars(DD.cx(p), p.y + 6, 10, '#ffd24a'); DD.SFX.cp && DD.SFX.cp();
-        p.x = e.dx * 16 + 2; p.y = (e.dr + 1) * 16 - p.h - 1; p.vx = 0; p.vy = 0; p.slam = 0; p.inv = Math.max(p.inv || 0, 20);
+        { const x0 = e.dx * 16 + 8 - p.w / 2, y0 = (e.dr + 1) * 16 - p.h - 1; let x = x0; for (let d = 1; d <= 40 && !DD.boxFree(x, y0, p.w, p.h); d++) x = x0 + (d % 2 ? 1 : -1) * Math.ceil(d / 2) * 4; p.x = x; p.y = y0; }   // centred, nudged to the nearest spot this Dot fits
+         p.vx = 0; p.vy = 0; p.slam = 0; p.inv = Math.max(p.inv || 0, 20);
         G.safe = { x: p.x, y: p.y }; G.cpSafe = { x: p.x, y: p.y };
         G.cam.x = DD.clamp(p.x - 160, 0, LEVEL.W * 16 - 320); G.cam.y = DD.clamp(p.y + p.h - 112, 0, LEVEL.H * 16 - 180);
         DD.stars(DD.cx(p), p.y + 6, 10, '#ffd24a');

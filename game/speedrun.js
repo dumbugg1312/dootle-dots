@@ -90,7 +90,7 @@
     text(title, VW / 2, 16, '#ffe680', 2, '#7a2a10', 'center');
   }
   function keys(list) { text(list, VW / 2, VH - 20, '#cfc6bc', 1, '#000', 'center'); }
-  const jump = () => (DD.jumpKey ? DD.jumpKey() : 'Z');
+  const jump = () => (DD.jumpKey ? DD.jumpKey() : 'Z'), back = () => DD.touchOn ? 'SWITCH' : DD.padUsed ? (DD.btn ? DD.btn('circle') : 'CIRCLE') : 'X';   // back is X on a keyboard, the circle button on a pad (B on Nintendo), the SWITCH button on touch
 
   function drawPick() {
     backdrop('SPEEDRUN');
@@ -105,7 +105,7 @@
       if (b.runs) text(b.runs + (b.runs > 1 ? ' RUNS' : ' RUN'), VW - 42, y + 5, '#c8b8a0', 1, null, 'right');
     });
     text('NO STORE UPGRADES. ALL FOUR DOTS. A WRONG BLUE CARD COSTS 5 SECONDS.', VW / 2, 148, '#a89888', 1, '#000', 'center');
-    keys(jump() + ': GO    UP / DOWN: CATEGORY    X: BACK');
+    keys(DD.touchOn ? 'TAP A CATEGORY TWICE TO GO    ' + back() + ': BACK' : jump() + ': GO    UP / DOWN: CATEGORY    ' + back() + ': BACK');
   }
   function drawEnd() {
     const e = end, name = CATS.find(c => c[0] === e.cat)[1];
@@ -119,7 +119,7 @@
       text(id.toUpperCase(), x + 4, y, '#c8b8a0', 1, null);
       text(fmt(e.segs[i]), x + cw - 6, y, e.golds[i] ? '#ffd24a' : '#fff6d4', 1, null, 'right');
     });
-    keys(jump() + ': RUN IT AGAIN    X: BACK    GOLD = YOUR BEST EVER ON THAT STAGE');
+    keys((DD.touchOn ? 'TAP: RUN IT AGAIN    ' + back() + ': BACK' : jump() + ': RUN IT AGAIN    ' + back() + ': BACK') + '    GOLD = YOUR BEST EVER ON THAT STAGE');
   }
   function step(IN) {
     t++;

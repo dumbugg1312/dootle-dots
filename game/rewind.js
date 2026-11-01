@@ -15,7 +15,7 @@
     W(2, 'THE RED SEATS', 'SEASONS 1-4', 'WELCOME TO MY PROGRAM.', 'DR. SAN', '#3a0e1c', '#6a1a26', '#ffe9c0', '#e8c060', ['sam', 'mel']),
     W(3, 'DECKER', 'SEASONS 5-6 + DECKER 1-3', 'STARRING TIM HEIDECKER AS DECKER', 'ABDUL', '#5a4a40', '#8a7a6a', '#e8e8f0', '#f0c030', ['baxter', 'sam']),
     W(4, 'VFA & DEKKAR', 'SEASONS 7-8', 'LUCKY SEASON SEVEN.', 'DEKKAR TIM', '#1a0c0c', '#46211e', '#f4e0d0', '#e8302a', ['cloud', 'mel']),
-    W(5, 'SIX BAGS', 'SEASON 9', "IT'S SIX BAGS CINEMA TIME.", 'SIX BAGS TIM', '#0e0c0b', '#2a2420', '#f8e8c8', '#e8a040', ['mel', 'baxter']),
+    W(5, 'SIX BAGS', 'SEASON 9', "IT'S SIX BAG CINEMA TIME.", 'SIX BAGS TIM', '#0e0c0b', '#2a2420', '#f8e8c8', '#e8a040', ['mel', 'baxter']),
     W(6, 'THE TRIAL', '2017', 'MAY I APPROACH?', 'LAWYER TIM', '#6a4a2a', '#b08050', '#f4ecda', '#6a8aaa', ['sam', 'baxter']),
     W(7, 'OCX', 'SEASON 10', 'IMAGINE BEING GERM FREE.', 'OCX TIM', '#06080c', '#102030', '#ffffff', '#30d8f0', ['cloud', 'sam']),
     W(8, 'HEI NETWORK', 'SEASONS 11-12 + OSCARS 7-9', "ON CINEMA'S BACK. WE GOT THE MONEY.", 'JOKER GREGG', '#8a2a44', '#2a5ac8', '#fff2e0', '#f0c040', ['mel', 'cloud']),

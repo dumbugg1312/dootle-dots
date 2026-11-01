@@ -28,8 +28,8 @@
   const REPEAT = { hurt: 3, death: 3, checkpoint: 3, idle: 3, boss_hit: 5, aside: 99 };   // reactions that can speak again in a stage (each time the next take)   // boss_taunt: the boss gloats when it hits you, twice a fight at most
   const now = () => performance.now() / 1000;
   const ASIDE = [18, 30], ASIDE_FIRST = 12, BOSS_QUIET = 35;   // seconds of quiet before the hosts chime in: a random wait in this range, and never in a stage's first seconds
-  let PLAYS = {}; try { PLAYS = JSON.parse(localStorage.getItem('dd-voice-plays') || '{}') || {}; } catch (e) {}
-  let RECENT = []; try { RECENT = JSON.parse(localStorage.getItem('dd-voice-recent') || '[]') || []; } catch (e) {}
+  let PLAYS = {}; try { PLAYS = JSON.parse(localStorage.getItem('dd-voice-plays') || '{}') || {}; } catch (e) {} if (!PLAYS || typeof PLAYS !== 'object' || Array.isArray(PLAYS)) PLAYS = {};   // a hand-edited or damaged save must not throw
+  let RECENT = []; try { RECENT = JSON.parse(localStorage.getItem('dd-voice-recent') || '[]') || []; } catch (e) {} if (!Array.isArray(RECENT)) RECENT = [];   // not a list (a damaged save): start fresh
   const FRESH = 400;   // no line repeats a clip from the last FRESH lines heard (about two thirds of a playthrough): with ~900 clips, quiet beats a rehash
   const ENCORE = /^(clear|perfect|boss_defeat|join_)/;   // the payoff beats rather repeat a take than go unsaid; every other placed line (a retry's opener, beats, the boss intro, the blue card) stays quiet once heard
   let saveT = 0; const savePlays = () => { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem('dd-voice-plays', JSON.stringify(PLAYS)); localStorage.setItem('dd-voice-recent', JSON.stringify(RECENT)); } catch (e) {} }, 500); };
@@ -48,6 +48,7 @@
   function play(c) {
     try {
       if (cur) cur.pause();
+      if (window.DDCasino && window.DDCasino.stopVoice) window.DDCasino.stopVoice();   // the casino has its own voice channel: one speaker at a time
       const a = new Audio('voice/' + c.f); a.volume = 0.95 * (window.DDVol ? window.DDVol.get('voice') : 1); a.play().catch(() => {});
       cur = a; endAt = now() + c.d; curEnd = endAt + PAD;   // a breath after each line, so a waiting line never butts straight into it
       lastAt = now(); a.onended = () => { if (cur === a) cur = null; };
@@ -148,8 +149,10 @@
     // fight only after BOSS_QUIET seconds, so its own hits and gloats keep the floor)
     if (!busy && !cur && !pending && now() - stageAt > ASIDE_FIRST && now() - endAt > (fight ? Math.max(asideWait, BOSS_QUIET) : asideWait)) { if (!say('aside')) asideWait += 6; }
   }
+  const firstInput = () => { if (!titled && window.DD && window.DD.inMenu) { titled = true; setTimeout(() => say('title'), 250); } };   // the first key (or controller button) also unlocks audio
+  addEventListener('dd-pad', firstInput);   // engine.js sends this on a controller button, which is not a keydown
   addEventListener('keydown', e => {
-    if (!titled && window.DD && window.DD.inMenu) { titled = true; setTimeout(() => say('title'), 250); }   // the first key also unlocks audio
+    firstInput();
     if (e.code === 'KeyV' && !e.repeat) { on = !on; try { localStorage.setItem('dd-voice', on ? '1' : '0'); } catch (er) {} if (!on && cur) { cur.pause(); cur = null; } }
   });
   setInterval(tick, 250);

@@ -483,7 +483,7 @@ window.LEVEL = {"id": "10-1", "name": "THE LOBBY", "sub": "MOVIE HOUSE: COMING S
       if (!DD.door(e)) return;   // press Down on the door to go through
       s.doorCd = 90;
       DD.stars(DD.cx(e), e.y + 8, 8, to[2] ? '#9fd8ff' : '#ffe680'); DD.SFX.wind && DD.SFX.wind();
-      p.x = to[0] * 16 + 1; p.y = (to[1] + 1) * 16 - p.h; p.vx = 0; p.vy = 0; p.rolling = false;
+      { const x0 = to[0] * 16 + 8 - p.w / 2, y0 = (to[1] + 1) * 16 - p.h; let x = x0; for (let d = 1; d <= 40 && !DD.boxFree(x, y0, p.w, p.h); d++) x = x0 + (d % 2 ? 1 : -1) * Math.ceil(d / 2) * 4; p.x = x; p.y = y0; } p.vx = 0; p.vy = 0; p.rolling = false;   // centred, and nudged to the nearest spot this Dot fits
       G.safe = { x: p.x, y: p.y };
       if (!to[2]) { s.roomBack = G.cpSafe; G.cpSafe = { x: p.x, y: p.y }; } else if (s.roomBack) G.cpSafe = s.roomBack;   // a fall in the room puts you back in the room; leaving restores the real checkpoint
       G.cam.x = Math.max(0, DD.cx(p) - DD.VW / 2); G.cam.y = Math.max(0, DD.bot(p) - DD.VH * 0.62);

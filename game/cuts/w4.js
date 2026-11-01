@@ -88,7 +88,7 @@
       { sfx: 'vhs' },
       { wait: 20 },
       { say: 'gregg', clip: 'B91' },                                 // S8 "Solace and The Light Between Oceans": "The Dekkar master tape survived. So there is no justice in the world."
-      { third: 'SEASON 8: THE VFA FIRE', sub: "THE ARCHIVE IS GONE. TIM GOES EDM AS DKR. NEXT: SIX BAG CINEMAS", t: 140, wait: true },   // lore: VFA fire (S8E07); DKR (S8E10); S9 follows
+      { third: 'SEASON 8: THE VFA FIRE', sub: "THE ARCHIVE IS GONE. TIM GOES EDM AS DKR. NEXT: SIX BAG CINEMA", t: 140, wait: true },   // lore: VFA fire (S8E07); DKR (S8E10); S9 follows
       { fn: (G2, S2) => { S2.embersOff = true; } },
     ],
     over: (ctx, G, S) => {   // the fire's light along the bottom of the stage, flickering

@@ -9,12 +9,17 @@
 const DD = window.DD = { spriteDir: '../design/sprites/' };
 const TS = 16, VW = 320, VH = 180;
 let L = null, LW = 0, LH = 0;   // the running level's data and its size in pixels
-const cv = document.getElementById('c'), ctx = cv.getContext('2d', { willReadFrequently: true });   // the Dot's rim light reads the set behind it now and then; at 320x180 a CPU canvas is cheap
-const Q = new URLSearchParams(location.search);
+// A GPU canvas: nothing reads it back mid-frame (ink and the rim light read SNAP, a copy taken off the frame), so the drawing stays off the main thread.
+// ?cpucanvas puts it back on the CPU, for before/after timings.
+// Test and debug query params (?level ?warp ?casino ?w9hit ...) only work on a local dev host or in the node harness; the live site ignores them.
+window.DD_DEV = !location.hostname || /^(localhost|127\.0\.0\.1|\[::1\])$|\.localhost$|\.test$/.test(location.hostname);
+const Q0 = new URLSearchParams(location.search), DEVQ = ['dot', 'warp', 'sim', 'end', 'fall', 'ff', 'pause', 'test', 'rawink', 'oldsfx', 'cpucanvas', 'slow', 'fps', 'inkcheck'];   // ?desktop ?card ?nostock stay open to everyone
+const Q = { has: k => (window.DD_DEV || DEVQ.indexOf(k) < 0) && Q0.has(k), get: k => (window.DD_DEV || DEVQ.indexOf(k) < 0) ? Q0.get(k) : null };   // the debug ones read as absent on the live site
+const cv = document.getElementById('c'), ctx = cv.getContext('2d', window.DD_DEV && /[?&]cpucanvas/.test(location.search) ? { willReadFrequently: true } : {});
 const NOPAUSE = !!window.DD_NOPAUSE || Q.has('sim');   // headless tests and bot sims: dialogue and cards run alongside play instead of pausing it
 
 function fit() {   // fill the window edge to edge (16:9, so bars only on the side that doesn't match), even when that is not a whole number of pixels
-  const k = Math.min(innerWidth / VW, innerHeight / VH);
+  let k = Math.min(innerWidth / VW, innerHeight / VH); if (k >= 2) k = Math.floor(k);   // whole-number scale once the window allows 2x (crisp pixels), fractional below
   cv.style.width = VW * k + 'px'; cv.style.height = VH * k + 'px';
   cv.style.marginTop = Math.max(0, Math.floor((innerHeight - VH * k) / 2)) + 'px';
 }
@@ -78,13 +83,21 @@ function text(str, x, y, col = '#fff', s = 1, shadow = '#000', align = 'left') {
 // Colours that already read are untouched. ?rawink turns it off (for before/after shots).
 const AUTOINK = !Q.has('rawink');
 const RGB = new Map(), INKED = new Map(), SEEN = new Map();
-let inkNew = 8, inkOld = 2;   // fresh reads of the canvas per frame (each one stalls the canvas a little): new strings, and re-checks; frame() refills them
+let inkNew = 24, inkOld = 6;   // checks per frame (each one sorts a patch of SNAP): new strings, and re-checks; frame() refills them
 function inkCached(str, col, shadow, x, y, w, s) {   // a string keeps its fix for about a third of a second, so most frames only look it up
   const key = str + '|' + col + '|' + s + '|' + shadow + '|' + (x >> 5) + ',' + (y >> 5), now = performance.now(), hit = SEEN.get(key);
-  if (hit) { if (now < hit.t || inkOld <= 0) return hit.k; inkOld--; }
+  if (hit && now - hit.seen > 150) hit.first = now;   // gone a while (a box that closed and opened again): SNAP's copy may not have it in
+  if (hit) { hit.seen = now; if (now < hit.t || inkOld <= 0) return hit.k; inkOld--; }
   else { if (inkNew <= 0) return { col, outline: false }; inkNew--; }
   if (SEEN.size > 3000) SEEN.clear();
-  const k = ink(col, shadow, x, y, w, s); SEEN.set(key, { k, t: now + 250 + Math.random() * 150 }); return k;   // staggered, so the re-checks don't all land on one frame
+  const first = hit ? hit.first : now, plain = { col, outline: false };
+  if (!(SNAP.taken > first)) {   // SNAP is older than this string (a box that just opened, a plate that just slid in): draw it as written until a copy has it in
+    if (hit) hit.t = now + 50; else SEEN.set(key, { k: plain, t: now + 50, first, seen: now });
+    return hit ? hit.k : plain;
+  }
+  const k = ink(str, col, shadow, x, y, w, s, !!(hit && hit.k.outline), hit ? hit.k.col : col);
+  if (!k) { if (hit) hit.t = now + 50; return hit ? hit.k : plain; }   // that copy is of another screen: keep what it had, look again soon
+  SEEN.set(key, { k, t: now + 250 + Math.random() * 150, first, seen: now }); return k;   // staggered, so the re-checks don't all land on one frame
 }
 function rgbOf(c) {   // '#rgb', '#rrggbb', 'rgb()' or 'rgba()' to [r, g, b, a], cached
   let v = RGB.get(c); if (v) return v;
@@ -95,7 +108,8 @@ function rgbOf(c) {   // '#rgb', '#rrggbb', 'rgb()' or 'rgba()' to [r, g, b, a],
   if (v.some(n => isNaN(n))) v = [255, 255, 255, 1];
   RGB.set(c, v); return v;
 }
-const chan = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+const CHAN = Array.from({ length: 256 }, (_, v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+const chan = v => CHAN[Math.max(0, Math.min(255, Math.round(v)))];   // a table: ink runs this on every pixel it measures
 const lumOf = (r, g, b) => 0.2126 * chan(r) + 0.7152 * chan(g) + 0.0722 * chan(b);
 const ratio = (a, b) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 function toHsl(r, g, b) {
@@ -109,18 +123,59 @@ function fromHsl(h, s, l) {
   const q = l < 0.5 ? l * (1 + s) : l + s - l * s, p = 2 * l - q;
   return [f(p, q, h + 1 / 3), f(p, q, h), f(p, q, h - 1 / 3)].map(v => Math.round(v * 255));
 }
-function ink(col, shadow, x, y, w, s) {
+function ink(str, col, shadow, x, y, w, s, wasOutline, drawnCol) {   // null: no copy of this screen to measure yet; drawnCol: the colour it went out in last
   const plain = { col, outline: false };
   if (rgbOf(col)[3] < 1) return plain;   // see-through type is a watermark or a ghost on purpose
-  if (!ctx.getImageData || !ctx.getTransform) return plain;   // the node test harness's stub canvas
+  if (!ctx.getTransform) return plain;   // the node test harness's stub canvas
   const m = ctx.getTransform(); if (!m || m.b || m.c || m.a <= 0 || m.d <= 0) return plain;
-  const X0 = Math.max(0, Math.floor(m.a * x + m.e) - 1), Y0 = Math.max(0, Math.floor(m.d * y + m.f) - 1);
-  const X1 = Math.min(cv.width, Math.ceil(m.a * (x + w) + m.e) + 1), Y1 = Math.min(cv.height, Math.ceil(m.d * (y + 5 * s) + m.f) + 1);
-  if (X1 - X0 < 1 || Y1 - Y0 < 1) return plain;
-  let px; try { px = ctx.getImageData(X0, Y0, X1 - X0, Y1 - Y0).data; } catch (e) { return plain; }
-  const ls = []; for (let i = 0; i < px.length; i += 8) ls.push(lumOf(px[i], px[i + 1], px[i + 2]));   // every other pixel is plenty
+  const S = SNAP; if (!S.px || S.key !== snapKey()) return null;
+  const X0 = Math.floor(m.a * x + m.e) - 1, Y0 = Math.floor(m.d * y + m.f) - 1;
+  const X1 = Math.ceil(m.a * (x + w) + m.e) + 1, Y1 = Math.ceil(m.d * (y + 5 * s) + m.f) + 1, bw = X1 - X0, bh = Y1 - Y0;
+  if (bw < 1 || bh < 1 || bw * bh > 40000) return plain;
+  // The copy already holds this string as it was drawn last time (its type and shadow): mask those pixels out, so only what's behind it is measured.
+  const mask = new Uint8Array(bw * bh), gw = Math.max(1, Math.ceil(m.a * s)), gh = Math.max(1, Math.ceil(m.d * s));
+  const offs = !shadow ? [[0, 0]] : wasOutline ? [[0, 0], [-s, 0], [s, 0], [0, -s], [0, s], [s, s]] : [[0, 0], [s, s]], gp = [];
+  for (let i = 0; i < str.length; i++) {
+    const g = GLYPH[str[i]] || GLYPH['?'];
+    for (let p = 0; p < 15; p++) if (g[p] === '1') for (const [dx, dy] of offs) {
+      const gx = Math.floor(m.a * (Math.round(x) + i * 4 * s + (p % 3) * s + dx) + m.e) - X0, gy = Math.floor(m.d * (Math.round(y) + Math.floor(p / 3) * s + dy) + m.f) - Y0;
+      if (!dx && !dy) gp.push(gx, gy);   // where the type itself lands, to find it in the copy
+      for (let v = Math.max(0, gy); v < Math.min(bh, gy + gh); v++) for (let u = Math.max(0, gx); u < Math.min(bw, gx + gw); u++) mask[v * bw + u] = 1;
+    }
+  }
+  // Type drawn in the world phase may have moved since the copy: a sign on the set scrolls with the camera, a backdrop at half speed, a plate pinned
+  // to the screen not at all. Look for the string's own type in the copy at each, and measure around the one that finds it.
+  // Things that move on their own (a fan's bubble, a bouncing counter) get a small search round that spot when the type isn't quite where expected.
+  const px = S.px, ls = [], [cr, cg, cb] = rgbOf(drawnCol), np = gp.length / 2;
+  const found = (fx, fy) => {
+    let n = 0;
+    for (let j = 0; j < gp.length; j += 2) {
+      const sx = X0 + gp[j] + fx, sy = Y0 + gp[j + 1] + fy; if (sx < 0 || sy < 0 || sx >= S.w || sy >= S.h) continue;
+      const i = (sy * S.w + sx) * 4; if (Math.abs(px[i] - cr) + Math.abs(px[i + 1] - cg) + Math.abs(px[i + 2] - cb) < 90) n++;   // loose: grade and bloom tint it a little
+    }
+    return n;
+  };
+  let ox = 0, oy = 0, best = found(0, 0);
+  const margin = Math.max(2, np * 0.2);   // a spot has to find clearly more of it to win (type drawn in layers, like the menus' gold, half-matches anywhere)
+  const cdx = inkWorld && S.cam && drawnCam ? (drawnCam[0] - S.cam[0]) * m.a : 0, cdy = inkWorld && S.cam && drawnCam ? (drawnCam[1] - S.cam[1]) * m.d : 0;
+  if (Math.round(cdx) || Math.round(cdy)) for (const f of [1, 0.5]) { const fx = Math.round(cdx * f), fy = Math.round(cdy * f), n = found(fx, fy); if (n >= best + margin) { best = n; ox = fx; oy = fy; } }
+  if (np && best < np * 0.7) {
+    const bx = ox, by = oy, base = best; let top = base;
+    for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) { if (!dx && !dy) continue; const n = found(bx + dx, by + dy); if (n > top && n >= base + margin) { top = n; ox = bx + dx; oy = by + dy; } }
+    best = top;
+    if (best < np * 0.5) return null;   // not found (a title flying in, a sign half off screen): the copy can't say what's behind it, so keep what it had
+  }
+  for (let v = 0; v < bh; v++) {
+    const sy = Y0 + v + oy; if (sy < 0 || sy >= S.h) continue;
+    for (let u = 0; u < bw; u++) {
+      const sx = X0 + u + ox; if (mask[v * bw + u] || sx < 0 || sx >= S.w) continue;
+      const i = (sy * S.w + sx) * 4; ls.push(lumOf(px[i], px[i + 1], px[i + 2]));
+    }
+  }
+  if (!ls.length) return plain;
   ls.sort((a, b) => a - b);
   const bg = ls[ls.length >> 1], need = s * m.a >= 2 ? 3 : 4.5, [r, g, b] = rgbOf(col), fl = lumOf(r, g, b);
+  if (INKCHECK) inkCheck(bg, fl, need, m, x, y, w, s, str);
   if (ratio(fl, bg) >= need) return plain;
   if (shadow) { const [sr, sg, sb] = rgbOf(shadow), sl = lumOf(sr, sg, sb); if (sl < fl && ratio(fl, sl) >= need && bg > sl) return { col, outline: true }; }
   const key = col + '|' + need + '|' + Math.round(bg * 40);   // backgrounds bucketed, so type over moving scenery doesn't shimmer
@@ -132,6 +187,49 @@ function ink(col, shadow, x, y, w, s) {
     out = 'rgb(' + c.join(',') + ')'; INKED.set(key, out);
   }
   return { col: out, outline: false };
+}
+
+// ?inkcheck: also reads the live canvas the old way (slow) and tallies how far SNAP's background reading is from it, in DD.inkCheck
+const INKCHECK = Q.has('inkcheck');
+function inkCheck(bg, fl, need, m, x, y, w, s, str) {   // tallies type that SNAP and the live canvas disagree on (one says it reads, the other says fix it)
+  const X0 = Math.max(0, Math.floor(m.a * x + m.e) - 1), Y0 = Math.max(0, Math.floor(m.d * y + m.f) - 1);
+  const X1 = Math.min(cv.width, Math.ceil(m.a * (x + w) + m.e) + 1), Y1 = Math.min(cv.height, Math.ceil(m.d * (y + 5 * s) + m.f) + 1);
+  if (X1 - X0 < 1 || Y1 - Y0 < 1) return;
+  const px = ctx.getImageData(X0, Y0, X1 - X0, Y1 - Y0).data, ls = []; for (let i = 0; i < px.length; i += 8) ls.push(lumOf(px[i], px[i + 1], px[i + 2]));
+  ls.sort((a, b) => a - b); const live = ls[ls.length >> 1], C = DD.inkCheck = DD.inkCheck || { n: 0, same: 0, diff: [] };
+  C.n++; if ((ratio(fl, live) >= need) === (ratio(fl, bg) >= need)) C.same++; else if (C.diff.length < 40) C.diff.push(str.slice(0, 20) + ' @' + Math.round(x) + ',' + Math.round(y) + 'x' + s + (inkWorld ? 'w' : '') + ' live ' + live.toFixed(3) + ' snap ' + bg.toFixed(3));
+}
+// ---------------------------------------------------------------- SNAP: a copy of the finished frame, for the things that measure the screen
+// Reading a GPU canvas back mid-frame stalls the frame (and makes Chrome move the canvas to the CPU), so ink and the rim light measure a copy instead:
+// a few times a second the finished frame is copied (createImageBitmap, which doesn't wait) and read back between frames, tagged with where the camera
+// and the Dot were. The read-back has a fixed cost (about 3.5 ms on a fast Mac, whatever the size), so it happens 4 times a second, fewer on lighter tiers.
+const SNAP = { px: null, w: 0, h: 0, key: null, cam: null, busy: false, at: 0, taken: -1 };   // at: when the last copy was started; taken: when the one in px was
+let snapCv = null, snapG = null, inkWorld = false, drawnCam = null, rimAtXY = null;
+const snapKey = () => scene || G;   // which screen a copy belongs to: a menu scene, or the stage being played
+function snapTick(now) {   // end of every frame: take a copy every 250 ms (400 on tier 1, 800 from tier 2), once the last one is in
+  if (SNAP.busy || now - SNAP.at < [250, 400, 800, 800][GFX.tier] || typeof createImageBitmap !== 'function' || !cv.getBoundingClientRect) return;
+  SNAP.at = now; SNAP.busy = true;
+  const took = performance.now(), key = snapKey(), cam = !scene && drawnCam ? drawnCam.slice() : null, rim = !scene && rimAtXY ? rimAtXY.slice() : null, done = () => { SNAP.busy = false; };
+  try {
+    createImageBitmap(cv).then(im => {
+      try {
+        if (!snapG) { snapCv = document.createElement('canvas'); snapG = snapCv.getContext('2d', { willReadFrequently: true }); }
+        if (snapCv.width !== im.width || snapCv.height !== im.height) { snapCv.width = im.width; snapCv.height = im.height; }
+        snapG.clearRect(0, 0, im.width, im.height); snapG.drawImage(im, 0, 0);
+        Object.assign(SNAP, { px: snapG.getImageData(0, 0, im.width, im.height).data, w: im.width, h: im.height, key, cam, taken: took });
+        if (rim) rimLum = rimFromSnap(rim);
+      } catch (e) {}
+      if (im.close) im.close(); done();
+    }, done);
+  } catch (e) { done(); }
+}
+function rimFromSnap([X, Y, w, h]) {   // the set around the Dot (a ring round it, since the copy has the Dot in it): its average brightness
+  const d = SNAP.px, ex0 = X - w / 2 - 3, ex1 = X + w / 2 + 3, ey0 = Y - h - 6; let s = 0, n = 0;
+  for (let y = Math.max(0, Math.round(Y - 34)); y < Math.min(SNAP.h, Math.round(Y)); y += 2) for (let x = Math.max(0, Math.round(X - 20)); x < Math.min(SNAP.w, Math.round(X + 20)); x += 2) {
+    if (x >= ex0 && x <= ex1 && y >= ey0) continue;
+    const i = (y * SNAP.w + x) * 4; s += d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11; n++;
+  }
+  return n ? s / n : 255;
 }
 
 // ---------------------------------------------------------------- audio: tiny synth, unlocked on first input
@@ -213,13 +311,18 @@ addEventListener('keydown', e => {
   if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space', 'Tab'].includes(e.code)) e.preventDefault();
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
-addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; autoPause(); });
+function autoPause() {   // the window lost focus or the tab was hidden mid-stage: pause, so a Dot isn't lost while you were away (menus, cutscenes and results are left alone)
+  if (scene || !G || G.state !== 'play' || G.done || CUT || TR || G.fall) return;
+  G.state = 'pause'; G.pm.sel = 0;
+}
+try { document.addEventListener('visibilitychange', () => { if (document.hidden) autoPause(); }); } catch (e) {}
 let padNote = null, padSeen = {};   // padNote { s, until }: a strip saying a controller just showed up (or went away). readInput polls for pads every frame, so the first
 const notePad = s => { padNote = { s, until: performance.now() + 2500 }; };   // button or stick push the browser passes on connects it, connection events or not
 const KJ = ['KeyZ', 'Space', 'KeyK', 'ArrowUp', 'KeyW'], KS = ['KeyX', 'KeyC', 'KeyJ', 'KeyL', 'ShiftLeft', 'ShiftRight', 'Tab'];
 const ORDER = ['sam', 'mel', 'cloud', 'baxter'];
 const PORTRAITS = ORDER.map((dot, i) => ({ dot, x: VW - 84 + i * 20, y: 4, w: 18, h: 22 }));
-let padPrev = {}, padNav = {}, padUsed = false, SCRIPT = null, clickPick = null, clickAt = null;   // per-controller button state (edges), and whether the controller was the last thing used (for the prompts)
+let padPrev = {}, padNav = {}, padUsed = false, padId = '', SCRIPT = null, clickPick = null, clickAt = null;   // per-controller button state (edges), and whether the controller was the last thing used (for the prompts)
 cv.addEventListener('pointerdown', e => {
   initAudio();
   const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) * VW / r.width, y = (e.clientY - r.top) * VH / r.height;
@@ -237,7 +340,7 @@ function readInput() {
   let ok = hit(['Enter', 'Space', 'KeyZ']);   // menu confirm (jp also fires on ArrowUp, so menus use ok/back)
   let nx = (hit(['ArrowRight', 'KeyD']) ? 1 : 0) - (hit(['ArrowLeft', 'KeyA']) ? 1 : 0), ny = (hit(['ArrowDown', 'KeyS']) ? 1 : 0) - (hit(['ArrowUp', 'KeyW']) ? 1 : 0);
   ORDER.forEach((dot, i) => { if (hits['Digit' + (i + 1)]) pick = dot; });
-  let back = hit(['Escape', 'KeyX', 'Backspace']), spPrev = false, again = false, opt = hit(['KeyO']), store = hit(['KeyH']);
+  let back = hit(['Escape', 'KeyX', 'Backspace']), spPrev = false, again = hit(['KeyR']), opt = hit(['KeyO']), store = hit(['KeyH']);
   if (Object.keys(hits).length) padUsed = false;   // a key was pressed: show keyboard prompts
   let anyIn = Object.keys(hits).length > 0 || !!click;   // any key, click or controller button at all: "press start" screens take it
   const pads = navigator.getGamepads ? navigator.getGamepads() : [], live = {};
@@ -247,7 +350,8 @@ function readInput() {
     const ax = p.axes[0] || 0, ay = p.axes[1] || 0, B = i => !!(p.buttons[i] && p.buttons[i].pressed), was = padPrev[p.index] || {}, nav = padNav[p.index] || {};
     const pd = ay > 0.5 || B(13), pj = B(0), pc = B(1), psw = B(5), pl1 = B(4), pt = B(3), ps = B(9), psq = B(2);
     const pa = p.buttons.some(b => b && b.pressed) || p.axes.slice(0, 4).some(a => Math.abs(a) > 0.5);   // anything on the pad: every button (PS, touchpad, share too) and either stick
-    if (pa) padUsed = true;
+    if (pa) { padUsed = true; padId = p.id || ''; }
+    if (pa && !was.a) { initAudio(); try { window.dispatchEvent(new Event('dd-pad')); } catch (e) {} }   // a pad press unlocks audio like a keydown (music.js, voice.js listen), so pad-only play isn't silent
     anyIn = anyIn || (pa && !was.a);
     l = l || ax < -0.4 || B(14); r = r || ax > 0.4 || B(15); d = d || pd;
     j = j || pj; ok = ok || (pj && !was.j); jp = jp || (pj && !was.j); sp = sp || (psw && !was.sw); spPrev = spPrev || (pl1 && !was.l1);
@@ -359,7 +463,9 @@ function build() {
   placeFact();
   G.cam = { x: clamp(cx(G.pl) - VW / 2, 0, LW - VW), y: clamp(bot(G.pl) - VH * CAM_FEET, 0, LH - VH), look: 0 };
   if (RUN()) { G.state = 'play'; G.intro = INTRO_T; G.cutOpen = true; ORDER.forEach(d => { G.seen[d] = true; }); G.met = { gh: true, th: true }; }   // a speedrun drops straight into play: no title card, wipe, first-time banners or NEW FAN cards
-  hook('init', G); if (!TR) setTimeout(() => vo('level_start'), 600);
+  const n0 = popsTotal; hook('init', G);
+  if (popsTotal !== n0) { unbury(); if (K.bags) G.got = G.hudGot = Math.ceil(popsTotal * Math.min(6, K.bags) / 5); G.bagN = Math.floor(5 * bagFrac()); }   // the stage's init added kernels: OUTSIDE FOOD's bags and the bag count are worked out on the full total
+  if (!TR) setTimeout(() => vo('level_start'), 600);
 }
 function unbury() {   // safety net: a kernel or pickup placed inside solid tiles is lifted to the first open space above it
   const solidAt = (x, y) => { const t = T(Math.floor(x / TS), Math.floor(y / TS)); return t === 1 || t === 3; };
@@ -384,6 +490,7 @@ function setTile(x, y, kind) {   // change one tile at runtime: kind string, or 
 }
 const classic = () => (window.CLASSICS || {})[L.id];   // this stage's Popcorn Classic tape, rating extra and blue card (classics.js)
 const bagFrac = () => popsTotal ? Math.min(1, G.got / popsTotal) : 1;
+const allPopNow = () => pops.length > 0 && pops.every(c => c.got);   // every kernel really picked up (the bonus bags, a blue card and OUTSIDE FOOD can make five bags without it)
 function makePlayer(dot, x, bottom) {
   const D = DOTS[dot];
   return { dot, x, y: bottom - D.h, w: D.w, h: D.h, vx: 0, vy: 0, face: 1, ground: null, onGround: false, coyote: 0, buf: 0,
@@ -574,14 +681,19 @@ function drawBossHUD() {   // the boss's name and health pips, in a slim plate a
 }
 
 // ---------------------------------------------------------------- player
-function setDot(dot) {
+function setDot(dot, quiet) {   // true when the switch happened; quiet: a cycle trying each Dot in turn stays silent about the ones that don't fit
   const p = G.pl, D = DOTS[dot], c = cx(p), b = bot(p);
   if (dot === p.dot) return;
   if (!G.owned.includes(dot)) { SFX.buzz(); G.lockT[dot] = 20; float(c, p.y - 6, 'NOT IN THE CAST YET', '#ff8080'); return; }   // a Dot who hasn't joined: the portrait shakes
-  if (!boxFree(c - D.w / 2, b - D.h, D.w, D.h)) { SFX.buzz(); G.denyT = 20; float(c, p.y - 6, 'NO ROOM', '#ff8080'); return; }
+  if (!boxFree(c - D.w / 2, b - D.h, D.w, D.h)) { if (!quiet) { SFX.buzz(); G.denyT = 20; float(c, p.y - 6, 'NO ROOM', '#ff8080'); } return false; }
   p.dot = dot; p.w = D.w; p.h = D.h; p.x = c - D.w / 2; p.y = b - D.h; p.rolling = false; p.slam = 0;
   p.sy = 1.45; p.sx = 0.65; p.svx = p.svy = 0; p.landT = 0; SFX.switch(dot); vo('dot', { dot }); stars(c, b - D.h / 2, 10, D.col);
   if (!G.seen[dot]) { G.seen[dot] = true; banner(D.name, 110, D.how); } else float(c, b - D.h - 6, D.name, D.col);
+  return true;
+}
+function collectLoose() {   // credit every loose kernel still out there (a skipped knock-out scene would otherwise leave its popcorn burst on the floor)
+  for (const c of loose) if (!c.got) { c.got = true; G.got += c.v || 1; parts.push({ x: c.x, y: c.y, vx: 0, vy: -2, life: 30, max: 30, pop: true, g: 0.18, hud: true, hudAt: 7, sc: 0.7 }); }
+  popSound();
 }
 function rumble(strong, weak, ms) {   // controller rumble, where the browser supports it
   if (!padUsed || TR || !navigator.getGamepads) return;
@@ -589,6 +701,7 @@ function rumble(strong, weak, ms) {   // controller rumble, where the browser su
 }
 const BURST_LIFE = 150, BURST_KEEP = 0.7;   // frames the burst stays grabbable; the share of the lost bag that can be won back
 function loseBag(x, y, frac = 1) {   // a pit costs one bag (a fifth of the stage's popcorn), a hit half a bag; capped at what you hold
+  if (G.done || (G.boss && G.boss.dead)) return;   // the fight is won: a pit in the knock-out scene costs nothing
   const n = Math.min(G.got, Math.max(frac < 1 ? 2 : 3, Math.ceil(popsTotal / 5 * frac)));
   if (n <= 0) return;
   G.got -= n; G.bagLost = (G.bagLost || 0) + 1; if (G.got > 0 && G.got < Math.ceil(popsTotal / 5)) vo('lastbag');
@@ -614,7 +727,7 @@ function updatePlayer() {
   const wasGround = p.onGround;
   if (IN.jp) p.buf = P.buffer; else if (p.buf > 0) p.buf--;
   p.held = IN.j;
-  if (p.inv > 0) p.inv--;
+  if (p.inv > 0 && !G.fall) p.inv--;   // the respawn's invulnerability waits out the opening iris: the full 60 frames are control time
   if (G.star > 0) {   // GERM FREE: counts down only while you're playing; rainbow sparkles trail off the Dot
     if (G.star === G.pk.star) { SFX.star(); float(cx(p), p.y - 14, 'GERM FREE!', '#ffe680'); }
     if (--G.star === 0) { SFX.germsBack(); float(cx(p), p.y - 10, 'GERMS ARE BACK', '#cfc6bc'); }
@@ -629,7 +742,8 @@ function updatePlayer() {
   if (IN.pick) setDot(IN.pick);
   else if (IN.sp || IN.spPrev) {   // cycle through the Dots in the cast; L1 goes the other way
     const O = G.owned, i = O.indexOf(p.dot);
-    if (O.length > 1) setDot(O[(i + (IN.sp ? 1 : O.length - 1)) % O.length]); else { SFX.buzz(); float(cx(p), p.y - 6, 'NO ONE ELSE YET', '#ff8080'); }
+    if (O.length > 1) { let ok = false; for (let k = 1; k < O.length && !ok; k++) ok = setDot(O[(i + (IN.sp ? 1 : O.length - 1) * k) % O.length], true); if (!ok) { SFX.buzz(); G.denyT = 20; float(cx(p), p.y - 6, 'NO ROOM', '#ff8080'); } }   // the next Dot that fits; only when none do, the buzz
+    else { SFX.buzz(); float(cx(p), p.y - 6, 'NO ONE ELSE YET', '#ff8080'); }
   }
   // Mel curls into a bowling ball when she's running, and to squeeze under anything lower than her full height
   const wasRolling = p.rolling;
@@ -760,7 +874,7 @@ const FALL_OUT = 20, FALL_IN = 22;   // frames: iris closing after a pit, iris o
 function updateFall() {   // the respawn happens when the iris is shut (t = FALL_OUT); the opening that follows is visual only
   const f = G.fall, p = G.pl; f.t++;
   if (f.t === FALL_OUT) {
-    if ((G.frame - (G.lastRespawn || -1e9) < 120 || !G.landed) && G.cpSafe) G.safe = Object.assign({}, G.cpSafe);   // died again before landing anywhere: the footing spot is a trap, go back to the checkpoint
+    if (!G.landed && G.cpSafe) G.safe = Object.assign({}, G.cpSafe);   // died again before landing anywhere: the footing spot is a trap, go back to the checkpoint
     G.safe = respawnSpot(p);   // and never into a hole: the spot must have room and a floor under it
     G.lastRespawn = G.frame; G.landed = false;
     Object.assign(p, { x: G.safe.x, y: G.safe.y + p.h - DOTS[p.dot].h, h: DOTS[p.dot].h, vx: 0, vy: 0, inv: 60, rolling: false, slam: 0 });
@@ -969,7 +1083,7 @@ function interact() {
   for (const c of pops) {
     if (c.got) continue;
     if (c.x > box.x && c.x < box.x + box.w && c.y > box.y && c.y < box.y + box.h) {
-      c.got = true; G.got++; popSound(); sparkle(c.x, c.y); if (pops.every(o => o.got)) vo('allpop'); parts.push({ x: c.x, y: c.y, vx: 0, vy: -1, life: 14, max: 14, r: 3, col: '#fff6d4', ring: true, g: 0 });
+      c.got = true; G.got++; popSound(); sparkle(c.x, c.y); if (pops.every(o => o.got)) { vo('allpop'); if (G.pk && G.pk.six && Math.floor(5 * bagFrac()) >= 5) G.bagWig[5] = 34; } parts.push({ x: c.x, y: c.y, vx: 0, vy: -1, life: 14, max: 14, r: 3, col: '#fff6d4', ring: true, g: 0 });
       parts.push({ x: c.x, y: c.y, vx: (Math.random() - 0.5) * 1.2, vy: -2.2, life: 34, max: 34, pop: true, g: 0.18, hud: true, hudAt: 9, sc: 0.7 });   // and the kernel flies up to the counter
       if (c.tag && !G.secrets[c.tag]) { G.secrets[c.tag] = true; }
     }
@@ -1023,6 +1137,7 @@ function interact() {
   const B = G.boss; if (B && B.engaged && B.arena && !B.dead) p.x = clamp(p.x, B.arena[0], B.arena[1] - p.w);   // arena walls
 }
 function finish(goal) {
+  for (const c of pops) if (!c.got && c.x > goal.x && c.x < goal.x + goal.w && c.y > goal.y && c.y < goal.y + goal.h) { c.got = true; G.got++; popSound(); sparkle(c.x, c.y); }   // a kernel inside the flag's trigger box can't be reached before the win fires: it counts now, so every kernel stays collectable
   const frac = clamp((bot(goal) - bot(G.pl)) / goal.h, 0, 1), go = () => endLevel(frac, Math.round(frac * 10));
   if (!cue('goal', { then: go })) go();   // a stage-end scene (a Dot joining) plays first
 }
@@ -1161,8 +1276,8 @@ function updateCamera(snap = false) {
   if (p.onGround) ty = bot(p) - VH * CAM_FEET;
   if (p.y < c.y + 28) ty = p.y - 28;
   if (bot(p) > c.y + VH - 24) ty = bot(p) - VH + 24;
-  ty = clamp(ty, 0, LH - VH);
-  c.y += (ty - c.y) * (snap ? 1 : p.onGround ? 0.08 : 0.12);
+  ty = clamp(ty, p.y < TS / 4 ? -TS : 0, LH - VH);   // a Dot who has flown up past the map's top row is followed a tile above it
+  c.y += (ty - c.y) * (snap ? 1 : p.onGround ? 0.08 : p.y < c.y + 4 ? 0.3 : 0.12);   // quicker to catch a Dot who is above the frame
   hook('camera', G, c, snap);   // a level can take the camera over (2-3's auto-scroll)
 }
 
@@ -1172,7 +1287,7 @@ const speaker = who => SPEAK[who] || { col: '#ffe680', pitch: 230 + (String(who)
 function sayLine(who, txt, o = {}) {
   if (RUN()) return;   // a speedrun has no dialogue holds   // queue one line: who 'tim' | 'gregg' | a key of LEVEL.portraits. o: { name, hold (frames after typing), col, now (cut in front) }
   if (!G || !G.dlg) return;
-  txt = String(txt).replace(/[‘’]/g, "'").replace(/[“”"]/g, '').replace(/[—–]/g, '-').replace(/…/g, '...').replace(/;/g, ',').toUpperCase();
+  txt = keyText(txt).replace(/[‘’]/g, "'").replace(/(\d)[”"]/g, '$1\u0001').replace(/[“”"]/g, '').replace(/\u0001/g, '"').replace(/[—–]/g, '-').replace(/…/g, '...').replace(/;/g, ',').toUpperCase();
   const lines = []; let cur = '';
   for (const w of txt.split(/\s+/)) { if (cur && cur.length + 1 + w.length > 64) { lines.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w; }
   if (cur) lines.push(cur);
@@ -1286,7 +1401,7 @@ function drawPause() {
     if (on) { ctx.fillStyle = 'rgba(232,80,74,0.35)'; ctx.fillRect(VW / 2 - 70, y - 4, 140, 17); ctx.fillStyle = '#fff'; for (let i = 0; i < 5; i++) { ctx.fillRect(VW / 2 - 64 + i, y + i, 1, 9 - 2 * i); ctx.fillRect(VW / 2 + 60 - i, y + i, 1, 9 - 2 * i); } }   // the selection arrows
     text(it, VW / 2, y, on ? '#fff' : '#9a8a90', 2, '#000', 'center');
   });
-  text(padUsed ? 'UP/DOWN + CROSS.  OPTIONS: RESUME' : 'UP/DOWN + ENTER, OR CLICK.  ESC: RESUME', VW / 2, VH - 16, '#cfc6bc', 1, '#000', 'center');
+  text(padUsed ? 'UP/DOWN + ' + btn('cross') + '.  ' + btn('options') + ': RESUME' : touchOn() ? 'TAP ONE.  TAP OUTSIDE TO RESUME' : 'UP/DOWN + ' + jumpKey() + ', OR CLICK.  ESC: RESUME', VW / 2, VH - 16, '#cfc6bc', 1, '#000', 'center');
 }
 
 // ---------------------------------------------------------------- results: the count-up (popcorn, bags, VHS, foam heads, rating, NEXT tease)
@@ -1306,12 +1421,14 @@ function cardSetup(d) {   // lay out the count-up timeline (card clock c, in fra
   const bags = Math.floor(5 * bagFrac()), cdur = clamp(Math.round(G.got * 0.6), 30, 110), cnt0 = 24, tape0 = cnt0 + cdur + 16, bag0 = tape0 + 26;
   const six = bags === 5, g0 = bag0 + bags * BAG_GAP + 6, tally = g0 + 6 + (six ? SIX_T : 0), cl = classic();
   const rt = { vhs: tally }; let t = tally; if (cl) rt.card = t += ROW_GAP; if ((G.dsecDots || []).length) rt.dsec = t += ROW_GAP; rt.foam = t += ROW_GAP; const hei0 = t + ROW_GAP + 4;   // five bags: Tim tries to add a sixth, Gregg cites the VFA maximum
-  const sixWin = six && !!(G.pk && G.pk.six);   // the HEI store's SIX BAGS: this time the sixth bag stays
+  const sixWin = six && !!(G.pk && G.pk.six) && allPopNow();   // the HEI store's SIX BAGS: this time the sixth bag stays
   const rating = sixWin ? (cl ? 'SIX BAGS AND ' + cl.garnish : "SIX BAGS. TIM'S CALL.") : bags === 5 && cl ? 'FIVE BAGS AND ' + cl.garnish : RATINGS[bags], nxt = nextTease(), r0 = hei0 + 40, n0 = r0 + rating.length * TYPE + 24;
   let rl = [rating]; if (rating.length > 34) { const k = / BAGS AND /.test(rating) ? rating.indexOf(' AND ') + 4 : rating.lastIndexOf(' ', 34); rl = [rating.slice(0, k), rating.slice(k + 1)]; }   // two lines when the extra runs long
+  d.joins = DD.opts && DD.opts.joins;   // the join banner's Dot, kept: saving below marks the stage beaten, which clears opts.joins
   Object.assign(d, { card: true, c: 0, bags, cnt0, cdur, tape0, bag0, six, sixWin, g0, tally, rt, hei0, rating, rl, r0, next: nxt, n0, END: (nxt ? n0 + (nxt.length + 6) * TYPE : r0 + rating.length * TYPE) + 30 + (DD.opts && DD.opts.joins ? 130 : 0) });
   G.dlg.q.length = 0; G.dlg.cur = null;
   if (!TR && DD.opts && DD.opts.perks && window.DDStore) d.hei = window.DDStore.award(result());   // the HEI store's pay-out (store.js award)
+  if (!TR && DD.opts && DD.opts.onSave && !d.saved) { d.saved = true; DD.opts.onSave(result()); }   // the win is saved the moment it is paid, once: closing the tab on the card can't keep the points and lose the clear (exit and AGAIN just save the same result again)
 }
 const HEIBTN = { x: VW - 70, y: 15, w: 46, h: 32 };   // the results card's HEI Points box, which opens the store (inside the card, which runs x 20 to VW - 20, and right of the SIX BAGS sixth tub at x 229-247)
 function updateResults() {
@@ -1347,7 +1464,7 @@ function drawResults() {
   const cl = classic(), two = d.rl.length > 1, ds = G.dsecDots || [], BY = 33, RY = two ? 58 : 60, NAVY = '#0a1a4a';
   const gt = d.six ? c - d.g0 : -1;
   if (gt >= 0 && gt < 50) text('TIM: SIX BAGS. MY CALL.', VW / 2, 18, '#94e0cc', 2, NAVY, 'center');
-  else if (gt >= 50 && gt < SIX_T) text(d.sixWin ? "IT'S SIX BAGS CINEMA TIME." : 'GREGG: FIVE IS THE HIGHEST.', VW / 2, 18, d.sixWin ? '#94e0cc' : '#ffe680', 2, NAVY, 'center');
+  else if (gt >= 50 && gt < SIX_T) text(d.sixWin ? "IT'S SIX BAG CINEMA TIME." : 'GREGG: FIVE IS THE HIGHEST.', VW / 2, 18, d.sixWin ? '#94e0cc' : '#ffe680', 2, NAVY, 'center');
   else text(d.sixWin && gt >= SIX_T ? "TIM'S RATING" : "GREGG'S RATING", VW / 2, 18, d.sixWin && gt >= SIX_T ? '#94e0cc' : '#fff', 2, NAVY, 'center');
   if (d.sixWin && gt >= 18) { const sx = VW / 2 - 61 + 5 * 26, p = gt >= 50 && gt < 64 ? Math.round(Math.sin((gt - 50) / 14 * Math.PI) * 5) : 0; drawBag(sx, BY - p, 1, 0.35, 0, 1 + p * 0.04); }   // SIX BAGS: the sixth stays on the scale
   else if (gt >= 0 && gt < SIX_T) {   // the sixth bag slides in from Tim's side, then Gregg knocks it off the scale
@@ -1361,7 +1478,8 @@ function drawResults() {
   }
   if (hit) { ctx.fillStyle = 'rgba(255,240,200,' + (0.25 * (1 - (c - rEnd) / 10)) + ')'; ctx.fillRect(24, RY - 3, VW - 48, two ? 28 : 15); }
   if (c >= d.r0) { let t0 = d.r0; d.rl.forEach((l, i) => { text(typed(l, t0), VW / 2 - Math.floor((l.length * 8 - 2) / 2), RY + i * 13, '#ffd27a', 2, '#000'); t0 += (l.length + 1) * TYPE; }); }
-  const rows = ['pop', 'tape', 'vhs'].concat(cl ? ['card'] : [], ds.length ? ['dsec'] : [], ['foam']), st = two ? 8 : 9, LY = RY + (two ? 30 : 19);   // every row's slot is fixed up front, so nothing shifts as they reveal
+  const scr = /-bonus$/.test(L.id || ''), rows = scr ? ['pop'] : ['pop', 'tape', 'vhs'].concat(cl ? ['card'] : [], ds.length ? ['dsec'] : [], ['foam']),   // a Popcorn Classic screening has no tape, no foam: just the popcorn count
+     st = two ? 8 : 9, LY = RY + (two ? 30 : 19);   // every row's slot is fixed up front, so nothing shifts as they reveal
   ctx.fillStyle = '#1a47a6'; ctx.fillRect(32, LY - 5, VW - 64, rows.length * st + 5); ctx.fillStyle = '#3a6ad0'; ctx.fillRect(32, LY - 5, VW - 64, 1);   // the ledger's inset
   const row = (key, lab, val, col, dy = 0, vw = String(val).length * 4 - 1) => {
     const y = LY + rows.indexOf(key) * st, xv = VW - 40 - vw;
@@ -1373,15 +1491,15 @@ function drawResults() {
   const k = clamp((c - d.cnt0) / d.cdur, 0, 1), shown = Math.round(G.got * k);
   const cj = k > 0 && k < 1 && (c - d.cnt0) % 3 < 1 ? 1 : 0;   // the count ticks with a little jump
   if (c > d.cnt0) row('pop', 'POPCORN', shown + ' / ' + popsTotal, '#fff6d4', cj);
-  if (c >= d.tape0) {
+  if (c >= d.tape0 && !scr) {
     if (!d.boss) row('tape', 'UP THE TAPE', Math.round(d.frac * 100) + '%  +' + d.bonus, '#fff6d4');
     else row('tape', G.boss ? G.boss.name : 'BOSS', 'DEFEATED', '#fff6d4');
   }
-  if (c >= d.tally) row('vhs', 'POPCORN CLASSIC', G.vhs && cl ? cl.title + ' (' + cl.year + ')' : G.vhs ? 'FOUND' : 'STILL OUT THERE', G.vhs ? '#ffe680' : '#7f93cc');
-  if (cl && c >= d.rt.card) row('card', 'BLUE CARD', G.factGot === 'right' ? 'YOU CALLED IT  +25' : G.factGot ? 'CALLED IT WRONG' : 'STILL OUT THERE', G.factGot === 'right' ? '#94e0cc' : G.factGot ? '#ff9a8a' : '#7f93cc');
+  if (c >= d.tally && !scr) row('vhs', 'POPCORN CLASSIC', G.vhs && cl ? cl.title + ' (' + cl.year + ')' : G.vhs ? 'FOUND' : 'STILL OUT THERE', G.vhs ? '#ffe680' : '#7f93cc');
+  if (cl && !scr && c >= d.rt.card) row('card', 'BLUE CARD', G.factGot === 'right' ? 'YOU CALLED IT  +25' : G.factGot ? 'CALLED IT WRONG' : 'STILL OUT THERE', G.factGot === 'right' ? '#94e0cc' : G.factGot ? '#ff9a8a' : '#7f93cc');
   if (ds.length && c >= d.rt.dsec) { const p = row('dsec', 'DOT SECRETS', null, null, 0, ds.length * 8 - 3); ds.forEach((q, i) => secPip(p.x + i * 8, p.y, DOTS[q].col, !!G.dsec[q] || G.dsecHad.includes(q), 0)); }
-  if (c >= d.rt.foam) row('foam', 'FOAM HEADS', 'GREGG ' + (G.heads.gh || 0) + '   TIM ' + (G.heads.th || 0), '#fff');
-  const jn = DD.opts && DD.opts.joins, jy = jn ? 137 : 142;
+  if (c >= d.rt.foam && !scr) row('foam', 'FOAM HEADS', 'GREGG ' + (G.heads.gh || 0) + '   TIM ' + (G.heads.th || 0), '#fff');
+  const jn = d.joins, jy = jn ? 137 : 142;
   if (d.next && c >= d.n0) { const s = 'NEXT: ' + d.next; text(typed(s, d.n0), VW / 2 - Math.floor((s.length * 4 - 1) / 2), jy, '#94e0cc', 1, '#000'); }
   if (jn && DOTS[jn]) {   // a new Dot joins the cast: walks on from the right, then the line types out
     const j0 = d.next ? d.n0 + 12 : d.r0 + 12, D = DOTS[jn], k = clamp((c - j0) / 40, 0, 1), sx = Math.round(VW + 20 - k * 60);
@@ -1400,8 +1518,13 @@ function drawResults() {
     if (d.hei.first) { const ty = B.y + bh + 3; ctx.fillStyle = '#94e0cc'; ctx.fillRect(B.x, ty, B.w, 8); text('FIRST CLEAR', B.x + B.w / 2, ty + 2, NAVY, 1, null, 'center'); }   // a teal sticker hung under the panel
   }
   const sto = DD.opts && DD.opts.store;
-  if (c > d.END - 24 && Math.floor(d.t / 30) % 2) text(padUsed ? (DD.opts && DD.opts.onExit ? (sto ? 'CROSS: CONTINUE  SQUARE: STORE  TRIANGLE: AGAIN' : 'CROSS: CONTINUE   TRIANGLE: AGAIN') : 'TRIANGLE: PLAY AGAIN') : DD.opts && DD.opts.onExit ? (sto ? jumpKey() + ': CONTINUE   X: HEI STORE   R: AGAIN' : jumpKey() + ': CONTINUE   R: AGAIN') : 'PRESS R TO PLAY AGAIN', VW / 2, 156, '#fff', 1, '#000', 'center');
-  else if (c <= d.END - 24 && Math.floor(d.t / 30) % 2) text(jumpKey() + ': SKIP', VW / 2, 156, '#7a90d8', 1, null, 'center');
+  if (c > d.END - 24 && Math.floor(d.t / 30) % 2 && touchOn()) {   // on touch each word sits over the strip of the card a tap there does (the click zones above)
+    const ex = DD.opts && DD.opts.onExit;
+    if (ex) text('TAP: CONTINUE', sto ? 61 : 80, 156, '#fff', 1, '#000', 'center');
+    if (ex && sto) text('HEI STORE', 160, 156, '#fff', 1, '#000', 'center');
+    text(ex ? 'AGAIN' : 'TAP HERE: PLAY AGAIN', ex && sto ? 259 : 240, 156, '#fff', 1, '#000', 'center');
+  } else if (c > d.END - 24 && Math.floor(d.t / 30) % 2) text(padUsed ? (DD.opts && DD.opts.onExit ? (sto ? btn('cross') + ': CONTINUE  ' + btn('square') + ': STORE  ' + btn('triangle') + ': AGAIN' : btn('cross') + ': CONTINUE   ' + btn('triangle') + ': AGAIN') : btn('triangle') + ': PLAY AGAIN') : DD.opts && DD.opts.onExit ? (sto ? jumpKey() + ': CONTINUE   ' + switchKey() + ': HEI STORE   R: AGAIN' : jumpKey() + ': CONTINUE   R: AGAIN') : 'PRESS R TO PLAY AGAIN', VW / 2, 156, '#fff', 1, '#000', 'center');
+  else if (c <= d.END - 24 && Math.floor(d.t / 30) % 2) text(touchOn() ? 'TAP TO SKIP' : jumpKey() + ': SKIP', VW / 2, 156, '#7a90d8', 1, null, 'center');
   ctx.restore(); ctx.globalAlpha = 1;
 }
 
@@ -1409,11 +1532,12 @@ function drawResults() {
 function step() {
   if (RUN() && G.state !== 'pause' && !G.done) RUN().tick();   // the speedrun clock
   if (G.runNag > 0) G.runNag--;
+  if (G.fall && G.fall.t < FALL_OUT) { const sc = SCRIPT; SCRIPT = null; readInput(); SCRIPT = sc; }   // the iris is closing: presses made now (keys, clicks, pad edges) are read and dropped, so none fires on the respawn frame
   if (G.fall) { if (G.fall.t + 1 < FALL_OUT) { G.fall.t++; return; } updateFall(); }   // the iris is closing after a pit: nothing runs, not even the script clock or input, so a fall costs the simulation nothing
   readInput();
   if (G.restartReq) { restart(); return; }
   G.frame++;
-  if (CUT) { if (CUT.step(IN)) { if (CUT.live) cutLive(); updateParts(); if (G.shake > 0) G.shake *= 0.86; return; } CUT = null; }   // a cutscene holds the stage
+  if (CUT) { if (CUT.step(IN)) { if (CUT.live) cutLive(); updateParts(); if (G.shake > 0) G.shake *= 0.86; return; } CUT = null; IN.start = false; IN.click = null; }   // a cutscene holds the stage; the press that skipped it is spent, so START / Enter / Esc / P can't also open pause this frame
   if (!G.cutOpen) { G.cutOpen = true; if (cue('open')) return; }   // the stage's opening scene, before the controls card and the title wipe
   if (G.state === 'title') { if (IN.jp || IN.start || IN.sp || IN.click || IN.any) { G.state = 'play'; try { localStorage.setItem('dd_controls_seen', '1'); } catch (e) {} } return; }   // the level title wipe (introStrip) takes over from here
   if (G.state === 'pause') { updatePause(); return; }
@@ -1667,13 +1791,9 @@ function drawShadow(p, X) {   // a soft oval on the floor that shrinks and fades
   ctx.fillStyle = `rgba(10,4,14,${a})`;
   ctx.fillRect(L0 + 2, SY - 1, w - 4, 1); ctx.fillRect(L0, SY, w, 1); ctx.fillRect(L0 + 2, SY + 1, w - 4, 1);
 }
-let rimLum = 255, rimAt = -99;
-function rimFor(X, Y) {   // how much rim light the Dot needs: measures the set behind it now and then (0 on a bright set)
-  if (G.frame - rimAt >= 12 || G.frame < rimAt) {
-    rimAt = G.frame;
-    try { const d = ctx.getImageData(Math.max(0, X - 12), Math.max(0, Y - 30), 24, 30).data; let s = 0, n = 0; for (let i = 0; i < d.length; i += 12) { s += d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11; n++; } rimLum = n ? s / n : 255; }
-    catch (e) { rimLum = 255; }
-  }
+let rimLum = 255;
+function rimFor(X, Y) {   // how much rim light the Dot needs, from the set around it in the last SNAP (0 on a bright set)
+  rimAtXY = [X, Y, G.pl.w, G.pl.h];
   return clamp((78 - rimLum) / 60, 0, 1) * 0.5;
 }
 // contact shadows: a soft dark oval on the floor under every character, so they stand on the set instead of floating over it.
@@ -1697,7 +1817,7 @@ function drawPlayer() {   // GERM FREE wraps the Dot in a cycling rainbow (a hue
   const p = G.pl, X = wx(cx(p)), Y = wy(p.y + p.h / 2), hue = (G.frame * 14) % 360;
   ctx.save(); const gl = ctx.createRadialGradient(X, Y, 2, X, Y, p.h * 0.9);
   gl.addColorStop(0, `hsla(${hue},100%,70%,0.55)`); gl.addColorStop(1, `hsla(${(hue + 120) % 360},100%,60%,0)`); ctx.fillStyle = gl; ctx.fillRect(X - p.h, Y - p.h, p.h * 2, p.h * 2);
-  ctx.filter = `hue-rotate(${hue}deg) saturate(2.4) brightness(1.2)`;
+  if (GFX.tier < 2) ctx.filter = `hue-rotate(${hue}deg) saturate(2.4) brightness(1.2)`;   // tier 2 keeps the glow, not the colour cycling
   try { drawDotNow(); } finally { ctx.restore(); }
 }
 function drawDotNow() {
@@ -1804,12 +1924,22 @@ function drawParts() {
     ctx.globalAlpha = 1;
   }
 }
+const GREY = new Map();
+function greyTub(im, dim) {   // the tub in grey at a brightness, made once (a canvas filter on every HUD tub, every frame, is slow on older machines)
+  const k = im.src + '|' + dim; let c = GREY.get(k); if (c) return c;
+  try {
+    c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const g = c.getContext('2d'); g.drawImage(im, 0, 0);
+    const d = g.getImageData(0, 0, c.width, c.height); for (let i = 0; i < d.data.length; i += 4) { const v = Math.min(255, (d.data[i] * 0.2126 + d.data[i + 1] * 0.7152 + d.data[i + 2] * 0.0722) * dim); d.data[i] = d.data[i + 1] = d.data[i + 2] = v; }
+    g.putImageData(d, 0, 0);
+  } catch (e) { c = im; }
+  GREY.set(k, c); return c;
+}
 function drawBag(x, y, fill = 1, empty = 0.22, rot = 0, sc = 1, dim = 0.35) {   // the popcorn tub sprite; fill 0..1 fills it from the bottom, the rest is a dim ghost (dim: its brightness); rot/sc wiggle it about its base
   if (!ready('tub')) return;
   const im = IMG.tub, w = im.width, h = im.height, from = Math.round(h - fill * h);
   ctx.save();
   if (rot || sc !== 1) { ctx.translate(Math.round(x + w / 2), y + h); ctx.rotate(rot); ctx.scale(sc, sc); ctx.translate(-w / 2, -h); x = 0; y = 0; }
-  ctx.save(); ctx.globalAlpha *= empty; ctx.filter = 'grayscale(1) brightness(' + dim + ')'; ctx.drawImage(im, x, y); ctx.restore();   // grey: an empty tub never reads as a full red one
+  ctx.save(); ctx.globalAlpha *= empty; ctx.drawImage(greyTub(im, dim), x, y); ctx.restore();   // grey: an empty tub never reads as a full red one
   if (fill > 0) ctx.drawImage(im, 0, from, w, h - from, x, y + from, w, h - from);
   if (fill > 0.02 && fill < 1) { ctx.fillStyle = 'rgba(255,246,212,0.9)'; ctx.fillRect(x + 2, y + from - 1, w - 4, 2); }   // the fill line, so a part-full tub shows how far it has to go
   ctx.restore();
@@ -1818,7 +1948,7 @@ function updateHUD() {   // the popcorn counter bounces when it changes; a bag w
   if (G.got !== G.hudGot) { G.cntDir = sign(G.got - G.hudGot); G.cntT = 12; G.hudGot = G.got; }
   if (G.cntT > 0) G.cntT--;
   const nb = Math.floor(5 * bagFrac());
-  if (nb > G.bagN) { for (let i = G.bagN; i < nb; i++) G.bagWig[i] = 34; if (nb === 5 && G.pk && G.pk.six) G.bagWig[5] = 34; SFX.bag(); }
+  if (nb > G.bagN) { for (let i = G.bagN; i < nb; i++) G.bagWig[i] = 34; if (nb === 5 && G.pk && G.pk.six && allPopNow()) G.bagWig[5] = 34; SFX.bag(); }
   G.bagN = nb;
   for (let i = 0; i < 5; i++) if (G.bagWig[i] > 0) G.bagWig[i]--;
 }
@@ -1854,17 +1984,19 @@ function drawDepth() {
 // The frame so far is shrunk to a quarter, thresholded and blurred, then screened back on. It runs after the set and before
 // popcorn and characters, so only the set glows. [strength] per world, stronger on the dark sets; LEVEL.bloom = n or 0 overrides.
 const BLOOM = { 1: 0.14, 2: 0.34, 3: 0.16, 4: 0.3, 5: 0.34, 6: 0.22, 7: 0.34, 8: 0.26, 9: 0.18, 10: 0.18, 11: 0.22, 12: 0.26 };
-let bloomCv = null, bloomOK = true;
+let bloomCv = null, bloomOK = true, bloomN = 0;
 function drawBloom() {
-  let a = L.bloom !== undefined ? L.bloom : BLOOM[parseInt(L.id, 10)] || 0; if (!a || !bloomOK || DD.noBloom) return;
+  let a = L.bloom !== undefined ? L.bloom : BLOOM[parseInt(L.id, 10)] || 0; if (!a || !bloomOK || DD.noBloom || GFX.tier >= 2) return;
   const fl = G.frame - (G.flareAt ?? -999), dp = G.frame - (G.dipAt ?? -999);
   if (fl < 50) a *= 1 + 1.4 * (1 - fl / 50);   // a boss changes phase: the lights flare up and settle
   if (dp < 14 && dp % 5 < 2) a *= 0.25;         // Baxter's slam shakes the rig: the lights flicker
   try {
     if (!bloomCv) { bloomCv = document.createElement('canvas'); bloomCv.width = VW / 4; bloomCv.height = VH / 4; if (!('filter' in bloomCv.getContext('2d'))) { bloomOK = false; return; } }
     const b = bloomCv.getContext('2d'), w = bloomCv.width, h = bloomCv.height;
-    b.globalCompositeOperation = 'copy'; b.filter = 'brightness(0.72) contrast(2.8) saturate(1.3) blur(2px)'; b.imageSmoothingEnabled = true;
-    b.drawImage(ctx.canvas, 0, 0, w, h); b.filter = 'none';
+    if (GFX.tier < 1 || (bloomN++ & 1) === 0) {   // tier 1 reuses every other glow; at a quarter size it's a soft blur anyway
+      b.globalCompositeOperation = 'copy'; b.filter = 'brightness(0.72) contrast(2.8) saturate(1.3) blur(2px)'; b.imageSmoothingEnabled = true;
+      b.drawImage(ctx.canvas, 0, 0, w, h); b.filter = 'none';
+    }
     ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = a; ctx.imageSmoothingEnabled = true;
     ctx.drawImage(bloomCv, 0, 0, ctx.canvas.width, ctx.canvas.height); ctx.restore(); ctx.imageSmoothingEnabled = false;
   } catch (e) { bloomOK = false; }
@@ -1975,11 +2107,25 @@ function cardK() { if (!G.cards.length || !G.cards[0].t) return 0; const t = G.c
 function leftStack() { return (perkRow() ? 13 : 0) + Math.round(32 * cardK()); }   // how far below y 24 the left column (popcorn strip, perk row, NEW FAN card) reaches
 function rightStack() { return G.dsecDots && G.dsecDots.length ? 7 : 0; }   // the Dot plate grows when the stage has Dot secrets
 function readout(x, y, w, h, fn, accent) {   // a stage's own readout (counters, pips): one plate style, pushed down past the HUD so nothing ever covers it
+  if (G && G.state === 'title') return;   // the controls card is up: a stage's counters would show through it behind the logo
   ctx.save(); ctx.translate(0, Math.max(x < VW / 2 ? leftStack() : 0, x + w > VW / 2 ? rightStack() : 0));   // a wide one clears both
   pill(x, y, w, h, 0.72); ctx.fillStyle = accent || 'rgba(255,240,210,0.18)'; ctx.fillRect(x + 1, y, w - 2, 1);
   fn(); ctx.restore();
 }
-function jumpKey() { return padUsed ? 'CROSS' : window.DDTouch && window.DDTouch.on() ? 'JUMP' : 'Z'; }   // what every prompt calls the jump button: the key itself on a keyboard
+function btn(k) {   // a pad button's label for the controller in hand: PlayStation names, Nintendo's swapped letters, or Xbox / generic for anything else
+  let id = padId; if (!id && navigator.getGamepads) for (const p of navigator.getGamepads()) if (p && p.connected !== false) { id = p.id || ''; break; }
+  const T = /054c|dualsense|dualshock|wireless controller|playstation/i.test(id) ? { cross: 'CROSS', circle: 'CIRCLE', square: 'SQUARE', triangle: 'TRIANGLE', options: 'OPTIONS', l1: 'L1', r1: 'R1' }
+    : /057e|pro controller|joy-?con|nintendo/i.test(id) ? { cross: 'B', circle: 'A', square: 'Y', triangle: 'X', options: '+', l1: 'L', r1: 'R' }
+    : { cross: 'A', circle: 'B', square: 'X', triangle: 'Y', options: 'MENU', l1: 'LB', r1: 'RB' };
+  return T[k] || String(k).toUpperCase();
+}
+function jumpKey() { return padUsed ? btn('cross') : window.DDTouch && window.DDTouch.on() ? 'JUMP' : 'Z'; }
+function keyText(s) {   // a line of text with its key tokens filled in for this device: {JUMP} {SWITCH} {PAUSE} {SLAM} (signs, dialogue and cutscene text)
+  return String(s).replace(/\{(JUMP|SWITCH|PAUSE|SLAM)\}/g, (m, k) => k === 'JUMP' ? jumpKey() : k === 'SWITCH' ? switchKey() : k === 'PAUSE' ? (padUsed ? btn('options') : touchOn() ? 'PAUSE' : 'ENTER') : (touchOn() ? 'PAD DOWN' : 'DOWN'));
+}
+function switchKey() { return padUsed ? btn('r1') : window.DDTouch && window.DDTouch.on() ? 'SWITCH' : 'X'; }
+const touchOn = () => !padUsed && !!(window.DDTouch && window.DDTouch.on());   // a phone or tablet with the touch overlay up
+function keyName(k) { return !touchOn() ? k : k === 'JUMP' || k === 'Z' ? 'JUMP' : k === 'X' ? 'SWITCH' : /^TAP/.test(k) ? k : /DRAG/.test(k) ? 'DRAG' : 'TAP'; }   // a keyboard key as a prompt names it on this device: on touch X is the SWITCH button and the rest are taps   // what every prompt calls the jump button: the key itself on a keyboard
 function pill(x, y, w, h, a = 0.45) { ctx.fillStyle = `rgba(10,4,8,${a})`; ctx.fillRect(x + 1, y, w - 2, h); ctx.fillRect(x, y + 1, w, h - 2); }
 function secDisc(x, y, r, sx, col) {   // a pixel disc, squeezed to sx wide (a coin turning)
   ctx.fillStyle = col;
@@ -2016,7 +2162,7 @@ function drawHUDCore() {
   text(num, 18, 8 - bo, G.cntT > 0 ? (G.cntDir > 0 ? '#ffe680' : '#ff8080') : '#fff6d4', 1);
   const bf = bagFrac() * 5, bags = Math.floor(bf), frac = bf % 1;
   for (let i = 0; i < 5; i++) { const w = G.bagWig[i]; drawBag(bx + i * 11 - 4, -6, i < bags ? 1 : i === bags ? frac : 0, 0.75, w > 0 ? Math.sin(w * 0.9) * 0.4 * (w / 34) : 0, 0.5 * (w > 0 ? 1 + 0.2 * Math.sin(w / 34 * Math.PI) : 1), 0.62); }   // empty tubs: a ghost bright enough to count against the dark plate
-  if (NB > 5) { const w = G.bagWig[5], on = bags >= 5; if (on) { ctx.fillStyle = 'rgba(232,48,42,0.55)'; ctx.fillRect(bx + 5 * 11 - 3, 4, 9, 13); } drawBag(bx + 5 * 11 - 4, -6, on ? 1 : 0, 0.75, w > 0 ? Math.sin(w * 0.9) * 0.4 * (w / 34) : 0, 0.5 * (w > 0 ? 1 + 0.2 * Math.sin(w / 34 * Math.PI) : 1), 0.62); }   // the sixth: lit red once all five are full
+  if (NB > 5) { const w = G.bagWig[5], on = bags >= 5 && allPopNow(); if (on) { ctx.fillStyle = 'rgba(232,48,42,0.55)'; ctx.fillRect(bx + 5 * 11 - 3, 4, 9, 13); } drawBag(bx + 5 * 11 - 4, -6, on ? 1 : 0, 0.75, w > 0 ? Math.sin(w * 0.9) * 0.4 * (w / 34) : 0, 0.5 * (w > 0 ? 1 + 0.2 * Math.sin(w / 34 * Math.PI) : 1), 0.62); }   // the sixth: lit red once all five are full
   if (G.vhs) spr('vhs', bx + NB * 11 + 4, 16, false, 0.5, 0.5);
   drawPerkHUD();
   // the Dots, top right: the one you are is a framed portrait, the rest are little coloured pips (click one, press 1-4, or switch)
@@ -2093,7 +2239,7 @@ function drawFact() {   // the blue card slides in under the banner; a wrong one
     ctx.fillStyle = lit ? (f.ans ? '#2a8a5a' : '#ffe680') : '#1e52bc'; ctx.fillRect(bx, bY, 68, 12);
     text(lab, bx + 34, bY + 3, lit && !f.ans ? '#0a1a4a' : '#fff', 1, null, 'center');
   });
-  if (!f.ans) { if (f.t > 24) text(f.pick ? jumpKey() + ' TO LOCK IT IN' : 'LEFT: TRUE   RIGHT: FALSE', VW / 2, bY + 16, '#ffe680', 1, '#000', 'center'); }
+  if (!f.ans) { if (f.t > 24) text(f.pick ? jumpKey() + ' TO LOCK IT IN' : touchOn() ? 'TAP TRUE OR FALSE' : 'LEFT: TRUE   RIGHT: FALSE', VW / 2, bY + 16, '#ffe680', 1, '#000', 'center'); }
   else { const s = f.ans === 'right' ? 'YOU CALLED IT! +25' : 'NOPE. NO POPCORN.'; text(s, X + 180 - s.length * 4, Y + 3, f.ans === 'right' ? '#94e0cc' : '#ff5a5a', 1, '#000'); }
   ctx.globalAlpha = 1;
 }
@@ -2103,13 +2249,17 @@ function drawTitle() {
   ctx.fillStyle = 'rgba(8,2,6,0.85)'; ctx.fillRect(0, 0, VW, VH);
   text('DOOTLE DOTS', VW / 2, 20, '#ffe680', 3, '#7a2a10', 'center');
   text('LEVEL ' + (L.id || '').toUpperCase() + '  ' + (L.name || ''), VW / 2, 42, '#e8504a', 1, '#000', 'center');
-  const rows = padUsed ? [['STICK', 'MOVE. HOLD TO BUILD SPEED'], ['CROSS', 'JUMP. HOLD FOR HIGHER'], ['R1 / L1', 'NEXT DOT / DOT BEFORE'],
-    ['DOWN', 'BAXTER SLAMS IN THE AIR'], ['OPTIONS', 'PAUSE']]
+  let rows = padUsed ? [['STICK', 'MOVE. HOLD TO BUILD SPEED'], [btn('cross'), 'JUMP. HOLD FOR HIGHER'], [btn('r1') + ' / ' + btn('l1'), 'NEXT DOT / DOT BEFORE'],
+    ['DOWN', 'BAXTER SLAMS IN THE AIR'], [btn('options'), 'PAUSE']]
+    : touchOn() ? [['PAD', 'MOVE. HOLD TO BUILD SPEED'], ['JUMP', 'JUMP. HOLD FOR HIGHER'], ['SWITCH', 'SWITCH DOT  (OR TAP ITS FACE)'],
+    ['PAD DOWN', 'BAXTER SLAMS IN THE AIR'], ['PAUSE', 'THE BUTTON UP TOP']]   // the overlay's own buttons (touch.js), which stay up over this card
     : [['ARROWS', 'MOVE. HOLD TO BUILD SPEED'], ['Z', 'JUMP. HOLD FOR HIGHER'], ['X', 'SWITCH DOT  (OR 1-4, OR CLICK)'],
     ['DOWN', 'BAXTER SLAMS IN THE AIR'], ['ENTER', 'PAUSE']];
-  if (!showControls()) { text('PRESS ' + jumpKey() + ' TO START', VW / 2, 100, '#fff', 1, '#000', 'center'); ORDER.forEach((n, i) => drawDot(n, 'idle', VW / 2 - 48 + i * 32, 130)); return; }
+  const cast = ORDER.filter(n => G.owned.includes(n)), dx = i => VW / 2 - (cast.length - 1) * 16 + i * 32;   // only the Dots in the cast so far
+  if (!showControls()) { text('PRESS ' + jumpKey() + ' TO START', VW / 2, 100, '#fff', 1, '#000', 'center'); cast.forEach((n, i) => drawDot(n, 'idle', dx(i), 130)); return; }
+  rows = rows.filter((r, i) => (i !== 2 || cast.length > 1) && (i !== 3 || cast.includes('baxter')));   // no switch row with one Dot, no slam row until Baxter is in
   rows.forEach(([k, v], i) => { text(k, 50, 60 + i * 11, '#ffd27a', 1, '#000'); text(v, 92, 60 + i * 11, '#fff', 1, '#000'); });
-  ORDER.forEach((n, i) => { const ph = Math.sin(G.frame / 10 + i); drawDot(n, ph < -0.4 ? 'jump' : ph > 0.85 ? 'land' : 'idle', VW / 2 - 48 + i * 32, 158 + Math.round(ph * 2)); });
+  cast.forEach((n, i) => { const ph = Math.sin(G.frame / 10 + i); drawDot(n, ph < -0.4 ? 'jump' : ph > 0.85 ? 'land' : 'idle', dx(i), 158 + Math.round(ph * 2)); });
   if (Math.floor(G.frame / 30) % 2) text('PRESS ' + jumpKey() + ' TO START', VW / 2, 168, '#fff', 1, '#000', 'center');
 }
 function cutLive() {   // a live cutscene: the stage keeps running around a Dot who stands still
@@ -2136,7 +2286,10 @@ function renderNow() {
   ctx.imageSmoothingEnabled = false;
   const sh = G.shake > 0.3 ? G.shake : 0, ox = (Math.random() - 0.5) * sh * 2, oy = (Math.random() - 0.5) * sh * 2;
   ctx.save(); ctx.translate(Math.round(ox), Math.round(oy));
+  drawnCam = [G.cam.x, G.cam.y]; inkWorld = true;   // type drawn from here to the restore moves with the camera (ink allows for the scroll since SNAP)
+  try {
   drawBG(); drawTiles(); drawDepth(); hook('drawMid', ctx, G); drawBloom(); drawFollowSpot(); drawBodies(); drawPops(); drawFans(); if (!(CUT && CUT.hidePlayer)) drawPlayer(); if (CUT) CUT.drawWorld(ctx); drawFGLayer(); hook('drawFG', ctx, G); drawParts(); drawGoalFlags(); drawDoorCues();
+  } finally { inkWorld = false; }
   ctx.restore();
   drawGrade(); drawHitFlash();
   if (!CUT) introIris(); drawFallIris(); drawEndIris();
@@ -2171,7 +2324,7 @@ function makeStock() {
 function stockTick() {
   if (!stockOK) return;
   try {
-    const want = !scene && L && !DD.noStock && !Q.has('nostock') ? (L.stock !== undefined ? L.stock : STOCK[parseInt(L.id, 10)]) : null;
+    const want = !scene && L && !DD.noStock && GFX.tier < 2 && !Q.has('nostock') ? (L.stock !== undefined ? L.stock : STOCK[parseInt(L.id, 10)]) : null;
     if (!stockEl) { if (!want || typeof document === 'undefined' || !document.body) return; stockEl = makeStock(); }
     const st = stockEl;
     if (!want) { if (st.on) { st.root.style.display = 'none'; st.on = false; } return; }
@@ -2182,24 +2335,69 @@ function stockTick() {
       st.scan.style.opacity = want.s || 0; st.scan.style.background = want.s && per >= 2 ? `repeating-linear-gradient(to bottom, #000 0, #000 1px, transparent 1px, transparent ${per}px)` : 'none';
       st.on = true; st.cfg = want;
     }
-    if (++st.t % 2 === 0) {   // grain moves at about film rate; the flicker wanders
+    if (++st.t % 2 === 0 && GFX.tier < 1) {   // grain moves at about film rate; the flicker wanders (tier 1 holds them still: each move repaints a full-screen blend)
       st.grain.style.backgroundPosition = `${Math.floor(Math.random() * 256)}px ${Math.floor(Math.random() * 256)}px`;
       st.flick.style.opacity = want.f ? (want.f * Math.random()).toFixed(4) : 0;
     }
   } catch (e) { stockOK = false; }
 }
-// ---------------------------------------------------------------- main loop: fixed 60Hz simulation, render every display frame
+// ---------------------------------------------------------------- graphics: FULL wherever it runs smoothly, lighter where it doesn't
+// DD.gfx.mode: 'auto' (the default), 'full' or 'light', kept in dootledots.gfx. AUTO watches the frames and steps the dressing down a tier at a time
+// when they run long, and back up when there's room again. The physics and controls never change, only what's drawn and how often:
+//   1  the film grain holds still, bloom refreshes every other frame, a 120/144 Hz screen draws at 60
+//   2  no bloom, no film stock, no colour cycling on a star-powered Dot (LIGHT starts here)
+//   3  the screen draws at 30 (the game still steps at 60)
+// ?fps shows frames per second, the cost of a frame in ms and the tier; ?slow=N makes every frame N times as costly, to try the tiers on a fast computer.
+const GFX = { mode: 'auto', tier: 0, iv: [], work: [], hold: 0, ups: 0, fails: 0, upAt: -1e9 };
+try { const m = localStorage.getItem('dootledots.gfx'); if (m === 'full' || m === 'light') GFX.mode = m; } catch (e) {}
+GFX.tier = GFX.mode === 'light' ? 2 : 0;
+DD.gfx = {
+  get mode() { return GFX.mode; }, get tier() { return GFX.tier; },
+  set(m) { GFX.mode = m; GFX.tier = m === 'light' ? 2 : 0; GFX.iv = []; GFX.work = []; GFX.fails = 0; try { localStorage.setItem('dootledots.gfx', m); } catch (e) {} },
+};
+const SLOW = Math.max(1, parseFloat(Q.get('slow')) || 1), FPS = Q.has('fps');
+function gfxWatch(now, iv, work) {   // AUTO: a window of 90 frames at a time; long gaps (a hidden tab, a load) don't count
+  if (GFX.mode === 'full' || iv > 250) return;
+  GFX.iv.push(iv); GFX.work.push(work); if (GFX.iv.length < 90) return;
+  const n = GFX.iv.length, slow = GFX.iv.filter(v => v > 21).length / n;   // slower than about 48 fps
+  const load = GFX.work.reduce((a, b) => a + b, 0) / GFX.iv.reduce((a, b) => a + b, 0);   // the share of each frame spent in our code
+  GFX.iv = []; GFX.work = [];
+  const floor = GFX.mode === 'light' ? 2 : 0;
+  if ((slow > 0.15 || load > 0.7) && GFX.tier < 3) {
+    if (now - GFX.upAt < 6000) GFX.fails++;   // it only just stepped back up: that tier really is too much here
+    GFX.tier++; GFX.hold = 0;
+  } else if (slow < 0.02 && load < 0.3 && GFX.tier > floor && GFX.fails < 2) {
+    if (++GFX.hold >= 3) { GFX.tier--; GFX.hold = 0; GFX.upAt = now; }   // about 4 s of easy frames: try the next tier up
+  } else GFX.hold = 0;
+}
+// ---------------------------------------------------------------- main loop: fixed 60Hz simulation, render every display frame (fewer on tiers 1 and 3)
 let acc = 0, last = 0, scene = null, looping = false, hooked = false;
-let frameErrs = 0;
+let frameErrs = 0, steps = 0, drawnAt = -1, fpsN = 0, fpsAt = 0, fpsWork = 0, fpsShow = '';
 function frame(now) {
-  inkNew = 8; inkOld = 2;
+  inkNew = 24; inkOld = 6;
   requestAnimationFrame(frame);   // ask for the next frame first: an error in one frame is logged, and the game never freezes on it
+  const t0 = performance.now(), iv = now - last;
   try {
-    acc += Math.min(100, now - last); last = now;
-    while (acc >= 1000 / 60) { acc -= 1000 / 60; if (scene) { readInput(); scene.step(IN); } else { keepPrev(); simStep(); } }
-    if (scene) { lerpG = null; scene.draw(ctx); } else { lerpA = acc / (1000 / 60); render(); }
-    stockTick(); drawPadNote(now);
+    acc += Math.min(100, iv); last = now;
+    let n = 0;
+    while (acc >= 1000 / 60) {
+      if (++n > 4) { acc = 0; break; }   // a machine that can't keep up runs a little slow instead of piling up catch-up steps, each frame worse than the last
+      acc -= 1000 / 60; steps++; if (scene) { readInput(); scene.step(IN); } else { keepPrev(); simStep(); }
+    }
+    const need = GFX.tier >= 3 ? 2 : GFX.tier >= 1 ? 1 : 0;   // sim steps between draws: 0 draws every display frame, smoothed between steps
+    if (steps - drawnAt >= need || need === 0) {
+      drawnAt = steps;
+      if (scene) { lerpG = null; scene.draw(ctx); } else { lerpA = need ? 1 : acc / (1000 / 60); render(); }
+      drawPadNote(now); fpsN++;
+      if (FPS) text(fpsShow, 2, VH - 7, '#9cf0a0', 1, '#000');
+    }
+    stockTick(); snapTick(now);
   } catch (e) { if (frameErrs++ < 20) console.error('[frame]', e); }
+  let work = performance.now() - t0;
+  if (SLOW > 1) { const end = performance.now() + work * (SLOW - 1); while (performance.now() < end); work *= SLOW; }
+  fpsWork += work;
+  if (now - fpsAt >= 500) { fpsShow = Math.round(fpsN * 1000 / (now - fpsAt)) + ' FPS  ' + (fpsN ? fpsWork / fpsN : 0).toFixed(1) + ' MS  T' + GFX.tier + (GFX.mode === 'auto' ? '' : ' ' + GFX.mode.toUpperCase()); fpsN = 0; fpsWork = 0; fpsAt = now; }
+  if (looping && iv > 0) gfxWatch(now, iv, work);
 }
 function drawPadNote(now) {   // over the menu and the game alike, fading out at the end
   if (!padNote) return;
@@ -2215,10 +2413,11 @@ function leave(quit, extra) {   // level over (or quit from pause): hand the res
   G.left = true;
   o(quit ? { id: L.id, quit: true } : Object.assign(result(), extra));
 }
-const result = () => ({ id: L.id, six: !!(G.pk && G.pk.six) && bagFrac() >= 1, got: G.got, total: popsTotal, bags: Math.floor(5 * bagFrac()), vhs: G.vhs, dsec: Object.keys(G.dsec), dsecAll: (G.dsecDots || []).slice(), fact: G.factGot || null, allPop: pops.length > 0 && pops.every(c => c.got), boss: !!(G.done && G.done.boss) });
+const result = () => ({ id: L.id, six: !!(G.pk && G.pk.six) && bagFrac() >= 1 && allPopNow(), got: G.got, total: popsTotal, bags: Math.floor(5 * bagFrac()), vhs: G.vhs, dsec: Object.keys(G.dsec), dsecAll: (G.dsecDots || []).slice(), fact: G.factGot || null, allPop: allPopNow(), boss: !!(G.done && G.done.boss) });
 function restart() {   // play it again: a won run is saved first (opts.onSave), so AGAIN on the results card never throws the win away
-  if (G.done && !G.left && DD.opts && DD.opts.onSave) DD.opts.onSave(result());
-  build(); G.state = 'play';
+  if (G.done && !G.left && !G.done.saved && DD.opts && DD.opts.onSave) DD.opts.onSave(result());
+  const seen = G.lineSeen && G.lineSeen.start; build(); G.state = 'play';
+  if (seen) G.lineSeen.start = true;   // a retry of the same stage skips the opening chatter (the stage's other lines still play)
 }
 function start(level, opts = {}) {
   L = level; DD.opts = opts; LW = L.W * TS; LH = L.H * TS;
@@ -2505,7 +2704,7 @@ Object.defineProperties(DD, Object.getOwnPropertyDescriptors({
   drop: o => loose.push(Object.assign({ vx: 0, vy: 0, life: 240, wait: 0 }, o)),   // loose popcorn: {x, y, vx, vy, life, wait}
   part: o => parts.push(o),
   T, setTile, boxFree, moveX, moveY, ov, cx, bot, clamp, sign, wx, wy, setDot, door,
-  defineEntity, collectDefs, addEntity, spawn, hitBoss, endLevel, start, setScene, leave, trailer, readout, jumpKey,
+  defineEntity, collectDefs, addEntity, spawn, hitBoss, endLevel, start, setScene, leave, trailer, readout, collectLoose, jumpKey, switchKey, keyText, btn, keyName, get touchOn() { return touchOn(); },
   setCut: c => { CUT = c; }, get cut() { return CUT; },   // cutscenes (game/cutscene.js)
   get trailing() { return !!TR; },   // a trailer is running (DD.trailer)
   get padUsed() { return padUsed; }, rumble,

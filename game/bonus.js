@@ -12,21 +12,23 @@
     const titles = ids.map(id => C[id] && C[id].title).filter(Boolean);
     const SOLID = [[floor, 0, F, W, 3], [floor, 0, 0, 1, H], [floor, W - 1, 0, 1, H],
       [step, 6, 10, 5, 1], [step, 16, 8, 5, 1], [step, 26, 10, 5, 1], [step, 34, 7, 5, 1], [step, 12, 5, 4, 1], [step, 28, 4, 4, 1]];
+    const LAST = 150;   // frames left when the kernels stop
+    function kernel() {   // a kernel appears somewhere on screen, falling into a platform or the floor
+      const tx = 2 + Math.floor(Math.random() * (W - 4)); let ty = 1; while (ty < F - 1 && !DD.T(tx, ty + 1)) ty++;
+      DD.addPop(tx, Math.max(1, ty - Math.floor(Math.random() * 3)));
+    }
     const L = {
       id: n + '-bonus', name: 'POPCORN CLASSIC SCREENING', sub: 'ALL FOUR TAPES, WORLD ' + n, world: n, W, H, FLOOR: F, SOLID,
       THINGS: [['dot', 21, 12]], POPCORN: [], KINDS: base.KINDS, sprites: base.sprites, portraits: base.portraits, names: base.names,
       theme: base.theme, intro: base.intro, ENTS: base.ENTS,
       lines: { start: [['gregg', "HEY GUYS. IT'S A POPCORN CLASSIC SCREENING."]] },
       script: {
-        init(G) { Object.assign(G.s, { t: 45 * 60, drop: 0, now: 0, ended: false }); },
+        init(G) { Object.assign(G.s, { t: 45 * 60, drop: 0, now: 0, ended: false }); kernel(); },   // the first kernel is there from frame 1, so the HUD never reads five bags off an empty count
         update(G) {
           const s = G.s; if (G.done || s.ended) return;
           if (--s.t <= 0) { s.ended = true; DD.endLevel(1, 0); return; }
           if (s.t % (60 * 45 / Math.max(1, titles.length)) === 0) s.now = (s.now + 1) % Math.max(1, titles.length);
-          if (++s.drop % 14 === 0) {   // a kernel appears somewhere on screen, falling into a platform or the floor
-            const tx = 2 + Math.floor(Math.random() * (W - 4)); let ty = 1; while (ty < F - 1 && !DD.T(tx, ty + 1)) ty++;
-            DD.addPop(tx, Math.max(1, ty - Math.floor(Math.random() * 3)));
-          }
+          if (++s.drop % 14 === 0 && s.t > LAST) kernel();   // the last kernel lands 2.5 s before the end, so every one can be collected and five bags is possible
         },
         drawBG(ctx, G) {   // the big screen: the world's tapes, one after another
           const w = 180, h = 30, X = DD.VW / 2 - w / 2, Y = 34;   // fixed on the back wall, behind the action

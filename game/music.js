@@ -37,9 +37,10 @@
     const d = NOISE.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   }
   const unlock = () => { init(); if (AC && AC.state !== 'running') AC.resume().catch(() => {}); if (deck) deck.blocked = false; };   // Safari can also report 'interrupted'
+  addEventListener('dd-pad', unlock);   // a controller button (engine.js) unlocks audio like a key
   addEventListener('keydown', e => {
     unlock();
-    if (e.code === 'KeyM') { muted = !muted; try { localStorage.setItem('dd-mute', muted ? '1' : '0'); } catch (er) {} if (OUT) OUT.gain.value = muted ? 0 : 0.32 * MV(); }
+    if (e.code === 'KeyM' && !e.repeat) { muted = !muted; try { localStorage.setItem('dd-mute', muted ? '1' : '0'); } catch (er) {} if (OUT) OUT.gain.value = muted ? 0 : 0.32 * MV(); }
   });
   addEventListener('pointerdown', unlock); addEventListener('click', unlock); addEventListener('touchend', unlock);
   // the context is made inside the first key or click, like the sound effects' (engine.js initAudio): Safari never lets one made

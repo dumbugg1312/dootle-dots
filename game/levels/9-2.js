@@ -173,7 +173,7 @@ DD.defineEntity('w92dancer', {   // a high-heeled dancer in sequins: every step 
       s.tiles = 0; for (let y = 18; y < DD.L.H; y++) for (let x = 0; x < DD.L.W; x++) if (kind(x, y) === 'tape') s.tiles++;
       s.pickups = DD.bodies.filter(b => b.kind === 'w92tape').length; s.total = s.tiles + s.pickups + 5;
       s.signs = (G.things.sign || []).map(t => ({ x: t.x, y: t.y, txt: t.args[0] }));
-      if (typeof location !== 'undefined' && /[?&]w92cake/.test(location.search || '')) { s.cake.st = 3; this.landCake(G); G.lineSeen.cake = true; G.dlg.q.length = 0; }   // screenshots only: the cake is already down
+      if (window.DD_DEV && typeof location !== 'undefined' && /[?&]w92cake/.test(location.search || '')) { s.cake.st = 3; this.landCake(G); G.lineSeen.cake = true; G.dlg.q.length = 0; }   // screenshots only: the cake is already down
     },
     landCake(G) {   // the cake hits the carpet: frosting where it lands, a shake, and Tim's and Gregg's lines
       const s = G.s, p = G.pl, ck = s.cake, { cx } = DD;
@@ -319,7 +319,7 @@ DD.defineEntity('w92dancer', {   // a high-heeled dancer in sequins: every step 
       if (!DD.door(e)) return;   // press Down on the door to go through
       s.doorCd = 90;
       DD.stars(DD.cx(e), e.y + 8, 8, to[2] ? '#9fd8ff' : '#ffe680'); DD.SFX.wind && DD.SFX.wind();
-      p.x = to[0] * 16 + 1; p.y = (to[1] + 1) * 16 - p.h; p.vx = 0; p.vy = 0; p.rolling = false;
+      { const x0 = to[0] * 16 + 8 - p.w / 2, y0 = (to[1] + 1) * 16 - p.h; let x = x0; for (let d = 1; d <= 40 && !DD.boxFree(x, y0, p.w, p.h); d++) x = x0 + (d % 2 ? 1 : -1) * Math.ceil(d / 2) * 4; p.x = x; p.y = y0; } p.vx = 0; p.vy = 0; p.rolling = false;   // centred, and nudged to the nearest spot this Dot fits
       G.safe = { x: p.x, y: p.y };
       if (!to[2]) { s.roomBack = G.cpSafe; G.cpSafe = { x: p.x, y: p.y }; } else if (s.roomBack) G.cpSafe = s.roomBack;   // a fall in the room puts you back in the room; leaving restores the real checkpoint
       G.cam.x = Math.max(0, DD.cx(p) - DD.VW / 2); G.cam.y = Math.max(0, DD.bot(p) - DD.VH * 0.62);

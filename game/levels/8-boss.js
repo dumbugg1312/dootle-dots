@@ -126,7 +126,7 @@
         if (e.x <= lo || e.x + e.w >= hi) {
           e.x = DD.clamp(e.x, lo, hi - e.w);
           if (ph >= 1 && !e.ram2) { e.ram2 = true; e.dir = -e.dir; e.st = 'wind'; e.atk = 'ram'; e.t = 0; jokerSetH(e, 54); DD.SFX.thud(); G.shake = Math.max(G.shake || 0, 5); }   // phase 2: a second pass, with a full wind-up first
-          else { e.st = 'open'; e.t = 0; e.openT = ph >= 1 ? 90 : 105; jokerSetH(e, 54); DD.SFX.thud(); G.shake = Math.max(G.shake || 0, 8); DD.stars(DD.cx(e), e.y, 8, '#ffe680'); }
+          else { e.st = 'open'; e.t = 0; e.openT = ph >= 1 ? 117 : 137; jokerSetH(e, 54); DD.SFX.thud(); G.shake = Math.max(G.shake || 0, 8); DD.stars(DD.cx(e), e.y, 8, '#ffe680'); }
         }
       } else if (e.st === 'picket') {              // the signs drop in, then the opening
         if (!e.dropped) {
@@ -142,7 +142,7 @@
         if (e.t > 90) { e.st = 'cool'; e.t = 0; }
       } else if (e.st === 'cool') {                // the attack is still out there: he waits for it to clear, then goes dizzy
         e.vx = 0; jokerSetH(e, 54);
-        if (e.t > 24 && (!hazards() || e.t > 110)) { sweep(); e.st = 'open'; e.t = 0; e.openT = ph >= 1 ? 90 : 105; }
+        if (e.t > 24 && (!hazards() || e.t > 110)) { sweep(); e.st = 'open'; e.t = 0; e.openT = ph >= 1 ? 117 : 137; }
       } else if (e.st === 'hurt') {                // knocked about by the stomp: harmless for a moment
         e.vx = 0; jokerSetH(e, 54);
         if (e.t > 45) { e.st = 'walk'; e.t = 0; }

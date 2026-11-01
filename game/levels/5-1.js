@@ -395,7 +395,7 @@ window.LEVEL = {"id": "5-1", "name": "THE RECLINER ROOM", "sub": "STARRING SIX B
         ctx.fillStyle = 'rgba(10,4,8,0.78)'; ctx.fillRect(0, VH - 11, VW, 11);
         ctx.fillStyle = '#c8202a'; ctx.fillRect(0, VH - 11, 26, 11); DD.text('NEWS', 13, VH - 8, '#fff2a6', 1, null, 'center');
         ctx.save(); ctx.beginPath(); ctx.rect(28, VH - 11, VW - 28, 11); ctx.clip();
-        const msg = 'BREAKING: VICTORVILLE FILM CENTER FIRE   ...   ONE TAPE SURVIVED   ...   SIX BAG CINEMAS OPEN LATE   ...   TRUFFLE OIL POPCORN: ZERO BAGS';
+        const msg = 'BREAKING: VICTORVILLE FILM CENTER FIRE   ...   ONE TAPE SURVIVED   ...   SIX BAG CINEMA OPEN LATE   ...   TRUFFLE OIL POPCORN: ZERO BAGS';
         DD.text(msg, VW - ((G.frame * 0.55) % (msg.length * 4 + VW)), VH - 8, '#f4ecdc', 1, null, 'left'); ctx.restore();
       },
     },

@@ -46,10 +46,16 @@
 
   // ---------------------------------------------------------------- the save: what's owned, what the team wears
   let W;
-  function load() { try { W = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { W = {}; } W = { own: W.own || {}, on: Object.assign({ outfit: null, tex: null, trail: null }, W.on) }; }
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(W)); } catch (e) {} };
+  function load() {   // a missing key is a fresh save (reload() after LOAD / CLEAR DATA); wrong types from a hand-edited save are dropped
+    let r; try { r = JSON.parse(localStorage.getItem(KEY)); } catch (e) { r = null; }
+    const obj = v => v && typeof v === 'object' && !Array.isArray(v) ? v : {}, o = obj(r && r.own), n = obj(r && r.on), own = {}, on = { outfit: null, tex: null, trail: null };
+    for (const k in o) if (o[k] && byId(k)) own[k] = 1;   // only real items, only truthy
+    for (const c in on) { const it = typeof n[c] === 'string' ? byId(n[c]) : null; if (it && it.cat === c) on[c] = it.id; }   // only a real item of that slot
+    W = { own, on };
+  }
+  const ST = () => window.DDStore, save = () => { if (ST() && ST().sandboxed) return; try { localStorage.setItem(KEY, JSON.stringify(W)); } catch (e) {} };
   load();
-  const ST = () => window.DDStore, unl = () => !!(ST() && ST().unlimited);
+  const unl = () => !!(ST() && ST().unlimited);
   const owns = id => { const it = byId(id); return !!W.own[id] || (unl() && !!it && !it.sec); };   // UNLIMITED never hands out the secret stash
   function secFound() {   // Dot secrets found across every stage (menu.js keeps them per stage in its progress save)
     let P = window.__menu && window.__menu.PROG;

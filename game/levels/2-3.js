@@ -201,7 +201,7 @@ Object.assign(window.LEVEL, {
   script: {
     init(G) {
       const s = G.s, th = G.things, L = DD.L, TS = 16;
-      Object.assign(s, { safe: { x: G.pl.x, y: G.pl.y }, scroll: 0, speed: 0.8, endX: L.SCROLL_END * TS, movies: 2, day: 1, hist: [], prevInv: 0, list: false, paid: false, zoneSeen: {}, balls: [], ballT: 60, rocks: [], rockT: 80, ready: true });
+      Object.assign(s, { safe: { x: G.pl.x, y: G.pl.y + G.pl.h }, hold: 0, scroll: 0, speed: 0.8, endX: L.SCROLL_END * TS, movies: 2, day: 1, hist: [], prevInv: 0, list: false, paid: false, zoneSeen: {}, balls: [], ballT: 60, rocks: [], rockT: 80, ready: true });
       s.wit = (th.witness || []).map((t, i) => ({ x: t.x, y: t.y, hx: t.x, hy: t.y, st: 'wait', col: ['#3a78e8', '#e8a030', '#5aa050'][i % 3], vx: 0 }));
       s.mov = (th.movie || []).map(t => ({ x: t.x + 3, y: t.y + 5, got: false }));
       s.zones = (th.zone || []).map(t => ({ x: t.x, name: t.args[0], sub: t.args[1] || '' }));
@@ -216,12 +216,13 @@ Object.assign(window.LEVEL, {
       const followers = () => s.wit.filter(w => w.st === 'follow');
       const loseOne = () => { const f = followers().pop(); if (f) { f.st = 'gone'; f.vx = -1.6; DD.float(cx(f) || f.x, f.y - 6, 'WITNESS WENT HOME', '#ff8a80'); SFX.buzz(); } };
       // the scroll; a respawn behind it rewinds it, and the building at the end is free to explore
-      for (const b of DD.bodies) if (b.kind === 'cp' && b.lit && b.x > s.safe.x) s.safe = { x: b.x, y: bot(b) - p.h };
+      for (const b of DD.bodies) if (b.kind === 'cp' && b.lit && b.x > s.safe.x) s.safe = { x: b.x, y: bot(b) };   // the feet line, so any Dot re-seats at its own height
       if (G.fall && G.fall.t >= 20 && !s.rewound) {   // just respawned (the iris is opening): back to the last checkpoint, the scroll with you, like Mario's auto-scroll stages
-        s.rewound = true; p.x = s.safe.x; p.y = s.safe.y + p.h - p.h; G.safe = { x: p.x, y: p.y }; s.scroll = Math.max(0, p.x - 48); s.prevInv = p.inv; loseOne();
+        s.rewound = true; p.x = s.safe.x; p.y = s.safe.y - p.h; G.safe = { x: p.x, y: p.y }; s.scroll = Math.max(0, p.x - 96); s.hold = 100; s.prevInv = p.inv; loseOne();   // 6 tiles behind, and the days hold still ~1.3 s after the iris opens (or until you move)
       }
       if (!G.fall) s.rewound = false;
-      if (!G.done && s.scroll < s.endX) s.scroll = Math.min(s.endX, Math.max(s.scroll + s.speed, cx(p) - VW * 0.55));   // a minimum speed: run ahead and the days go by faster
+      if (s.hold > 0) { s.hold--; if (!G.fall && (Math.abs(p.vx) > 0.3 || p.vy < -1)) s.hold = 0; }
+      if (!G.done && s.scroll < s.endX && !s.hold) s.scroll = Math.min(s.endX, Math.max(s.scroll + s.speed, cx(p) - VW * 0.55));   // a minimum speed: run ahead and the days go by faster
       const lead = s.scroll < s.endX ? s.scroll : s.endX;
       if (p.x < lead + 2) {   // pushed by the left edge; pinned against a wall, it's a lost life
         const want = lead + 2 - p.x; DD.moveX(p, want);

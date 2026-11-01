@@ -41,7 +41,7 @@
   const SPEAK = { tim: '#6cc8b4', gregg: '#e8707a' };
   const rect = (c, x, y, w, h) => { DD.ctx.fillStyle = c; DD.ctx.fillRect(Math.round(x), Math.round(y), w, h); };
   const fitScale = (s, w, max) => { for (let k = max; k > 1; k--) if (s.length * 4 * k - k <= w) return k; return 1; };
-  const clean = s => String(s).replace(/[‘’]/g, "'").replace(/[“”"]/g, '').replace(/[—–]/g, '-').replace(/…/g, '...').replace(/;/g, ',').toUpperCase();
+  const clean = s => (DD.keyText ? DD.keyText(s) : String(s)).replace(/[‘’]/g, "'").replace(/(\d)[”"]/g, '$1\u0001').replace(/[“”"]/g, '').replace(/\u0001/g, '"').replace(/[—–]/g, '-').replace(/…/g, '...').replace(/;/g, ',').toUpperCase();
   function wrap(txt, n) { const out = []; let cur = ''; for (const w of clean(txt).split(/\s+/)) { if (cur && cur.length + 1 + w.length > n) { out.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w; } if (cur) out.push(cur); return out.slice(0, 3); }
 
   function scene(level, kind, def) { LIB[level + ':' + kind] = Object.assign({ level, kind, key: level + ':' + kind }, def); }
@@ -185,6 +185,7 @@
       G.cam.x = clamp(p.x + p.w / 2 - VW / 2, 0, Math.max(0, L.W * TS - VW)); G.cam.y = clamp(p.y + p.h - VH * 0.62, 0, Math.max(0, L.H * TS - VH));
     }
     if (def.kind === 'boss_in' && skipped && B) DD.banner(B.name, 100, B.cfg.sub || '');
+    if (def.kind === 'boss_out' && DD.collectLoose) DD.collectLoose();   // however the knock-out ends (skipped, tapped through, played out) its popcorn burst is credited
     if (def.kind === 'boss_out' && B && !def.keepEnd) B.endT = Math.min(B.endT, def.endT || 30);
     G.dlg.q.length = 0; G.dlg.cur = null; G.banner = null; if (G.bq) G.bq.length = 0;
     if (S.then) S.then();
@@ -247,7 +248,7 @@
     if (window.DDCutFX) window.DDCutFX.over(S, ctx);   // stamps, the tape OSD, the pause tag
     if (S.hint > 0 && S.ready && !S.closing) {   // the skip prompt, in the top bar, when a key goes down
       ctx.globalAlpha = Math.min(1, S.hint / 30) * 0.9;
-      const s = 'HOLD ' + (DD.jumpKey ? DD.jumpKey() : 'JUMP') + ' TO SKIP', w = s.length * 4 - 1, x = VW - 8 - w;
+      const s = DD.touchOn ? 'HOLD THE SCREEN TO SKIP' : 'HOLD ' + (DD.jumpKey ? DD.jumpKey() : 'JUMP') + ' TO SKIP', w = s.length * 4 - 1, x = VW - 8 - w;
       text(s, x, 6, '#a8a0b8', 1, null);
       rect('#3a3446', x, 13, w, 1); if (S.skipT) rect('#ffe680', x, 13, Math.round(w * S.skipT / SKIP_HOLD), 1);
       ctx.globalAlpha = 1;

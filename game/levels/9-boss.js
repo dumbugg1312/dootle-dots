@@ -162,7 +162,7 @@
       DD.hitBoss(1); e.st = 'hurt'; e.t = 0; e.lastHp = B.hp; e.vx = (DD.cx(G.pl) < DD.cx(e) ? 1 : -1) * 2.4; G.s.hitFx = 14;
       return true;
     },
-    touch(e, G) { const B = DD.boss; if (B && !B.dead && B.engaged && e.st !== 'hurt' && e.st !== 'stun') DD.hurt(DD.cx(e)); },
+    touch(e, G) { const B = DD.boss; if (B && !B.dead && B.engaged && e.st !== 'hurt' && e.st !== 'stun' && !(e.st === 'walk' && e.t < 30)) DD.hurt(DD.cx(e)); },   // walking, harmless for his first half second after the dizzy window
     draw(e, ctx, G) {
       const B = DD.boss, X = DD.wx(e.x + e.w / 2), Y = DD.wy(e.y + e.h), flip = e.dir < 0;
       const bob = e.st === 'walk' ? Math.round(Math.sin(e.t / 6) * 1) : 0;
@@ -196,10 +196,10 @@
   window.LEVEL = {
     id: '9-boss', name: 'T. AMATO', sub: 'ON CINEMA ON DEMAND', world: 9,
     W: 64, H: 24, FLOOR: 21,
-    SOLID: [['slate', 0, 21, 64, 3], ['ledge', 12, 18, 6, 1], ['ledge', 46, 18, 6, 1], ['ledge', 29, 12, 6, 1]],
+    SOLID: [['slate', 0, 21, 64, 3], ['ledge', 12, 18, 6, 1], ['ledge', 46, 18, 6, 1], ['ledge', 29, 18, 6, 1]],   // the middle ledge was row 12: nothing could reach the kernels on it
     KINDS: { slate: 1, desk: 1, ledge: 2 },
     THINGS: [['dot', 1, 20], ['amato_boss', 50, 19]],
-    POPCORN: [[4, 20, 6], [12, 17, 6], [46, 17, 6], [29, 11, 6], [16, 20, 4], [38, 20, 4], [24, 14, 3], [36, 14, 3], [22, 20, 3], [53, 20, 4], [8, 18, 2], [56, 18, 2], [42, 20, 3]],
+    POPCORN: [[4, 20, 6], [12, 17, 6], [46, 17, 6], [29, 17, 6], [16, 20, 4], [38, 20, 4], [24, 14, 3], [36, 14, 3], [22, 20, 3], [53, 20, 4], [8, 18, 2], [56, 18, 2], [42, 20, 3]],
     sprites: ['w9_tiles', 'w9_panel', 'w9_tvlogo', 'w9_shelf_a', 'w9_shelf_b', 'w9_shelf_c', 'w9_boom', 'w9_deskprops', 'w9_jet', 'w9_balls', 'w9_star',
       'w9_amato_0', 'w9_amato_1', 'w9_amato_2', 'w9_dumble_0', 'w9_dumble_1', 'w9_dbooth', 'w9_scenes', 'w9_seat_gregg14', 'w9_joey_0', 'w9_jgate'],
     portraits: { amato: 'w9_portrait_amato', dumble: 'w9_portrait_dumble' },
@@ -245,7 +245,7 @@
     },
     script: {
       init(G) { G.s.shiftT = 0; G.s.conj = 0; G.s.hitFx = 0; },
-      update(G) { const s = G.s; if (G.frame === 8 && typeof location !== 'undefined' && /w9hit=(\d)/.test(location.search || '')) DD.hitBoss(+RegExp.$1);   // ?w9hit=3 jumps to phase 2 for screenshots
+      update(G) { const s = G.s; if (G.frame === 8 && window.DD_DEV && typeof location !== 'undefined' && /w9hit=(\d)/.test(location.search || '')) DD.hitBoss(+RegExp.$1);   // ?w9hit=3 jumps to phase 2 for screenshots
          if (s.shiftT > 0 && s.shiftT < 50) s.shiftT++; if (s.conj > 0) s.conj--; if (s.hitFx > 0) s.hitFx--; },
       drawFG(ctx, G) {
         const B = DD.boss;

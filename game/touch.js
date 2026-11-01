@@ -5,7 +5,8 @@
 // detection, jump buffering, coyote time and variable jumps exactly as for a real keyboard. Taps on the canvas itself still reach the
 // engine and the menus the way a mouse click does (portraits, pause menu, dialogue, the blue card, every menu screen).
 // Also here: the scale is allowed to be fractional (engine.js floors it), a rotate-me card covers the game in portrait, and the
-// overlay hides itself when a real keyboard key is pressed (a tablet with a keyboard) until the next touch.
+// overlay hides itself when a real keyboard key is pressed (a tablet with a keyboard) until the next touch. What shows depends on
+// what is on screen (mode() below), so the buttons never sit over a menu, a line of dialogue, a card or a caption.
 (function () {
   const VW = 320, VH = 180, cv = document.getElementById('c');
   const SPR = (window.DD && DD.spriteDir) || '../design/sprites/';
@@ -18,15 +19,26 @@
     #tc.kb { display: none; }
     #tc > div { position: absolute; pointer-events: auto; box-sizing: border-box; opacity: 0.42; transition: opacity 0.08s; }
     #tc > div.on { opacity: 0.85; }
-    #tc .pad { left: 14px; bottom: 18px; width: 150px; height: 100px; border: 2px solid #ffe680; border-radius: 14px; background: rgba(20,8,14,0.45); }
+    #tc .pad { left: max(14px, env(safe-area-inset-left)); bottom: max(18px, calc(env(safe-area-inset-bottom) + 8px)); width: 150px; height: 100px; border: 2px solid #ffe680; border-radius: 14px; background: rgba(20,8,14,0.45); }
     #tc .pad i { position: absolute; font-style: normal; font-size: 16px; color: #ffe680; }
     #tc .pad .l { left: 22px; top: 28px; } #tc .pad .r { right: 22px; top: 28px; } #tc .pad .d { left: 50%; bottom: 6px; margin-left: -6px; }
     #tc .pad:before { content: ''; position: absolute; left: 50%; top: 10px; bottom: 36px; border-left: 1px dashed rgba(255,230,128,0.45); }
     #tc .pad:after { content: ''; position: absolute; left: 10px; right: 10px; bottom: 32px; border-top: 1px dashed rgba(255,230,128,0.45); }
     #tc .btn { border-radius: 50%; border: 2px solid #ffe680; background: rgba(138,28,36,0.55); display: flex; align-items: center; justify-content: center; text-shadow: 1px 1px 0 #000; }
-    #tc .jump { right: 18px; bottom: 22px; width: 76px; height: 76px; font-size: 13px; }
-    #tc .sw { right: 108px; bottom: 30px; width: 58px; height: 58px; font-size: 10px; }
-    #tc .pause { left: 50%; top: 6px; width: 44px; height: 30px; margin-left: -22px; border-radius: 8px; border: 2px solid #ffe680; background: rgba(20,8,14,0.55); }
+    #tc .jump { right: max(18px, env(safe-area-inset-right)); bottom: max(22px, calc(env(safe-area-inset-bottom) + 12px)); width: 76px; height: 76px; font-size: 13px; }
+    #tc .sw { right: calc(max(18px, env(safe-area-inset-right)) + 90px); bottom: max(30px, calc(env(safe-area-inset-bottom) + 20px)); width: 58px; height: 58px; font-size: 10px; }
+    /* what is on screen decides what the overlay shows (mode() below): play gets everything; a menu gets JUMP and SWITCH as two
+       small pills in the bottom corners, clear of the keycap row (or out in the side bars on a wide phone); dialogue, cards, the
+       pause menu and the results card are all taps, so nothing covers them; in a cutscene the whole screen is the JUMP button */
+    #tc.m-menu .pad, #tc.m-menu .pause, #tc.m-tap > div, #tc.m-cut > div { display: none; }
+    #tc.m-menu .btn { width: 62px; height: 28px; border-radius: 14px; font-size: 11px; bottom: max(3px, env(safe-area-inset-bottom)); opacity: 0.75; }
+    #tc.m-menu .btn.on { opacity: 1; }
+    #tc.m-menu .jump { right: max(4px, env(safe-area-inset-right)); }
+    #tc.m-menu .sw { right: auto; left: max(4px, env(safe-area-inset-left)); }
+    #tc.m-menu.wide .btn { bottom: max(12px, env(safe-area-inset-bottom)); }
+    #tc.m-menu.wide .jump { right: calc((var(--bar) - 62px) / 2); }
+    #tc.m-menu.wide .sw { left: calc((var(--bar) - 62px) / 2); }
+    #tc .pause { left: 50%; top: max(6px, env(safe-area-inset-top)); width: 44px; height: 30px; margin-left: -22px; border-radius: 8px; border: 2px solid #ffe680; background: rgba(20,8,14,0.55); }
     #tc .pause:before, #tc .pause:after { content: ''; position: absolute; top: 8px; width: 4px; height: 10px; background: #fff6d4; }
     #tc .pause:before { left: 15px; } #tc .pause:after { left: 23px; }
     #tr { position: fixed; inset: 0; display: none; background: #0a0408; color: #fff6d4; z-index: 9; text-align: center; font: bold 13px/1.7 ui-monospace, Menlo, Consolas, monospace; letter-spacing: 1px; }
@@ -108,6 +120,30 @@
   window.DDTouch = { on: () => !root.classList.contains('kb') };   // prompts say JUMP (the on-screen button) while the overlay is up   // a real key: a keyboard is here, step aside
   addEventListener('blur', () => { for (const c in held) held[c] = 0; fingers.clear(); });   // the engine drops its keys on blur too
   document.addEventListener('visibilitychange', () => { if (document.hidden) releaseAll(); });
+  // ---- modes: play, title (the level's controls card, which names these buttons), menu, tap (dialogue, blue card, pause menu,
+  // results: all taps on the canvas) and cut. Polled every frame.
+  function mode() {
+    const D = window.DD, G = D && D.G;
+    if (!D || D.inMenu || !G) return 'menu';
+    if (D.cut) return 'cut';
+    if (G.state === 'pause') return G.pm && G.pm.opt ? 'menu' : 'tap';   // the pause menu's OPTIONS run the menu screens
+    if (G.done || (G.intro >= 72 && (G.fact || (G.dlg && (G.dlg.cur || G.dlg.q.length))))) return 'tap';   // 72: engine.js INTRO_T, when talk starts pausing play
+    return G.state === 'title' ? 'title' : 'play';
+  }
+  const cutHeld = new Set();   // a cutscene: a finger anywhere is JUMP (tap to move a caption on, hold to skip), which the canvas alone can't give
+  let cur = '';
+  (function poll() {
+    const m = mode();
+    if (m !== cur) {   // into or out of a menu or a cutscene the buttons change meaning: let go of everything. A thumb held on the pad
+      if (/menu|cut/.test(m + cur)) { releaseAll(); cutHeld.clear(); }   // through a line of dialogue keeps holding, like a held key
+      root.classList.remove('m-' + cur); root.classList.add('m-' + m); cur = m;
+    }
+    requestAnimationFrame(poll);
+  })();
+  document.addEventListener('touchstart', e => { if (cur !== 'cut') return; for (const t of e.changedTouches) if (!cutHeld.has(t.identifier)) { cutHeld.add(t.identifier); press('KeyZ'); } }, { passive: true });
+  const cutEnd = e => { for (const t of e.changedTouches) if (cutHeld.delete(t.identifier)) release('KeyZ'); };
+  document.addEventListener('touchend', cutEnd, { passive: true }); document.addEventListener('touchcancel', cutEnd, { passive: true });
+
   const portrait = matchMedia('(orientation: portrait)');
   (portrait.addEventListener ? portrait.addEventListener.bind(portrait, 'change') : portrait.addListener.bind(portrait))(() => releaseAll());
 
@@ -116,6 +152,8 @@
     const k = Math.min(innerWidth / VW, innerHeight / VH);
     cv.style.width = VW * k + 'px'; cv.style.height = VH * k + 'px';
     cv.style.marginTop = Math.max(0, Math.floor((innerHeight - VH * k) / 2)) + 'px';
+    const bar = (innerWidth - VW * k) / 2;   // the side bars beside a 16:9 game on a wider phone: menu pills sit out there when they fit
+    root.style.setProperty('--bar', bar + 'px'); root.classList.toggle('wide', bar >= 72);
   }
   addEventListener('resize', fit); addEventListener('orientationchange', () => setTimeout(fit, 50));
   if (window.visualViewport) visualViewport.addEventListener('resize', fit);

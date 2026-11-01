@@ -401,10 +401,12 @@ window.LEVEL = {"id": "1-2", "name": "HAS ANYONE SEEN MAYOR RON?", "sub": "I'M N
         const s = G.s, VW = DD.VW, VH = DD.VH;
         let a = 0; if (s.tele) a = Math.min(1, (G.frame - s.tele.f0 + 1) / 9); else if (G.frame - s.arriveF < 14) a = 1 - (G.frame - s.arriveF) / 14;
         if (a > 0) { ctx.fillStyle = 'rgba(8,4,12,' + a + ')'; ctx.fillRect(0, 0, VW, VH); }
-        // the search so far: three shops to look in
+        // the search so far: three shops to look in (not over the title card)
+        if (G.state !== 'title') {
         ctx.fillStyle = 'rgba(10,4,8,0.9)'; ctx.fillRect(156, 4, 76, 24); ctx.fillStyle = 'rgba(207,198,188,0.35)'; ctx.fillRect(156, 4, 76, 1); ctx.fillRect(156, 27, 76, 1);   // nearly opaque: the shop sign behind mustn't read through the names
         DD.text('LOOKED IN', 160, 6, '#cfc6bc', 1, null);
         [['BANK', 'bank'], ['BARBER', 'barber'], ['POST', 'post']].forEach(([n, k], i) => { const x = [160, 184, 213][i], on = s.peek[k]; ctx.fillStyle = on ? '#9ae0a8' : '#3a3438'; ctx.fillRect(x, 14, 5, 5); DD.text(n, x, 21, on ? '#9ae0a8' : '#8a7e86', 1, null); });
+        }
       },
     },
     drawGoal(ctx, G, b, X, Y) {   // the Residence's back door: it cracks open as you come, and shuts when you reach it

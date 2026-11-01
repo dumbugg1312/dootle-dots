@@ -25,7 +25,7 @@ window.LEVEL = {"id": "6-2", "name": "WATCH IT, MARK", "sub": "WITNESS: MARK PRO
     intro: { bg: '#2a1608', fg: '#f4eedc', edge: '#e8362a' },
     lines: {   // design/VOICE.md. Source: Trial Day 3 (hl-day-3). start and goal are the engine's; fifth is fired when he is first cornered
       start: [['lawyer', 'WATCH IT, MARK.']],                                                             // hl-day-3 2:13
-      fifth: [['lawyer', 'WHY WAS THERE NO SIX BAG CINEMAS FOOD TRUCK AT THE MUSIC FESTIVAL?'], ['mark', 'YOU JUST TOLD ME TO GET A TRUCK.']],   // hl-day-3 4:12-4:24
+      fifth: [['lawyer', 'WHY WAS THERE NO SIX BAG CINEMA FOOD TRUCK AT THE MUSIC FESTIVAL?'], ['mark', 'YOU JUST TOLD ME TO GET A TRUCK.']],   // hl-day-3 4:12-4:24
       goal: [['judge', 'MR. HEIDECKER, I\'M ENTERING A CITATION OF CONTEMPT FOR YOU.'], ['lawyer', 'THANK YOU.']],   // hl-day-3 5:45-5:56
     },
   });

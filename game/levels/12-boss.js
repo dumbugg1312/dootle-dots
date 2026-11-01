@@ -174,7 +174,7 @@
       DD.hitBoss(1);
       return true;
     },
-    touch(e) { if (e.st !== 'open' || !DD.boss || DD.boss.dead) DD.hurt(DD.cx(e)); },
+    touch(e) { if ((e.st !== 'open' && !(e.st === 'walk' && e.t < 30)) || !DD.boss || DD.boss.dead) DD.hurt(DD.cx(e)); },   // walking, harmless for his first half second after the dizzy window
     draw(e, ctx, G) {
       const B = DD.boss, X = DD.wx(e.x), Y = DD.wy(e.y), cxs = DD.wx(e.x + e.w / 2);
       const shadowOn = e.st === 'wind' || (e.atk === 'dive' && (e.st === 'rise' || e.st === 'fall'));

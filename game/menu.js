@@ -3,20 +3,28 @@
 // Look: the title is the On Cinema theater (w2 curtain parts on a gilded screen); the world select is a video-store shelf of VHS sleeves
 // (each thumbnail is built from that world's own set sprites); the era card opens with a film-leader countdown; levels show bags as popcorn tubs.
 (function () {
-  const VW = DD.VW, VH = DD.VH, text = DD.text, spr = DD.spr, drawDot = DD.drawDot || ((n, pose, ...r) => DD.spr(n, ...r)), SFX = DD.SFX, Q = new URLSearchParams(location.search);
+  const VW = DD.VW, VH = DD.VH, text = DD.text, spr = DD.spr, drawDot = DD.drawDot || ((n, pose, ...r) => DD.spr(n, ...r)), SFX = DD.SFX, Q0 = new URLSearchParams(location.search), DEV = !!window.DD_DEV;
+  const DEVQ = ['level', 'era', 'world', 'bonus', 'end', 'unlock', 'casino', 'select', 'shelf', 'options', 'ff'], Q = { has: k => (DEV || DEVQ.indexOf(k) < 0) && Q0.has(k), get: k => (DEV || DEVQ.indexOf(k) < 0) ? Q0.get(k) : null };   // test and cheat links only work on a dev host; the live site ignores them (?desktop ?card ?nostock stay open)
+  const JK = () => DD.jumpKey ? DD.jumpKey() : 'Z', pk = (k, f) => DD.btn ? DD.btn(k) : f;   // prompts name the key or pad button in hand: jump key, and a pad button by its label on this controller (CROSS / A / B ...)
   const WORLDS = window.WORLDS, LEVELS = {}, MISSING = {};
   const idsOf = w => w.levels.map(l => l.id);
-  const have = id => !!LEVELS[id];
+  const have = id => Object.prototype.hasOwnProperty.call(LEVELS, id) && !!LEVELS[id];   // own property only: ?level=__proto__ is not a stage
   const ctx = DD.ctx;
 
   // ---- progress: best bags and the VHS per level, in localStorage (memory-only if storage is blocked)
   const KEY = 'dootledots.progress.v1';
-  let PROG = {};
-  try { PROG = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { PROG = {}; }
+  const arr = v => Array.isArray(v) ? v : [];   // a hand-edited save can put anything where a list belongs
+  function loadProg() {   // the save must be a plain object of stage objects; anything else is dropped, and each stage's `sec` is a list
+    let p; try { p = JSON.parse(localStorage.getItem(KEY)); } catch (e) { p = null; }
+    if (!p || typeof p !== 'object' || Array.isArray(p)) return {};
+    const o = {}; for (const k of Object.keys(p)) if (p[k] && typeof p[k] === 'object' && !Array.isArray(p[k])) o[k] = Object.assign({}, p[k], { sec: arr(p[k].sec) });
+    return o;
+  }
+  let PROG = loadProg();
   function record(r) {
     if (!r || r.quit || !r.id) return;
-    const o = PROG[r.id] || {};
-    PROG[r.id] = { bags: Math.max(o.bags || 0, r.bags || 0), got: Math.max(o.got || 0, r.got || 0), total: r.total || o.total || 0, vhs: !!(o.vhs || r.vhs), sec: [...new Set([].concat(o.sec || [], r.dsec || []))], fact: o.fact || r.fact || null, allPop: !!(o.allPop || r.allPop), six: !!(o.six || r.six) };   // six: won at six bags (the HEI store's SIX BAGS)
+    const o = Object.prototype.hasOwnProperty.call(PROG, r.id) && PROG[r.id] && typeof PROG[r.id] === 'object' ? PROG[r.id] : {};
+    PROG[r.id] = { bags: Math.max(o.bags || 0, r.bags || 0), got: Math.max(o.got || 0, r.got || 0), total: r.total || o.total || 0, vhs: !!(o.vhs || r.vhs), sec: [...new Set([].concat(arr(o.sec), arr(r.dsec)))], fact: o.fact || r.fact || null, allPop: !!(o.allPop || r.allPop), six: !!(o.six || r.six) };   // six: won at six bags (the HEI store's SIX BAGS)
     try { localStorage.setItem(KEY, JSON.stringify(PROG)); } catch (e) { /* storage blocked: progress lasts this session */ }
   }
   const marks = id => { const p = PROG[id] || {}; return (p.allPop ? 1 : 0) + (p.vhs ? 1 : 0) + (p.fact ? 1 : 0); };   // a stage's three goals: every kernel, the tape, the blue card
@@ -24,7 +32,7 @@
   const worldBags = w => idsOf(w).reduce((s, id) => s + ((PROG[id] && PROG[id].bags) || 0), 0);
   const worldMax = w => idsOf(w).length * 5;
   const secOf = id => have(id) ? ['sam', 'mel', 'cloud', 'baxter'].filter(d => (LEVELS[id].THINGS || []).some(t => t[0] === 'dsec' && t[3] === d)) : [];   // the Dots with a secret in this stage
-  const secGot = id => ((PROG[id] && PROG[id].sec) || []).filter(d => secOf(id).includes(d));
+  const secGot = id => arr(PROG[id] && PROG[id].sec).filter(d => secOf(id).includes(d));
   const worldSec = w => idsOf(w).reduce((s, id) => s + secGot(id).length, 0), worldSecMax = w => idsOf(w).reduce((s, id) => s + secOf(id).length, 0);
   const worldVhs = w => idsOf(w).reduce((s, id) => s + ((PROG[id] && PROG[id].vhs) ? 1 : 0), 0);
   const worldOpen = w => idsOf(w).some(have);
@@ -50,10 +58,11 @@
   // ---- level files: a script tag per id; onerror (404 / file missing) means COMING SOON. Works over file:// and http.
   // All of them are fetched at once; async=false makes them run in order, each one's load (or error) event firing right after
   // it runs and before the next, so the entities a file defines (DD.collectDefs) are always its own.
+  let probed = 0, probeN = 0;   // levels answered so far / asked for: the LOADING screen's readout
   function probe(ids, done) {
-    let left = ids.length; if (!left) return done();
+    let left = ids.length; probeN = left; probed = 0; if (!left) return done();
     let defs = DD.collectDefs(true); window.LEVEL = null;
-    const finish = () => { window.LEVEL = null; defs = DD.collectDefs(true); if (--left === 0) { DD.collectDefs(false); done(); } };
+    const finish = () => { probed++; window.LEVEL = null; defs = DD.collectDefs(true); if (--left === 0) { DD.collectDefs(false); done(); } };
     for (const id of ids) {
       const s = document.createElement('script'); s.async = false; s.src = 'levels/' + id + '.js';
       s.onload = () => { if (window.LEVEL && window.LEVEL.SOLID) { LEVELS[id] = window.LEVEL; LEVELS[id].ENTS = defs; if (!LEVELS[id].id) LEVELS[id].id = id; } else MISSING[id] = 1; finish(); };
@@ -181,6 +190,7 @@
   const SH = { n: 24, w: 12, h: 54, gx: 1, x0: 4, y0: [17, 78] };
   const shelfIds = () => [].concat(...WORLDS.map(idsOf)).filter(id => window.CLASSICS && CLASSICS[id]);
   let scur = 0;
+  const screenOk = w => ALL || worldTapes(w) === w.levels.length;   // all four tapes found opens the world's screening; UNLOCK ALL LEVELS opens every one
   function openShelf() { st = 'shelf'; t = 0; scur = 0; SFX.switch(); }
   function selectTo(i) { if (i === cur) return; cur = i; sTape(); }
   const eraLine = w => { const V = window.DDVoice; if (V && w && worldOpen(w)) V.say('world', { world: w.n }); };   // opening a world: its era says its line (game/voice/cues.js)
@@ -197,7 +207,7 @@
   }
   let fcur = 0;
   const FORK = [['KEEP PLAYING DOT CITY', 'THREE MORE STAGES AND A BOSS. THE DOTS JOIN ONE BY ONE.'], ['SKIP TO ON CINEMA', 'START AT SEASON ONE. ALL FOUR DOTS COME WITH YOU.']];
-  const FY = i => 92 + i * 30;
+  const FY = i => 58 + i * 30;   // the two options sit high: the hint and the bouncing Dots (up to 36 px tall, feet at the foot of the screen) get the lower third to themselves
   function forkDo(i) {
     if (i === 0) { SFX.switch(); return playLevel('1-2'); }
     try { localStorage.setItem(SKIPKEY, '1'); } catch (e) {}
@@ -206,15 +216,15 @@
   function drawFork() {
     const w1 = WORLDS[0];
     rect(w1.bg, 0, 0, VW, VH); backdrop(w1, t, 0, VH); rect('rgba(6,4,14,0.6)', 0, 0, VW, VH);
-    ctext('DOT CITY IS SAVED... FOR NOW', 26, '#ffe680', 2, '#7a2a10');
-    ctext('WHERE TO NEXT?', 50, '#fffbd0', 1, '#000');
+    ctext('DOT CITY IS SAVED... FOR NOW', 22, '#ffe680', 2, '#7a2a10');
+    ctext('WHERE TO NEXT?', 40, '#fffbd0', 1, '#000');
     FORK.forEach(([a, b], i) => {
       const on = i === fcur, y = FY(i);
       rect(on ? 'rgba(232,80,74,0.45)' : 'rgba(0,0,0,0.45)', 30, y - 6, VW - 60, 24); if (on) rect('#ffd27a', 30, y - 6, 3, 24);
       ctext(a, y, on ? '#fffbd0' : '#c8a8a0', 1, '#000'); ctext(b, y + 10, on ? '#9ac8a0' : '#7a6a70', 1, '#000');
     });
     ['sam', 'mel', 'cloud', 'baxter'].forEach((n, i) => spr(n, 112 + i * 32, VH - 6 + Math.round(-Math.abs(Math.sin(t / 10 + i * 1.3)) * 5), false, 1, 1));
-    ctext(DD.padUsed ? 'UP/DOWN + CROSS' : 'UP/DOWN + JUMP, OR CLICK', VH - 26, '#ffd27a', 1, '#000');
+    ctext('UP/DOWN + ' + JK() + (DD.touchOn ? ', OR TAP' : DD.padUsed ? '' : ', OR CLICK'), 116, '#ffd27a', 1, '#000');
   }
   function startRewind() {
     st = 'rewind'; t = 0; try { localStorage.setItem(RWK, '1'); } catch (e) {}
@@ -239,7 +249,7 @@
   function drawRewind() {
     const R = RWR(); if (!R) return;
     R.draw(ctx, t / 60, R.cues, { total: R.total });
-    if (t > 30 && Math.floor(t / 30) % 2 && !R.speaking(t / 60)) text(DD.padUsed ? 'CROSS: SKIP' : 'JUMP: SKIP', VW - 50, VH - 8, '#cfc6bc', 1, '#000');
+    if (t > 30 && Math.floor(t / 30) % 2 && !R.speaking(t / 60)) text(DD.touchOn ? 'TAP TO SKIP' : JK() + ': SKIP', VW - 50, VH - 8, '#cfc6bc', 1, '#000');
   }
   const prepSongs = w => { const m = window.DDMusic; if (m && m.prepare && w) for (const id of idsOf(w)) m.prepare(id, w.n, /boss/.test(id)); };   // fetch the world's songs before its stages start
   function enterWorld(i) { if (worldOpen(WORLDS[i]) && !worldUnlocked(WORLDS[i])) { SFX.buzz(); note = 'BEAT ' + WORLDS[i - 1].boss + ' FIRST'; noteT = 60; return; } world = WORLDS[i]; st = 'era'; t = 0; eraPlay = false; SFX.switch(); prepSongs(world); if (world.n === 2) { let seen = false; try { seen = !!localStorage.getItem(RWK); } catch (e) {} if (!seen) { startRewind(); return; } } eraLine(world); }
@@ -274,6 +284,7 @@
     const wi = WORLDS.findIndex(w => idsOf(w).includes(id)), w = WORLDS[wi], li = w ? idsOf(w).indexOf(id) : 0;
     if (!w) { st = 'select'; t = 0; return DD.setScene(scene); }
     cur = wi; world = w; lcur = li; t = 0;
+    if (!r.quit && id === '12-boss') { st = 'end'; t = 0; SFX.switch(); return DD.setScene(scene); }   // the last boss, every time it falls: the completion card, then the title
     if (!r.quit) {
       const nx = w.levels[li + 1];
       if (id === '1-1' && !all && !ALL && !beaten('1-boss') && !skipped() && !beaten('1-2')) { st = 'fork'; fcur = 0; t = 0; return DD.setScene(scene); }   // the fork: more Dot City, or straight to On Cinema
@@ -290,30 +301,35 @@
   const say = (s, n = 90) => { note = s; noteT = n; };
   const MUS = () => window.DDMusic || null;
   const ROTL = () => ((window.CUES && window.CUES.rotation) || []).filter(n => !(window.DDMusic && window.DDMusic.missing(n)));   // songs fetch when highlighted (game/music.js)
+  const trackWorld = n => { const C = window.CUES || {}; let w = 99; for (const g of ['world', 'boss', 'level']) for (const k in (C[g] || {})) if (C[g][k] === n) w = Math.min(w, parseInt(k, 10)); return w === 99 ? 1 : w; };   // the first world a song is heard in (the theme and anything unused: World 1)
+  const trackOpen = n => { const w = WORLDS[trackWorld(n) - 1]; return !w || worldUnlocked(w); };   // a song is listed once its world is open (UNLOCK ALL LEVELS: all of them); until then it reads ???
   const songTitle = n => ((window.CUES && window.CUES.titles) || {})[n] || n.toUpperCase().replace(/-/g, ' ');
   let ocur = 0, jcur = 1, clearArm = 0;
-  const CLR = 11;   // the CLEAR DATA row
+  const CLR = 12;   // the CLEAR DATA row
   const VOLS = [['music', 'MUSIC'], ['sfx', 'SOUND EFFECTS'], ['voice', 'VOICES']];   // rows 0-2: volume sliders (left / right, or click the bar)
   const OPTS = () => {
     const m = MUS(), sh = m && m.prefs && m.prefs.shuffle;
     const V = window.DDVol;
-    return [...VOLS.map(([k, n]) => [n, 'LEFT / RIGHT TO SET THE VOLUME', k, V ? V.level(k) : 10]), ['JUKEBOX', 'CHOOSE WHICH SONGS PLAY'], ['SHUFFLE: ' + (sh ? 'ON' : 'OFF'), sh ? 'SONGS COME UP IN ANY ORDER' : 'SONGS COME UP IN ORDER'],
+    return [...VOLS.map(([k, n]) => [n, DD.touchOn ? 'TAP ALONG THE BAR TO SET THE VOLUME' : 'LEFT / RIGHT TO SET THE VOLUME', k, V ? V.level(k) : 10]), ['JUKEBOX', 'CHOOSE WHICH SONGS PLAY'], ['SHUFFLE: ' + (sh ? 'ON' : 'OFF'), sh ? 'SONGS COME UP IN ANY ORDER' : 'SONGS COME UP IN ORDER'],
       ['UNLOCK ALL LEVELS: ' + (ALL ? 'ON' : 'OFF'), ALL ? 'EVERY WORLD AND STAGE IS OPEN' : 'WORLDS OPEN ONE BOSS AT A TIME'],
       ['UNLOCK ALL DOTS: ' + (ALLD ? 'ON' : 'OFF'), ALLD ? 'ALL FOUR DOTS FROM THE FIRST STAGE' : 'THE DOTS JOIN ONE STAGE AT A TIME'],
       ['UNLIMITED HEI POINTS: ' + (unl() ? 'ON' : 'OFF'), unl() ? 'EVERY UPGRADE IN THE HEI STORE IS FREE' : 'EARN HEI POINTS BY BEATING STAGES'],
       ['CUTSCENES: ' + (cutsEvery() ? 'EVERY TIME' : 'FIRST TIME'), cutsEvery() ? 'SCENES PLAY ON EVERY VISIT TO A STAGE' : 'EACH SCENE PLAYS THE FIRST TIME YOU GET THERE'],   // game/cutscene.js
+      ['GRAPHICS: ' + gfxMode().toUpperCase(), GFX_HELP[gfxMode()]()],   // DD.gfx in engine.js
       ['SAVE DATA', 'DOWNLOAD YOUR SAVE AS A FILE'], ['LOAD DATA', 'OPEN A SAVE FILE'],
       [clearArm ? 'PRESS AGAIN TO CLEAR' : 'CLEAR DATA', 'ERASE ALL PROGRESS ON THIS COMPUTER'], ['BACK', '']];
   };
   const unl = () => !!(window.DDStore && window.DDStore.unlimited);
   const cutsEvery = () => !!(window.DDCut && window.DDCut.every);
+  const gfxMode = () => (DD.gfx ? DD.gfx.mode : 'auto'), GFX_MODES = ['auto', 'full', 'light'];
+  const GFX_HELP = { auto: () => DD.gfx && DD.gfx.tier > 0 ? 'EFFECTS TURNED DOWN TO KEEP IT SMOOTH HERE' : 'EFFECTS TURN DOWN ONLY IF THE GAME SLOWS', full: () => 'EVERY EFFECT, EVEN IF IT SLOWS DOWN', light: () => 'FEWER EFFECTS, FOR OLDER COMPUTERS' };
   function openOptions() { st = 'options'; t = 0; ocur = 0; clearArm = 0; SFX.switch(); }
   let inGame = null;   // { st, t, done } while the options are up over a paused level (the pause menu's OPTIONS); BACK hands it back
   function optBack() {
     if (!inGame) { st = 'select'; t = 0; SFX.switch(); return; }
     const g = inGame; inGame = null; st = g.st; t = g.t; lastSt = st; SFX.switch(); g.done();
   }
-  function afterLoad() { try { PROG = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { PROG = {}; } ALL = Q.has('unlock') || unlockPref(); ALLD = dotsPref(); const m = MUS(); if (m && m.reloadPrefs) m.reloadPrefs(); if (window.DDStore) window.DDStore.reload(); }
+  function afterLoad() { PROG = loadProg(); ALL = Q.has('unlock') || unlockPref(); ALLD = dotsPref(); const m = MUS(); if (m && m.reloadPrefs) m.reloadPrefs(); if (window.DDStore) window.DDStore.reload(); if (window.DDWear && window.DDWear.reload) window.DDWear.reload(); if (window.DDCasino && window.DDCasino.reload) window.DDCasino.reload(); }   // every cached save: wardrobe and casino too, or their stale copy gets written back over the file just loaded
   function saveData() {
     const data = {}; saveKeys().forEach(k => { data[k] = localStorage.getItem(k); });
     const json = JSON.stringify({ game: 'dootledots', v: 1, saved: new Date().toISOString(), data }, null, 1);
@@ -343,18 +359,20 @@
     else if (i === 3) { ALLD = !ALLD; try { localStorage.setItem(DKEY, ALLD ? '1' : '0'); } catch (e) {} SFX.tick(); }
     else if (i === 4) { if (window.DDStore) window.DDStore.setUnlimited(!unl()); SFX.tick(); }
     else if (i === 5) { if (window.DDCut) window.DDCut.every = !cutsEvery(); SFX.tick(); }
-    else if (i === 6) saveData();
-    else if (i === 7) loadData();
+    else if (i === 6) { if (DD.gfx) DD.gfx.set(GFX_MODES[(GFX_MODES.indexOf(gfxMode()) + 1) % 3]); SFX.tick(); }
+    else if (i === 7) saveData();
+    else if (i === 8) loadData();
     else if (i === CLR - 3) { if (clearArm) { clearArm = 0; clearData(); } else { clearArm = 1; SFX.buzz(); } }
     else optBack();
   }
   const SLX = 150, SLW = 9;   // the sliders' bar: left edge and notch width
-  const OGRP = [5, 9, 12], OY = i => 22 + i * 9 + OGRP.filter(g => i >= g).length * 4, JB = { x: [14, 166], y0: 36, dy: 12, per: 9 };   // options rows in groups: sound, play, save data, then BACK
+  const OGRP = [5, 10, 13], OY = i => 21 + i * 8 + OGRP.filter(g => i >= g).length * 4, JB = { x: [14, 166], y0: 36, dy: 12, per: 9 };   // options rows in groups: sound, play, save data, then BACK
   const jPos = k => ({ x: JB.x[Math.floor(k / JB.per)], y: JB.y0 + (k % JB.per) * JB.dy });   // song k (0-based) on the jukebox page
   function jukeDo(i) {
     const m = MUS(), list = ROTL(); if (!m) return;
     if (i === 0) { m.setShuffle(!m.prefs.shuffle); SFX.tick(); return; }
     const n = list[i - 1]; if (!n) return;
+    if (!trackOpen(n)) { SFX.buzz(); say('NOT UNLOCKED YET', 60); return; }
     if (m.toggle(n)) SFX.tick(); else { SFX.buzz(); say('KEEP AT LEAST ONE SONG ON', 60); }
   }
 
@@ -377,6 +395,7 @@
       rewindCues();
       return;
     }
+    if (st === 'end') { if (t > 45 && (IN.ok || IN.start || IN.any || IN.back || c)) { st = 'title'; t = 130; SFX.switch(); } return; }   // jump, click, tap or a pad button (after a beat, so the results card's last press doesn't skip it)
     if (st === 'store') { if (!window.DDStore || window.DDStore.step(IN, c) === 'back') closeStore(); return; }
     if (st === 'wardrobe') { if (window.DDCasino.step(IN, c) === 'back') { st = 'select'; t = 0; SFX.switch(); } return; }
     if (st === 'title') {
@@ -428,7 +447,7 @@
       if (c) { if (inR(c, 100, 18, 120, 12)) { if (jcur === 0) jukeDo(0); else jcur = 0; }
         else list.forEach((n, k) => { const p = jPos(k); if (inR(c, p.x - 2, p.y - 2, 148, 11)) { if (jcur === k + 1) jukeDo(k + 1); else { jcur = k + 1; SFX.tick(); } } }); }
       else if (IN.ok) jukeDo(jcur);
-      if (m) m.preview = jcur > 0 ? list[jcur - 1] : null;
+      if (m) m.preview = jcur > 0 && trackOpen(list[jcur - 1]) ? list[jcur - 1] : null;   // a locked song is never previewed
       if (IN.back || IN.opt) { if (m) m.preview = null; st = 'options'; t = 0; SFX.switch(); }
     } else if (st === 'era') {
       if (t < 24 && t % 8 === 0) sBeep(false);
@@ -440,8 +459,8 @@
       const n = shelfIds().length;
       if (IN.nx) { scur = Math.max(0, Math.min(n - 1, scur + IN.nx)); SFX.tick(); }
       if (IN.ny) { const k = scur + IN.ny * SH.n; if (k >= 0 && k < n) { scur = k; SFX.tick(); } else if (IN.ny < 0) { st = 'select'; t = 0; } }
-      if (c) { let hit = false; shelfIds().forEach((id, i) => { const x = SH.x0 + (i % SH.n) * (SH.w + SH.gx), y = SH.y0[Math.floor(i / SH.n)]; if (inR(c, x, y - 4, SH.w, SH.h + 4)) { scur = i; hit = true; SFX.tick(); } }); if (!hit) { st = 'select'; t = 0; } }
-      if (IN.ok) { const id = shelfIds()[scur], w = WORLDS[parseInt(id, 10) - 1]; if (w && worldTapes(w) === w.levels.length && window.makeBonus) { const B = window.makeBonus(w.n, LEVELS); if (B) { SFX.switch(); return DD.start(B, { perks: perks(), onSave: record, onExit: r => { record(r); st = 'shelf'; t = 0; DD.setScene(scene); } }); } } SFX.buzz(); }
+      if (c) { let hit = false; shelfIds().forEach((id, i) => { const x = SH.x0 + (i % SH.n) * (SH.w + SH.gx), y = SH.y0[Math.floor(i / SH.n)]; if (inR(c, x, y - 4, SH.w, SH.h + 4)) { if (scur === i) IN.ok = true; else SFX.tick(); scur = i; hit = true; } }); if (!hit) { st = 'select'; t = 0; } }   // a tap on the picked tape plays its screening, like Jump
+      if (IN.ok) { const id = shelfIds()[scur], w = WORLDS[parseInt(id, 10) - 1]; if (w && screenOk(w) && window.makeBonus) { const B = window.makeBonus(w.n, LEVELS); if (B) { SFX.switch(); return DD.start(B, { perks: perks(), onSave: record, onExit: r => { record(r); st = 'shelf'; t = 0; DD.setScene(scene); } }); } } SFX.buzz(); }
       if (IN.back) { st = 'select'; t = 0; SFX.switch(); }
     } else if (st === 'levels') {
       const n = world.levels.length;
@@ -452,7 +471,7 @@
       if (IN.store) { openStore(() => { st = 'levels'; t = 0; }); return; }
       if (go && st === 'levels') {
         const id = world.levels[lcur].id;
-        if (have(id) && !stageUnlocked(world, lcur)) { SFX.buzz(); note = 'BEAT ' + world.levels[lcur - 1].id.toUpperCase() + ' FIRST'; noteT = 60; }
+        if (have(id) && !stageUnlocked(world, lcur)) { SFX.buzz(); note = 'BEAT ' + (lcur > 0 ? world.levels[lcur - 1].id.toUpperCase() : WORLDS[WORLDS.indexOf(world) - 1] ? WORLDS[WORLDS.indexOf(world) - 1].boss : 'THE LAST STAGE') + ' FIRST'; noteT = 60; }
         else if (have(id)) { SFX.switch(); playLevel(id); } else { SFX.buzz(); note = 'COMING SOON'; noteT = 60; }
       }
       if (IN.back) { st = 'select'; t = 0; }
@@ -547,7 +566,7 @@
       rect('#2a1408', 94, 160, 132, 17); rect('#c98f22', 94, 160, 132, 1); rect('#c98f22', 94, 176, 132, 1); rect('#c98f22', 94, 160, 1, 17); rect('#c98f22', 225, 160, 1, 17);
       rect('#4f0f24', 96, 162, 128, 13);
       if (runOpen()) [['PLAY', 120, 96, 50], ['SPEEDRUN', 186, 146, 78]].forEach(([s, x, bx, bw], i) => { const on = i === tsel; if (on) rect('#7a1f3a', bx, 162, bw, 13); text(s, x, 164, on ? '#ffffff' : '#9a7a70', 2, on ? '#7a2a10' : null, 'center'); });   // left / right picks
-      else if (blink(tt, 28)) text('PRESS ANY BUTTON', 160, 164, '#fff6c0', 2, '#7a2a10', 'center');
+      else if (blink(tt, 28)) text(DD.touchOn ? 'TAP TO START' : 'PRESS ANY BUTTON', 160, 164, '#fff6c0', 2, '#7a2a10', 'center');
     }
     if (tt > 100 && tt < 124) rect('rgba(255,248,214,' + ((124 - tt) / 24 * 0.5).toFixed(2) + ')', 0, 0, VW, VH);
     if (msg && tt > 100) ctext(msg, 150, '#ff8080', 1);
@@ -632,7 +651,7 @@
       const ws = chips.map(c => tw(c[0], 1) + 6 + c[3]), gap = 6; let x = Math.round(VW / 2 - (ws.reduce((a, b) => a + b, 0) + gap * (chips.length - 1)) / 2);
       chips.forEach((c, k) => { inset(x, IY + 35, ws[k], 9); if (c[2]) c[2](x + 2); text(c[0], x + 3 + c[3], IY + 37, c[1], 1, null); x += ws[k] + gap; });
     }
-    keycaps(DD.padUsed ? [['CROSS', 'PLAY'], ['DOWN', 'WARDROBE'], ['SQUARE', 'STORE'], ['CIRCLE', 'BACK']] : [['JUMP', 'PLAY'], ['DOWN', 'WARDROBE'], ['H', 'STORE'], ['X', 'BACK']]);
+    keycaps(DD.padUsed ? [[pk('cross', 'CROSS'), 'PLAY'], ['DOWN', 'WARDROBE'], [pk('square', 'SQUARE'), 'STORE'], [pk('circle', 'CIRCLE'), 'BACK']] : [['JUMP', 'PLAY'], ['DOWN', 'WARDROBE'], ['H', 'STORE'], ['X', 'BACK']]);
   }
 
   function button(x, y, w, label, lit, icon, iw) {   // a brass plaque: black edge with clipped corners, a gold rim, a maroon face lit from above; brighter under the pointer. iw: the icon's width, centred with the label
@@ -683,7 +702,7 @@
   }
   function keycaps(keys, labCol) {   // the controls along the foot: [key, what it does] as little cream keycaps
     for (let y = VH - 16; y < VH; y++) rect('rgba(4,1,6,' + (0.5 * (y - VH + 16) / 16).toFixed(3) + ')', 0, y, VW, 1);
-    keys = keys.map(([k, l]) => [k === 'JUMP' ? DD.jumpKey() : k, l]);   // the jump key by its real name on this device
+    keys = keys.map(([k, l]) => [k === 'JUMP' ? DD.jumpKey() : DD.padUsed || !DD.keyName ? k : DD.keyName(k), l]);   // each key by its real name on this device (on touch: JUMP, SWITCH, or a tap)
     const ws = keys.map(([k, l]) => tw(k, 1) + 6 + 3 + tw(l, 1)), gap = 12, y = VH - 9; let x = Math.round(VW / 2 - (ws.reduce((a, b) => a + b, 0) + gap * (keys.length - 1)) / 2);
     keys.forEach(([k, l], i) => { const kw = tw(k, 1) + 6; rect('#000', x, y - 1, kw, 9); rect('#000', x - 1, y, kw + 2, 7); rect('#8a7a68', x, y, kw, 7); rect('#e8dcc0', x, y, kw, 6); text(k, x + 3, y + 1, '#2a0e1a', 1, null); text(l, x + kw + 3, y + 1, labCol || '#d8c8d0', 1, '#000'); x += ws[i] + gap; });
   }
@@ -713,7 +732,7 @@
     });
     if (O[ocur][1]) ctext(O[ocur][1], 157, '#9ac8a0', 1);
     drawNote();
-    keycaps(DD.padUsed ? [['CROSS', 'CHOOSE'], ['CIRCLE', 'BACK']] : [['JUMP', 'CHOOSE'], ['X', 'BACK']]);
+    keycaps(DD.padUsed ? [[pk('cross', 'CROSS'), 'CHOOSE'], [pk('circle', 'CIRCLE'), 'BACK']] : [['JUMP', 'CHOOSE'], ['X', 'BACK']]);
   }
   function drawJukebox() {
     curtainBg(t, 'JUKEBOX');
@@ -722,17 +741,39 @@
     if (jcur === 0) hilite(100, 19, 120, 10);
     ctext('SHUFFLE: ' + (sh ? 'ON' : 'OFF'), 21, jcur === 0 ? '#fffbd0' : '#c8a8a0', 1);
     list.forEach((n, k) => {
-      const p = jPos(k), on = jcur === k + 1, yes = !m || m.isOn(n);
+      const p = jPos(k), on = jcur === k + 1, op = trackOpen(n), yes = op && (!m || m.isOn(n));
       if (on) hilite(p.x - 2, p.y - 2, 148, 9);
       text(yes ? '[X]' : '[ ]', p.x + 2, p.y, yes ? '#9ac8a0' : '#6a5a60', 1, null);
-      text(songTitle(n), p.x + 18, p.y, on ? '#fffbd0' : yes ? '#c8a8a0' : '#6a5a60', 1, null);
-      if (on && Math.floor(t / 15) % 2) rect('#ffd27a', p.x + 140, p.y + 1, 3, 3);   // playing
+      text(op ? songTitle(n) : '???', p.x + 18, p.y, !op ? '#6a5a60' : on ? '#fffbd0' : yes ? '#c8a8a0' : '#6a5a60', 1, null);
+      if (on && op && Math.floor(t / 15) % 2) rect('#ffd27a', p.x + 140, p.y + 1, 3, 3);   // playing
     });
     drawNote();
-    ctext(jcur === 0 ? 'SONGS COME UP ' + (sh ? 'IN ANY ORDER' : 'IN ORDER') : 'PLAYING NOW. ' + (DD.padUsed ? 'CROSS' : 'JUMP') + ': IN OR OUT OF THE ROTATION', 158, '#9ac8a0', 1);
-    keycaps(DD.padUsed ? [['CROSS', 'CHOOSE'], ['CIRCLE', 'BACK']] : [['JUMP', 'CHOOSE'], ['X', 'BACK']]);
+    ctext(jcur === 0 ? 'SONGS COME UP ' + (sh ? 'IN ANY ORDER' : 'IN ORDER') : (list[jcur - 1] && !trackOpen(list[jcur - 1]) ? 'A SONG FROM A WORLD YOU HAVEN\'T REACHED' : 'PLAYING NOW. ' + JK() + ': IN OR OUT OF THE ROTATION'), 158, '#9ac8a0', 1);
+    keycaps(DD.padUsed ? [[pk('cross', 'CROSS'), 'CHOOSE'], [pk('circle', 'CIRCLE'), 'BACK']] : [['JUMP', 'CHOOSE'], ['X', 'BACK']]);
   }
 
+  // ---------------------------------------------------------------- the ending: after the 12-boss results card, the whole run in five numbers
+  function endTotals() {
+    const ids = [].concat(...WORLDS.map(idsOf)), C = window.DDCasino, sec = WORLDS.reduce((a, w) => a + worldSec(w), 0), secMax = WORLDS.reduce((a, w) => a + worldSecMax(w), 0);
+    return [['STAGES CLEARED', ids.filter(beaten).length, ids.length], ['VHS TAPES', WORLDS.reduce((a, w) => a + worldTapes(w), 0), ids.length], ['DOT SECRETS', sec, secMax],
+      ['GOLD CHIPS', C && C.hasChip ? WORLDS.filter(w => C.hasChip(w.n + '-1')).length : 0, WORLDS.length], ['GOLD STARS', WORLDS.filter(w => worldMarks(w) === w.levels.length * 3).length, WORLDS.length]];
+  }
+  function drawEnd() {
+    const tt = t, rows = endTotals(), X = 44, W = VW - 88, Y = 16, H = 130;
+    curtainBg(tt, null);
+    goldPanel(X, Y, W, H, tt, '#ffd27a');
+    logoWord('THE END', VW / 2, Y + 12, 3, tt % 200 < 50 ? 84 + (tt % 200) * 3 : null);
+    ctext('YOUR TOTALS', Y + 38, '#9ac8a0', 1);
+    rect('rgba(255,210,122,0.22)', X + 20, Y + 47, W - 40, 1);
+    rows.forEach(([lab, n, max], i) => {
+      const y = Y + 55 + i * 15, on = tt > 20 + i * 12, full = max > 0 && n >= max;
+      if (!on) return;
+      text(lab, X + 22, y, '#c8a8a0', 1, null); text(n + '/' + max, X + W - 22, y, full ? '#ffe680' : '#fff6d4', 1, null, 'right');
+      if (full) text('*', X + W - 22 - tw(n + '/' + max, 1) - 6, y, '#ffe680', 1, null);   // a full count gets a star
+      rect('rgba(255,210,122,0.12)', X + 20, y + 8, W - 40, 1);
+    });
+    keycaps(DD.padUsed ? [[pk('cross', 'CROSS'), 'CONTINUE']] : [['JUMP', 'CONTINUE']]);
+  }
   function drawShelf() {   // Gregg's shelf: red-tape spines for the tapes you've found, dark gaps for the rest
     const ids = shelfIds(), tt = t;
     rect('#120610', 0, 0, VW, VH);
@@ -768,7 +809,10 @@
       ctext('STILL OUT THERE', Y, '#9a8a90', 1);
       ctext(boss ? 'BEAT THE BOSS OF WORLD ' + parseInt(id, 10) + ' FOR THIS ONE' : 'HIDDEN SOMEWHERE IN LEVEL ' + id.toUpperCase(), Y + 8, '#cfc6bc', 1, null);
     }
-    { const w = WORLDS[parseInt(id, 10) - 1], k = worldTapes(w), n = w.levels.length; if (k === n && Math.floor(tt / 20) % 2) text('W' + w.n + ' JUMP: SCREEN', 50, 6, '#ffe680', 1, null, 'center'); else text('W' + w.n + ' ' + k + '/' + n + ' TAPES', 50, 6, k === n ? '#ffe680' : '#c8b8c0', 1, null, 'center'); }
+    { const w = WORLDS[parseInt(id, 10) - 1], k = worldTapes(w), n = w.levels.length, open = screenOk(w) && !!window.makeBonus, ph = Math.floor(tt / 30) % 3;   // an open screening cycles: the prompt, the tapes, this world's best bags (tubs)
+      if (open && ph === 0) text('W' + w.n + ' ' + JK() + ': SCREEN', 50, 6, '#ffe680', 1, null, 'center');
+      else if (open && ph === 2) { const b = Math.min(5, (PROG[w.n + '-bonus'] || {}).bags | 0), gx = 50 - Math.floor((tw('BEST', 1) + 4 + 5 * 7) / 2); text('BEST', gx, 6, '#ffe680', 1, null); for (let q = 0; q < 5; q++) tubIcon(gx + tw('BEST', 1) + 4 + q * 7, 4, q < b ? '#ffd24a' : '#3a2a30'); }
+      else text('W' + w.n + ' ' + k + '/' + n + ' TAPES', 50, 6, k === n ? '#ffe680' : '#c8b8c0', 1, null, 'center'); }
     if (p.fact) ctext('BLUE CARD: ' + c.fact + (c.wrong ? ' (WRONG)' : ''), Y + 33, '#7ab0ff', 1, null);
     else ctext('BLUE CARD: NOT FOUND YET', Y + 33, '#4a5a8a', 1, null);
   }
@@ -833,7 +877,7 @@
     const dk = n => Math.max(1, Math.min(w.dots.length > 2 ? 2 : 3, Math.floor(52 / ((DD.IMG[n] && DD.IMG[n].height) || 20))));
     const sp = w.dots.length > 2 ? [112, 144, 176, 208] : [136, 184];
     w.dots.forEach((n, i) => { const k = Math.min(dk(n), 2); spr(n, sp[i], VH - 18 + Math.round(Math.abs(Math.sin(tt / 12 + i * 1.7)) * -5), i % 2 === 1, k, k); });
-    if (u > 20 && blink(u, 28)) text('PRESS JUMP', VW / 2, VH - 11, w.fg, 1, sh, 'center');
+    if (u > 20 && blink(u, 28)) text('PRESS ' + JK(), VW / 2, VH - 11, w.fg, 1, sh, 'center');
     // projector flicker, grain, a scratch, and the cut from the leader
     if (u < 30 && hash(tt) > 0.7) rect('rgba(255,255,255,0.08)', 0, 18, VW, 144);
     for (let i = 0; i < 5; i++) rect('rgba(255,255,255,0.18)', Math.floor(hash(tt * 3 + i) * VW), 18 + Math.floor(hash(tt + i * 9) * 140), 1, 1);
@@ -935,7 +979,7 @@
     }
     if (!cm) w.dots.forEach((n, i) => { const sp = w.dots.length > 2 ? [30, 60, 90, 120][i] : [50, 110][i], ph = Math.sin(tt / 11 + i * 1.9), hy = Math.abs(ph) * 6; drawDot(n, hy > 4.5 ? (Math.cos(tt / 11 + i * 1.9) * ph > 0 ? 'jump' : 'fall') : hy < 0.8 ? 'land' : 'apex', sp, 158 - Math.round(hy), i % 2 === 1, 1, 1); });
     if (noteT > 0) ctext(note, 142, '#ff8080', 1);
-    keycaps(DD.padUsed ? [['CROSS', 'PLAY'], ['SQUARE', 'HEI STORE'], ['CIRCLE', 'BACK']] : [['JUMP', 'PLAY'], ['H', 'HEI STORE'], ['X', 'BACK']]);
+    keycaps(DD.padUsed ? [[pk('cross', 'CROSS'), 'PLAY'], [pk('square', 'SQUARE'), 'HEI STORE'], [pk('circle', 'CIRCLE'), 'BACK']] : [['JUMP', 'PLAY'], ['H', 'HEI STORE'], ['X', 'BACK']]);
   }
 
   // screen changes: the last frame of the old screen is pulled up out of the gate like film, the new one comes in under it
@@ -948,8 +992,12 @@
     }
     lastSt = st;
     if (pvTr && st !== 'levels') pvStop();   // the poster's footage only runs on the stage list   // never leave a trailer running under another screen
-    if (st === 'load') { bg('#2a0e1a', '#0e070c'); ctext('LOADING', VH / 2 - 3, '#fff', 1); return; }
-    if (st === 'rewind') drawRewind(); else if (st === 'fork') drawFork(); else if (st === 'title') drawTitle(); else if (st === 'select') drawSelect(); else if (st === 'era') drawEra(); else if (st === 'shelf') drawShelf(); else if (st === 'options') drawOptions(); else if (st === 'jukebox') drawJukebox(); else if (st === 'store') { if (window.DDStore) window.DDStore.draw(); } else if (st === 'wardrobe') drawWardrobe(); else drawLevels();
+    if (st === 'load') {   // the level probe's progress: levels in / levels asked for, with a bar
+      bg('#2a0e1a', '#0e070c'); ctext('LOADING', VH / 2 - 8, '#fff', 1);
+      if (probeN) { const bw = 100, k = Math.min(1, probed / probeN); ctext('LEVELS ' + probed + '/' + probeN, VH / 2 + 3, '#cfc6bc', 1); rect('#000', VW / 2 - bw / 2 - 1, VH / 2 + 12, bw + 2, 5); rect('#3a2a30', VW / 2 - bw / 2, VH / 2 + 13, bw, 3); rect('#ffd27a', VW / 2 - bw / 2, VH / 2 + 13, Math.round(bw * k), 3); }
+      return;
+    }
+    if (st === 'rewind') drawRewind(); else if (st === 'fork') drawFork(); else if (st === 'end') drawEnd(); else if (st === 'title') drawTitle(); else if (st === 'select') drawSelect(); else if (st === 'era') drawEra(); else if (st === 'shelf') drawShelf(); else if (st === 'options') drawOptions(); else if (st === 'jukebox') drawJukebox(); else if (st === 'store') { if (window.DDStore) window.DDStore.draw(); } else if (st === 'wardrobe') drawWardrobe(); else drawLevels();
     if (wipe && wipeT < WIPE) {
       const k = wipeT / WIPE, e = k * k * (3 - 2 * k), y = -Math.round(e * (VH + 8));
       ctx.drawImage(wipe, 0, y);
@@ -960,7 +1008,7 @@
 
   // ---- boot: probe every level id in the manifest (plus a deep-linked one), then show the title or jump straight in
   const want = [].concat(...WORLDS.map(idsOf));
-  const link = Q.get('level');
+  const link0 = Q.get('level'), link = link0 && /^\d+-(\d+|boss)$/.test(link0) ? link0 : null;   // a stage id only: the id becomes a script path, so nothing else gets fetched
   if (link && want.indexOf(link) < 0) want.push(link);
   DD.setScene(scene);
   probe(want, () => {
@@ -969,9 +1017,9 @@
     const era = +Q.get('era'), wd = +Q.get('world');
     const bn = +Q.get('bonus'); if (bn && window.makeBonus) { const B = window.makeBonus(bn, LEVELS); if (B) return DD.start(B, { perks: perks(), onSave: record, onExit: r => { record(r); st = 'shelf'; t = 0; DD.setScene(scene); } }); }   // ?bonus=N: straight into world N's screening (testing)
     if (link && have(link)) return playLevel(link, true);   // a direct link plays with the whole cast
-    if (link) msg = 'NO SUCH LEVEL: ' + link.toUpperCase();
-    if (era >= 1 && era <= WORLDS.length) { cur = era - 1; return enterWorld(cur); }
-    if (wd >= 1 && wd <= WORLDS.length) { cur = wd - 1; world = WORLDS[cur]; st = 'levels'; lcur = 0; t = 0; prepSongs(world); return; }
+    if (link0) msg = 'NO SUCH LEVEL: ' + link0.slice(0, 16).toUpperCase().replace(/[^A-Z0-9 :_-]/g, '?');   // a bad or missing id: say so, on the title
+    if (era >= 1 && era <= WORLDS.length) { cur = era - 1; enterWorld(cur); if (st === 'load') { st = 'select'; t = 0; } return; }   // a locked world buzzes ("BEAT x FIRST") and lands on the select, not on LOADING
+    if (wd >= 1 && wd <= WORLDS.length) { cur = wd - 1; world = WORLDS[cur]; if (worldOpen(world) && !worldUnlocked(world)) { world = null; st = 'select'; t = 0; SFX.buzz(); note = 'BEAT ' + WORLDS[cur - 1].boss + ' FIRST'; noteT = 60; return; } st = 'levels'; lcur = 0; t = 0; prepSongs(world); return; }
     if (Q.has('select')) { st = 'select'; t = 0; return; }
     if (Q.has('shelf')) { st = 'shelf'; t = 0; return; }
     if (Q.has('options')) { st = Q.get('options') === 'jukebox' ? 'jukebox' : 'options'; t = 0; return; }
@@ -979,6 +1027,6 @@
   });
   window.__menu = { have, LEVELS, MISSING, get PROG() { return PROG; }, get st() { return st; }, get t() { return t; }, rewind: () => { cur = 1; world = WORLDS[1]; eraPlay = !!have(idsOf(world)[0]); eraAll = false; startRewind(); },   // debug and tests: play the rewind into World 2
      get reel() { return window.RewindReel || null; }, ff: n => { for (let i = 0; i < n; i++) step({ nx: 0, ny: 0 }); draw(); },   // ff: run the menu n frames and draw (screenshots)
-     get lcur() { return lcur; }, cast, worldUnlocked, stageUnlocked,
+     get lcur() { return lcur; }, get loaded() { return [probed, probeN]; }, cast, worldUnlocked, stageUnlocked,
      pauseOptions: { open(done) { inGame = { st, t, done }; click = null; openOptions(); }, step, draw } };   // the engine's pause menu runs the options and jukebox screens over a paused level
 })();

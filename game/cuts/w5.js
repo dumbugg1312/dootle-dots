@@ -26,7 +26,7 @@
           },
         },
         { fade: 0, t: 40 },
-        { third: 'SIX BAG CINEMAS', sub: 'SEASON 9. MARCH 2017. A MOVIE THEATER WITH FINE DINING', t: 160, and: true },   // lore: Season 9, Mar-May 2017; "cinema with fine dining"
+        { third: 'SIX BAG CINEMA', sub: 'SEASON 9. MARCH 2017. A MOVIE THEATER WITH FINE DINING', t: 160, and: true },   // lore: Season 9, Mar-May 2017; "cinema with fine dining"
         { move: 'mark', x: 176, t: 110, ease: 'out' },
         { move: 'mark', y: FY, t: 14, hop: 3, face: false },        // he offers the drink to Gregg's hand
         { wait: 16 },
