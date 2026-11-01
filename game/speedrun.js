@@ -5,11 +5,13 @@
 // Fair play: no HEI store upgrades, all four Dots from the start, and each stage's enemy luck comes from a seed (the same every run).
 // The clock counts simulated frames (the engine steps at a fixed 60 a second), so it reads the same on any monitor; pause doesn't count.
 // A run never touches the save: no HEI Points, tapes, secrets or chips are kept. Bests live in localStorage under dootledots.speedrun.
+// The end screen's RUN CARD is a postable picture of the run (world splits, date, a RUN CODE from runcode.js, how to play and speedrun it),
+// saved as a 1280x720 PNG, or handed to the share sheet on a phone.
 (function () {
   const VW = DD.VW, VH = DD.VH, text = DD.text, ctx = DD.ctx, SFX = DD.SFX;
   const KEY = 'dootledots.speedrun', CATS = [['any', 'ANY%', 'REACH EVERY GOAL. GRAB WHAT YOU WANT'], ['full', '100%', 'EVERY KERNEL, TAPE, BLUE CARD, DOT SECRET AND GOLD CHIP']];
   const rect = (c, x, y, w, h) => { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); };
-  let M = null, scene = null, st = 'pick', t = 0, cur = 0, R = null, end = null;
+  let M = null, scene = null, st = 'pick', t = 0, cur = 0, R = null, end = null, esel = 0, snap = false, saved = 0;
   let BEST = {}; try { BEST = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { BEST = {}; }
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(BEST)); } catch (e) {} };
 
@@ -60,7 +62,9 @@
     const b = BEST[R.cat] = BEST[R.cat] || {}, tot = R.segs.reduce((a, x) => a + x, 0), n = R.segs.length;
     const golds = R.segs.map((s, i) => !(b.best && b.best[i] > 0) || s < b.best[i]);
     const prev = b.pb || 0, pb = !prev || tot < prev, cum = []; R.segs.reduce((a, x, i) => (cum[i] = a + x), 0);
-    end = { cat: R.cat, tot, segs: R.segs.slice(), list: R.list.slice(), golds, pb, prev, oldSplits: (b.splits || []).slice() };
+    const now = new Date(), p2 = n => (n < 10 ? '0' : '') + n, date = now.getFullYear() + '-' + p2(now.getMonth() + 1) + '-' + p2(now.getDate());   // the player's own date
+    end = { cat: R.cat, tot, segs: R.segs.slice(), list: R.list.slice(), golds, pb, prev, oldSplits: (b.splits || []).slice(), date };
+    esel = 0;
     b.best = Array.from({ length: n }, (_, i) => golds[i] ? R.segs[i] : b.best[i]);
     if (pb) { b.pb = tot; b.splits = cum; b.date = new Date().toISOString().slice(0, 10); }
     b.runs = (b.runs || 0) + 1;
@@ -119,7 +123,47 @@
       text(id.toUpperCase(), x + 4, y, '#c8b8a0', 1, null);
       text(fmt(e.segs[i]), x + cw - 6, y, e.golds[i] ? '#ffd24a' : '#fff6d4', 1, null, 'right');
     });
-    keys((DD.touchOn ? 'TAP: RUN IT AGAIN    ' + back() + ': BACK' : jump() + ': RUN IT AGAIN    ' + back() + ': BACK') + '    GOLD = YOUR BEST EVER ON THAT STAGE');
+    END_BTNS.forEach(([s, x, w], i) => { plaque(x, 149, w, 12, i === esel); text(s, x + w / 2, 152, i === esel ? '#fff' : '#fff6c0', 1, '#2a0a16', 'center'); });
+    text((DD.touchOn ? 'TAP ONE' : 'LEFT / RIGHT: PICK    ' + jump() + ': GO') + '    ' + back() + ': BACK    GOLD = YOUR BEST EVER ON THAT STAGE', VW / 2, 164, '#cfc6bc', 1, '#000', 'center');
+  }
+  const END_BTNS = [['RUN IT AGAIN', 70, 84], ['RUN CARD', 166, 84]];
+  const endBtn = c => END_BTNS.findIndex(([, x, w]) => c.x >= x && c.x < x + w && c.y >= 145 && c.y < 165);
+
+  // ---- the RUN CARD: one screen that is also the picture. Drawn plain into the canvas, copied out, then the key hints go over it.
+  const SITE = 'DOOTLEDOTS.ITCH.IO';   // the itch page frames the GitHub Pages build; check.html is linked from its description
+  function drawCard() {
+    const e = end, name = CATS.find(c => c[0] === e.cat)[1];
+    backdrop('DOOTLE DOTS SPEEDRUN');
+    const big = name + ' ' + fmt(e.tot), bw = big.length * 12 + 36;
+    plaque(Math.round(VW / 2 - bw / 2), 29, bw, 21, true);
+    text(big, VW / 2, 32, '#fff6d4', 3, '#2a0a16', 'center');
+    text(e.date + '    ' + (e.pb ? (e.prev ? 'NEW PERSONAL BEST' : 'FIRST RUN') : 'PERSONAL BEST ' + fmt(e.prev)), VW / 2, 54, e.pb ? '#7fe08a' : '#c8b8a0', 1, '#000', 'center');
+    const cw = (VW - 24) / 3;   // the twelve worlds' splits, three columns
+    M.WORLDS.forEach((w, i) => {
+      const f = e.list.reduce((a, id, k) => id.split('-')[0] === String(w.n) ? a + e.segs[k] : a, 0), x = 12 + (i % 3) * cw, y = 65 + Math.floor(i / 3) * 11;
+      rect('#1c1014', x + 2, y - 2, cw - 4, 9);
+      text(w.n + ' ' + w.short, x + 5, y, '#c8b8a0', 1, null);
+      text(fmt(f), x + cw - 6, y, '#fff6d4', 1, null, 'right');
+    });
+    rect('#2a1408', 12, 111, VW - 24, 1);
+    text('RUN CODE', VW / 2, 116, '#a89888', 1, null, 'center');
+    text(window.DDRunCode ? DDRunCode.make(e.cat, e.tot, e.date) : '----', VW / 2, 124, '#ffd24a', 2, '#2a0a16', 'center');
+    text('PLAY FREE: ' + SITE, VW / 2, 140, '#e8d8c0', 1, '#000', 'center');
+    text('SPEEDRUN NOW: OPTIONS > UNLOCK ALL LEVELS ON, THEN SPEEDRUN ON THE TITLE', VW / 2, 149, '#cfc6bc', 1, '#000', 'center');
+    text('CHECK A RUN CODE: LINK ON ' + SITE, VW / 2, 158, '#a89888', 1, '#000', 'center');
+  }
+  function saveCard() {   // the canvas as it stands (the card, no hints) at 4x, pixels kept square
+    try {
+      const src = ctx.canvas, out = document.createElement('canvas'); out.width = VW * 4; out.height = VH * 4;
+      const o = out.getContext('2d'); o.imageSmoothingEnabled = false; o.drawImage(src, 0, 0, out.width, out.height);
+      const url = out.toDataURL('image/png'), bin = atob(url.split(',')[1]), bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const fname = 'dootle-dots-' + (end.cat === 'full' ? '100' : 'any') + '-' + fmt(end.tot).replace(/[:.]/g, '-') + '.png';
+      const file = typeof File === 'function' ? new File([bytes], fname, { type: 'image/png' }) : null;
+      if (DD.touchOn && file && navigator.canShare && navigator.canShare({ files: [file] })) { navigator.share({ files: [file] }).catch(() => {}); saved = 120; return; }
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([bytes], { type: 'image/png' })); a.download = fname;
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); saved = 120;
+    } catch (err) { saved = -120; }
   }
   function step(IN) {
     t++;
@@ -133,15 +177,34 @@
     }
     if (st === 'end') {
       if (t < 30) return;
-      if (IN.ok || IN.start || c) return startRun(end.cat);
+      if (IN.nx) { esel = (esel + END_BTNS.length + IN.nx) % END_BTNS.length; SFX.tick(); }
+      let go = IN.ok || IN.start ? esel : -1;
+      if (c) { const k = endBtn(c); if (k >= 0) { if (DD.touchOn || k === esel) go = k; else { esel = k; SFX.tick(); } } }
+      if (go === 0) return startRun(end.cat);
+      if (go === 1) { st = 'card'; t = 0; saved = 0; SFX.switch(); }
       if (IN.back) { st = 'pick'; t = 0; SFX.switch(); }
+      return;
+    }
+    if (st === 'card') {
+      if (saved > 0) saved--; else if (saved < 0) saved++;
+      if (t > 10 && (IN.ok || IN.start || c)) { snap = true; SFX.goal(); }
+      if (IN.back) { st = 'end'; t = 30; SFX.switch(); }
     }
   }
-  function draw() { if (st === 'end' && end) drawEnd(); else drawPick(); }
+  function draw() {
+    if (st === 'card' && end) {
+      drawCard();
+      if (snap) { snap = false; saveCard(); }
+      rect('rgba(10,4,8,0.9)', 0, 170, VW, 10);
+      const msg = saved > 0 ? (DD.touchOn ? 'SENT TO THE SHARE SHEET' : 'SAVED. CHECK YOUR DOWNLOADS') : saved < 0 ? 'COULD NOT SAVE. TAKE A SCREENSHOT' : (DD.touchOn ? 'TAP: SAVE THIS CARD' : jump() + ': SAVE THIS CARD') + '    ' + back() + ': BACK';
+      text(msg, VW / 2, 173, saved > 0 ? '#7fe08a' : saved < 0 ? '#ff8a7a' : '#cfc6bc', 1, null, 'center');
+    } else if (st === 'end' && end) drawEnd(); else drawPick();
+  }
   scene = { step, draw };
 
   window.DDRun = {
     open(m) { M = m; st = 'pick'; t = 0; SFX.switch(); DD.setScene(scene); },   // m: { LEVELS, WORLDS, prepSongs, back }
     get best() { return BEST; }, fmt,
+    _end(e) { M = M || e.M; end = e; st = 'end'; t = 30; esel = 0; DD.setScene(scene); },   // tests / screenshots: show an end screen for a made-up run
   };
 })();
