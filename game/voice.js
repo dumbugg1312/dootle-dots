@@ -176,6 +176,7 @@
     menuAt[key] = now(); curKey = key; return play(c);
   }
   function hush() { if (cur) { cur.pause(); cur = null; } }   // a skipped cutscene stops its line
+  function forget() { PLAYS = {}; RECENT = []; clearTimeout(saveT); try { localStorage.removeItem('dd-voice-plays'); localStorage.removeItem('dd-voice-recent'); } catch (e) {} }   // CLEAR DATA: every line counts as unheard again
   const line = id => BY[id] ? BY[id].line : null;   // a clip's words, for its caption
-  window.DDVoice = { say, menu, preview, clip, hush, line, get on() { return on; }, set on(v) { on = !!v; }, get run() { return run; } };
+  window.DDVoice = { say, menu, preview, clip, hush, forget, line, get on() { return on; }, set on(v) { on = !!v; }, get run() { return run; } };
 })();

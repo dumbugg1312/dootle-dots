@@ -4,7 +4,7 @@
 // keydown / keyup events for the same key codes a keyboard would (arrows, Z, X, P): the engine's own listener then does its edge
 // detection, jump buffering, coyote time and variable jumps exactly as for a real keyboard. Taps on the canvas itself still reach the
 // engine and the menus the way a mouse click does (portraits, pause menu, dialogue, the blue card, every menu screen).
-// Also here: the scale is allowed to be fractional (engine.js floors it), a rotate-me card covers the game in portrait, and the
+// Also here: the scale is fractional below 2x and whole above it (same as engine.js), a rotate-me card covers the game in portrait, and the
 // overlay hides itself when a real keyboard key is pressed (a tablet with a keyboard) until the next touch. What shows depends on
 // what is on screen (mode() below), so the buttons never sit over a menu, a line of dialogue, a card or a caption.
 (function () {
@@ -149,7 +149,7 @@
 
   // ---- scale: same fill as engine.js, refit on rotation and when the phone's toolbars slide in and out
   function fit() {
-    const k = Math.min(innerWidth / VW, innerHeight / VH);
+    let k = Math.min(innerWidth / VW, innerHeight / VH); if (k >= 2) k = Math.floor(k);   // whole-number scale once the screen allows 2x (tablets), fractional below, same rule as engine.js
     cv.style.width = VW * k + 'px'; cv.style.height = VH * k + 'px';
     cv.style.marginTop = Math.max(0, Math.floor((innerHeight - VH * k) / 2)) + 'px';
     const bar = (innerWidth - VW * k) / 2;   // the side bars beside a 16:9 game on a wider phone: menu pills sit out there when they fit

@@ -347,7 +347,7 @@
       inp.click();
     } catch (e) { say('COULD NOT OPEN A FILE'); SFX.buzz(); }
   }
-  function clearData() { saveKeys().forEach(k => { try { localStorage.removeItem(k); } catch (e) {} }); PROG = {}; afterLoad(); say('ALL DATA CLEARED'); SFX.buzz(); }
+  function clearData() { saveKeys().forEach(k => { try { localStorage.removeItem(k); } catch (e) {} }); if (window.DDVoice && DDVoice.forget) DDVoice.forget(); PROG = {}; afterLoad(); say('ALL DATA CLEARED'); SFX.buzz(); }
   function optDo(i) {
     const m = MUS();
     if (i !== CLR) clearArm = 0;

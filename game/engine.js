@@ -525,6 +525,7 @@ const SOLIDK = { crate: 1, stack: 1, gate: 1, kernel: 1, tub: 1 };
 const solidBody = b => b.on && (SOLIDK[b.kind] || (b.def && (typeof b.def.solid === 'function' ? b.def.solid(b) : b.def.solid)));
 function moveX(e, dx, useBodies = true) {
   if (!dx) return null;
+  if (dx > TS / 2 || dx < -TS / 2) return moveX(e, dx / 2, useBodies) || moveX(e, dx / 2, useBodies);   // a big shove (11-1's tantrum push) in one go would skip a whole tile column and land inside it
   e.x += dx;
   let hit = null;
   const y0 = Math.floor(e.y / TS), y1 = Math.floor((e.y + e.h - 0.01) / TS);
