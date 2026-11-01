@@ -148,7 +148,7 @@
     rect('#2a1408', 12, 111, VW - 24, 1);
     text('RUN CODE', VW / 2, 116, '#a89888', 1, null, 'center');
     text(window.DDRunCode ? DDRunCode.make(e.cat, e.tot, e.date) : '----', VW / 2, 124, '#ffd24a', 2, '#2a0a16', 'center');
-    text('PLAY FREE: ' + SITE, VW / 2, 140, '#e8d8c0', 1, '#000', 'center');
+    text('PLAY FREE: ' + SITE + '/DOOTLE-DOTS', VW / 2, 140, '#e8d8c0', 1, '#000', 'center');
     text('SPEEDRUN NOW: OPTIONS > UNLOCK ALL LEVELS ON, THEN SPEEDRUN ON THE TITLE', VW / 2, 149, '#cfc6bc', 1, '#000', 'center');
     text('CHECK A RUN CODE: LINK ON ' + SITE, VW / 2, 158, '#a89888', 1, '#000', 'center');
   }
